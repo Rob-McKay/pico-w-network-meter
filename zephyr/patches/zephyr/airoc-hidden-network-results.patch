@@ -1,0 +1,30 @@
+diff --git a/drivers/wifi/infineon/airoc_wifi.c b/drivers/wifi/infineon/airoc_wifi.c
+index 447ab9e90..bef69c8d7 100644
+--- a/drivers/wifi/infineon/airoc_wifi.c
++++ b/drivers/wifi/infineon/airoc_wifi.c
+@@ -335,16 +335,19 @@ static uint8_t convert_whd_band_to_zephyr(whd_802_11_band_t band)
+ 
+ static void parse_scan_result(whd_scan_result_t *p_whd_result, struct wifi_scan_result *p_zy_result)
+ {
++	/* A hidden network has no SSID, but its channel, signal and BSSID
++	 * are still valid: report them.
++	 */
+ 	if (p_whd_result->SSID.length != 0) {
+ 		p_zy_result->ssid_length = p_whd_result->SSID.length;
+ 		strncpy(p_zy_result->ssid, p_whd_result->SSID.value, p_whd_result->SSID.length);
+-		p_zy_result->channel = p_whd_result->channel;
+-		p_zy_result->band = convert_whd_band_to_zephyr(p_whd_result->band);
+-		p_zy_result->security = convert_whd_security_to_zephyr(p_whd_result->security);
+-		p_zy_result->rssi = (int8_t)p_whd_result->signal_strength;
+-		p_zy_result->mac_length = 6;
+-		memcpy(p_zy_result->mac, &p_whd_result->BSSID, 6);
+ 	}
++	p_zy_result->channel = p_whd_result->channel;
++	p_zy_result->band = convert_whd_band_to_zephyr(p_whd_result->band);
++	p_zy_result->security = convert_whd_security_to_zephyr(p_whd_result->security);
++	p_zy_result->rssi = (int8_t)p_whd_result->signal_strength;
++	p_zy_result->mac_length = 6;
++	memcpy(p_zy_result->mac, &p_whd_result->BSSID, 6);
+ }
+ 
+ static void scan_callback(whd_scan_result_t **result_ptr, void *user_data, whd_scan_status_t status)

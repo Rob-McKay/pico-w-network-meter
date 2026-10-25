@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * The meter's screens on the Display Pack (320x240, landscape):
@@ -10,7 +12,7 @@
  *   | -60   2 ##    1              |  | Neighbour       11  -71 ==   |
  *   | -80   ## ## ## ## 1 ...      |  | ...                          |
  *   |  1  2  3  4  5  ... 13       |  |                              |
- *   | Best: ch 6          scan 12  |  | A: channels         scan 12  |
+ *   | Use ch 6: clear     scan 12  |  | 14 heard, 2 other   scan 12  |
  *   +------------------------------+  +------------------------------+
  *
  * Channels: a bar per 2.4 GHz channel (1-13), as tall as its interference
@@ -19,6 +21,9 @@
  * the channel above it. The recommended channel's number is highlighted.
  *
  * Networks: the strongest networks with channel, RSSI and a signal bar.
+ *
+ * Every network carries a freshness (struct chan_ap): bars, counts and
+ * list rows are drawn darker as the network's data ages, down to black.
  */
 
 #ifndef METER_UI_H_
@@ -38,8 +43,15 @@ enum ui_view {
 /**
  * @brief Start the display and show a blank screen.
  *
+ * The UI is not thread-safe: call it, and the other ui_ functions, from
+ * one thread (main).
+ *
  * @retval 0 Ready.
+ * @retval -ENOENT No font of the size the UI uses.
  * @retval <0 Negative errno from gfx_init().
+ *
+ * @sideeffects Sets the colour table and the font, clears the panel and turns it on
+ *              (gfx_init()). errno unchanged.
  */
 int ui_init(void);
 
@@ -53,6 +65,8 @@ int ui_init(void);
  * @param s The scan's statistics.
  * @param scan_no Scans so far, shown in the footer.
  * @param full Redraw the whole screen.
+ *
+ * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
 void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, bool full);
 
@@ -60,6 +74,8 @@ void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no
  * @brief Show a status message in the footer until the next ui_show().
  *
  * @param text Message.
+ *
+ * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
 void ui_message(const char *text);
 

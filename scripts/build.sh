@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+#
 # Build the network meter firmware. Runs inside the Docker image.
 #
 #   scripts/build.sh [pico] [extra CMake args...]
@@ -14,6 +17,10 @@
 #
 # The firmware ends up in out/<variant>/network-meter.uf2: hold BOOTSEL
 # while plugging the Pico W in and copy it to the RPI-RP2 drive.
+#
+# The console (log output) is a USB serial port on the Pico's own USB
+# socket: /dev/cu.usbmodem<N> on a Mac, /dev/ttyACM<N> on Linux, at any
+# baud rate.
 set -euo pipefail
 
 target=${1:-pico}
@@ -33,7 +40,10 @@ if [[ ! $country =~ ^[A-Z_]+$ ]]; then
 fi
 
 build_dir="$here/build/$target"
+# The console goes to the Pico's USB port (app/usb-console.*) rather than
+# UART0.
 west build -p auto -b "$board" -d "$build_dir" "$here/app" -- \
+  -DEXTRA_CONF_FILE=usb-console.conf -DEXTRA_DTC_OVERLAY_FILE=usb-console.overlay \
   "-DCONFIG_WHD_WIFI_COUNTRY=\"WHD_COUNTRY_${country}\"" "$@"
 
 mkdir -p "$here/out/$target"

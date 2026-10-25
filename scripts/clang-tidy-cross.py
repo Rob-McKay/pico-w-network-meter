@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+
 """Run clang-tidy on a source file using the build's compile command.
 
 CMake's <LANG>_CLANG_TIDY hook (see cmake/strict.cmake) runs this before
@@ -37,6 +40,8 @@ BUILTIN_HEADERS = re.compile(r"/lib/clang/[^/]+/include$")
 # @param compiler_cmd The compiler and the options that select headers
 #        (--sysroot, --target=, --config=, -m...).
 # @return Directories, in search order.
+#
+# @sideeffects Runs the compiler as a subprocess (preprocessing an empty input).
 def compiler_system_includes(compiler_cmd):
     out = subprocess.run(compiler_cmd + ["-E", "-Wp,-v", "-x", "c", os.devnull],
                          capture_output=True, text=True).stderr
@@ -57,6 +62,9 @@ def compiler_system_includes(compiler_cmd):
 #
 # @param cmd The compile command: compiler first.
 # @return The command for clang-tidy, after its "--".
+#
+# @sideeffects For a cross compile, runs the compiler as a subprocess
+#              (compiler_system_includes()).
 def clang_command(cmd):
     compiler, args = cmd[0], cmd[1:]
     # Zephyr's ztest macros (zassert_true(cond), ...) are called without
@@ -75,6 +83,8 @@ def clang_command(cmd):
 ## @brief Entry point.
 #
 # @return clang-tidy's exit status.
+#
+# @sideeffects Runs clang-tidy, which prints its findings, and the compiler (clang_command()).
 def main():
     argv = sys.argv[1:]
     if "--" not in argv:

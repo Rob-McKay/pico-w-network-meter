@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Network meter: quick reference</title>
+<!-- Source of docs/quick-reference.pdf: open in a browser and print to A4 PDF. -->
+<style>
+  @page { size: A4; margin: 10mm 12mm; }
+  body { font: 9.5pt/1.35 "Helvetica Neue", Arial, sans-serif; color: #111; margin: 0; }
+  h1 { font-size: 18pt; margin: 0 0 2mm; }
+  .sub { color: #555; margin: 0 0 5mm; }
+  h2 { font-size: 11.5pt; margin: 3.5mm 0 1.5mm; border-bottom: 1px solid #ccc; padding-bottom: 1mm; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { text-align: left; padding: 0.8mm 2mm; vertical-align: top; border-bottom: 1px solid #eee; }
+  th { width: 22%; white-space: nowrap; }
+  .cols { display: flex; gap: 6mm; }
+  .cols > div { flex: 1; }
+  img { width: 100%; image-rendering: pixelated; border: 1px solid #999; }
+  .cap { font-size: 9pt; color: #555; margin: 1mm 0 0; }
+  .dot { display: inline-block; width: 3.2mm; height: 3.2mm; border-radius: 50%;
+         vertical-align: -0.4mm; margin-right: 1.5mm; border: 1px solid #0004; }
+  .key { display: inline-block; min-width: 5mm; text-align: center; font-weight: bold;
+         border: 1px solid #333; border-radius: 1mm; padding: 0 1mm; }
+  ul { margin: 0; padding-left: 5mm; }
+</style>
+</head>
+<body>
+<h1>Pico W network meter</h1>
+<p class="sub">Shows how crowded each 2.4 GHz Wi-Fi channel is, so you can pick the best channel for your router.</p>
+
+<div class="cols">
+  <div>
+    <h2>Buttons</h2>
+    <table>
+      <tr><th><span class="key">A</span></th><td>Next screen</td></tr>
+      <tr><th><span class="key">B</span></th><td>Previous screen</td></tr>
+      <tr><th><span class="key">X</span></th><td>Scan now</td></tr>
+      <tr><th><span class="key">Y</span></th><td>Not used</td></tr>
+    </table>
+  </div>
+  <div>
+    <h2>LED</h2>
+    <table>
+      <tr><th><span class="dot" style="background:#1e6bff"></span>Blue</th><td>Scanning</td></tr>
+      <tr><th><span class="dot" style="background:#00c850"></span>Green</th><td>Recommended channel is clear</td></tr>
+      <tr><th><span class="dot" style="background:#ffaa00"></span>Amber</th><td>Recommended channel is moderately busy</td></tr>
+      <tr><th><span class="dot" style="background:#e62828"></span>Red</th><td>Even the best channel is busy</td></tr>
+      <tr><th><span class="dot" style="background:#d020d0"></span>Magenta</th><td>Last scan failed (retried in 2 s)</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="cols">
+  <div>
+    <h2>Channels screen</h2>
+    <img src="screens/channels.png" alt="Channels screen">
+    <ul>
+      <li><b>Bar height</b>: signal reaching the channel, including spill-over from neighbours up to 3 channels away.</li>
+      <li><b>Colour</b>: green clear, amber moderate, red busy.</li>
+      <li><b>Number above a bar</b>: networks on that channel.</li>
+      <li><b>Highlighted channel</b>: the one to use, the quietest of 1, 6 and 11. The footer names it: "Use ch 11: clear".</li>
+    </ul>
+  </div>
+  <div>
+    <h2>Networks screen</h2>
+    <img src="screens/networks.png" alt="Networks screen">
+    <ul>
+      <li>Strongest first: <b>name</b>, <b>channel</b>, <b>signal</b> in dBm (closer to 0 is stronger).</li>
+      <li><b>Bar</b>: green good (&ge; &minus;60), amber fair (&ge; &minus;75), red weak.</li>
+      <li>Names in <b>amber</b> are open networks (no password).</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Fading</h2>
+<p>A network stays at full brightness for <b>15 s</b> after it was last heard, then fades and is gone by <b>30 s</b>. Dim bars and rows are old data. A network that is heard again is bright again straight away.</p>
+
+<h2>Good to know</h2>
+<ul>
+  <li>Scans run every 10 s. Press <span class="key">X</span> after moving to a new spot.</li>
+  <li>Measure where you use Wi-Fi, not next to the router.</li>
+  <li>2.4 GHz only: the Pico W cannot hear 5 GHz networks.</li>
+  <li>Keep it away from USB 3 hubs: their noise drowns out all but the strongest networks. Use a long cable or a USB charger.</li>
+  <li>Serial log: over the Pico's USB socket, <code>/dev/cu.usbmodem&hellip;</code> on a Mac (<code>screen /dev/cu.usbmodem&lt;N&gt; 115200</code>).</li>
+</ul>
+</body>
+</html>

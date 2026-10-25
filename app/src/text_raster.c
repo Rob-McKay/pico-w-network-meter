@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,6 +11,9 @@
 #include "rgb565.h"
 #include "text_raster.h"
 
+/*
+ * Public interface: documented in text_raster.h.
+ */
 uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
 	return rgb565x(r, g, b);
@@ -23,6 +28,8 @@ uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b)
  * @param x Column in the glyph.
  * @param y Row in the glyph.
  * @return True if the pixel is ink.
+ *
+ * @sideeffects None; errno unchanged.
  */
 static bool glyph_pixel(const struct cfb_font *font, const uint8_t *glyph, unsigned int x,
 			unsigned int y)
@@ -42,6 +49,8 @@ static bool glyph_pixel(const struct cfb_font *font, const uint8_t *glyph, unsig
  * @param c Character; one the font lacks shows as '?' (or, in a font
  *        without '?', as its first character).
  * @return The glyph's bytes.
+ *
+ * @sideeffects None; errno unchanged.
  */
 static const uint8_t *glyph_of(const struct cfb_font *font, unsigned char c)
 {
@@ -63,6 +72,8 @@ static const uint8_t *glyph_of(const struct cfb_font *font, unsigned char c)
  * @param width Band width.
  * @param x0 Left edge of the glyph in the band.
  * @param fg Text colour.
+ *
+ * @sideeffects None (writes only through @p band); errno unchanged.
  */
 static void draw_glyph(const struct cfb_font *font, unsigned char c, uint16_t *band, size_t width,
 		       size_t x0, uint16_t fg)
@@ -78,6 +89,9 @@ static void draw_glyph(const struct cfb_font *font, unsigned char c, uint16_t *b
 	}
 }
 
+/*
+ * Public interface: documented in text_raster.h.
+ */
 void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
 		 uint16_t fg, uint16_t bg)
 {

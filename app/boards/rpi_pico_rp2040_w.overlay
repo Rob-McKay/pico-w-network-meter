@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Pimoroni Pico Display Pack 2.0 on a Raspberry Pi Pico W: a 2.0" 320x240
@@ -12,7 +14,10 @@
  *   LCD DC              16
  *   Backlight           20
  *   Button A, B, X, Y   12, 13, 14, 15  (to ground when pressed)
- *   LED red, green, blue 6, 7, 8       (active low)
+ *   LED red, green, blue 6, 7, 8       (active low; PWM 3A, 3B, 4A)
+ *
+ * The RGB LED is very bright at full power, so it is driven by PWM and
+ * dimmed (CONFIG_METER_LED_BRIGHTNESS).
  *
  * The panel's reset is wired to the Pico's RUN pin, so it has no reset GPIO
  * here: the driver resets it with a software reset command. None of these
@@ -27,6 +32,7 @@
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
 
 / {
 	chosen {
@@ -100,23 +106,28 @@
 		};
 	};
 
-	pack_leds: leds {
-		compatible = "gpio-leds";
+	/* PWM channel numbers are slice * 2, plus 1 for a slice's B output. */
+	pack_rgb_led: rgb_led {
+		compatible = "pwm-leds";
 
 		pack_led_red: led_red {
-			gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+			pwms = <&pwm 6 PWM_HZ(1000) PWM_POLARITY_INVERTED>;
 			label = "RGB LED red";
 		};
 
 		pack_led_green: led_green {
-			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+			pwms = <&pwm 7 PWM_HZ(1000) PWM_POLARITY_INVERTED>;
 			label = "RGB LED green";
 		};
 
 		pack_led_blue: led_blue {
-			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+			pwms = <&pwm 8 PWM_HZ(1000) PWM_POLARITY_INVERTED>;
 			label = "RGB LED blue";
 		};
+	};
+
+	pack_leds: leds {
+		compatible = "gpio-leds";
 
 		pack_backlight: backlight {
 			gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
@@ -135,6 +146,21 @@
 			pinmux = <SPI0_SCK_P18>, <SPI0_TX_P19>;
 		};
 	};
+
+	/* The RGB LED's pins, in place of the board's default PWM pin
+	 * (GPIO 25, the Wi-Fi chip's chip select on a Pico W).
+	 */
+	pwm_display_pack_led: pwm_display_pack_led {
+		group1 {
+			pinmux = <PWM_3A_P6>, <PWM_3B_P7>, <PWM_4A_P8>;
+		};
+	};
+};
+
+&pwm {
+	pinctrl-0 = <&pwm_display_pack_led>;
+	pinctrl-names = "default";
+	status = "okay";
 };
 
 &spi0 {

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Rob McKay
 # SPDX-License-Identifier: Apache-2.0
 
 menu "Network meter"
@@ -17,6 +18,63 @@ config METER_SCAN_TIMEOUT_S
 	help
 	  A scan of every 2.4 GHz channel takes a few seconds. One that has not
 	  finished by then is shown with what it heard so far.
+
+config METER_SCAN_PASSIVE
+	bool "Passive scans"
+	default y
+	help
+	  Listen on each channel for beacons instead of sending probe
+	  requests. A passive scan stays long enough on each channel to hear
+	  every network's beacons (sent about every 100 ms), so it finds
+	  weak and distant networks that an active scan, with its short
+	  stay on each channel, misses. A sweep takes a second or two.
+
+config METER_RETRY_S
+	int "Seconds before retrying a scan that heard nothing"
+	default 2
+	range 1 3600
+	help
+	  A scan that fails, or hears no networks at all, is retried after
+	  this long instead of CONFIG_METER_SCAN_INTERVAL_S.
+
+config METER_FADE_START_S
+	int "Seconds a network stays at full brightness"
+	default 15
+	range 0 3600
+	help
+	  Time after a network was last heard before it starts to fade on
+	  the screen.
+
+config METER_FADE_END_S
+	int "Seconds until a network has faded out"
+	default 30
+	range 1 3600
+	help
+	  Time after a network was last heard by which it has faded to black
+	  and is forgotten. Must be more than CONFIG_METER_FADE_START_S.
+
+config METER_REDRAW_MS
+	int "Milliseconds between screen updates"
+	default 500
+	range 50 10000
+	help
+	  How often the screen is checked for changes (new results or
+	  fading), and redrawn if anything changed.
+
+config METER_LED_BRIGHTNESS
+	int "RGB LED brightness, percent"
+	default 5
+	range 1 100
+	help
+	  The Display Pack's RGB LED is dimmed with PWM.
+
+config METER_SCAN_STACK_SIZE
+	int "Scan thread stack size"
+	default 2048
+
+config METER_SCAN_PRIORITY
+	int "Scan thread priority"
+	default 5
 
 module = METER
 module-str = Network meter

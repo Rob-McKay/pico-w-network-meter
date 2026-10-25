@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,12 +15,13 @@
 #include <zephyr/sys/util.h>
 
 #include "gfx.h"
+#include "rgb565.h"
 #include "text_raster.h"
 
 LOG_MODULE_REGISTER(gfx, CONFIG_METER_LOG_LEVEL);
 
 /* Widest display supported, in pixels. */
-#define MAX_WIDTH 320
+#define MAX_WIDTH  320
 /* Tallest font supported, in pixels: a band is one line of text. */
 #define MAX_FONT_H 24
 
@@ -37,11 +40,28 @@ static uint16_t band[MAX_WIDTH * MAX_FONT_H];
 static int disp_w;
 static int disp_h;
 
+/*
+ * Public interface: documented in gfx.h.
+ */
 uint16_t gfx_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
 	return raster_rgb(r, g, b);
 }
 
+/*
+ * Public interface: documented in gfx.h.
+ */
+uint16_t gfx_fade(uint16_t color, uint8_t level)
+{
+	return rgb565x_fade(color, level);
+}
+
+/*
+ * Public interface: documented in gfx.h.
+ *
+ * Checks the panel's pixel format at run time as well: the BUILD_ASSERT above covers only the
+ * devicetree.
+ */
 int gfx_init(uint16_t bg)
 {
 	struct display_capabilities caps;
@@ -64,16 +84,25 @@ int gfx_init(uint16_t bg)
 	return display_blanking_off(display);
 }
 
+/*
+ * Public interface: documented in gfx.h.
+ */
 int gfx_width(void)
 {
 	return disp_w;
 }
 
+/*
+ * Public interface: documented in gfx.h.
+ */
 int gfx_height(void)
 {
 	return disp_h;
 }
 
+/*
+ * Public interface: documented in gfx.h.
+ */
 const struct cfb_font *gfx_font(int height)
 {
 	const struct cfb_font *smallest = NULL;
@@ -97,6 +126,9 @@ const struct cfb_font *gfx_font(int height)
  * @param y Top edge.
  * @param w Width: the band holds @p w x @p h pixels, row by row.
  * @param h Height.
+ *
+ * @sideeffects Sends the band buffer's pixels to the panel (display_write()); logs a failed
+ *              write. errno unchanged.
  */
 static void write_band(int x, int y, int w, int h)
 {
@@ -121,6 +153,8 @@ static void write_band(int x, int y, int w, int h)
  * @param[in,out] w Width.
  * @param[in,out] h Height.
  * @return True if anything is left to draw.
+ *
+ * @sideeffects None (writes only through its parameters); errno unchanged.
  */
 static bool clip(int *x, int *y, int *w, int *h)
 {
@@ -138,6 +172,12 @@ static bool clip(int *x, int *y, int *w, int *h)
 	return *w > 0 && *h > 0;
 }
 
+/*
+ * Public interface: documented in gfx.h.
+ *
+ * Fills the shared band buffer once, then sends the rectangle in strips of as many rows as the
+ * band holds.
+ */
 void gfx_fill(int x, int y, int w, int h, uint16_t color)
 {
 	if (!clip(&x, &y, &w, &h)) {
@@ -154,6 +194,11 @@ void gfx_fill(int x, int y, int w, int h, uint16_t color)
 	}
 }
 
+/*
+ * Public interface: documented in gfx.h.
+ *
+ * Draws whole lines of text only: a box clipped to less than the font's height is skipped.
+ */
 void gfx_text(int x, int y, int w, const struct cfb_font *font, const char *text, uint16_t fg,
 	      uint16_t bg)
 {

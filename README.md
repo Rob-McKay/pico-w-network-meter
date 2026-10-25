@@ -21,11 +21,37 @@ and shows:
 (Screenshots from `make test`, which draws the real screens on an in-memory
 panel. The sample data is in `tests/ui_render`.)
 
+Networks stay on screen after they were last heard: at full brightness for
+15 s, then fading to black by 30 s. A scan that misses a network, or hears
+nothing at all, doesn't blank the display; an empty or failed scan is
+retried after 2 s.
+
 **Buttons**: A next screen, B previous screen, X scan now.
-**RGB LED**: blue while scanning, then green, amber or red for how busy the
-recommended channel is; magenta if a scan fails.
-**Serial console** (UART0: GPIO 0 TX, GPIO 1 RX, 115200 baud): each scan's
-per-channel figures as log lines.
+**RGB LED** (dimmed by PWM to 5%): blue while scanning, then green, amber or
+red for how busy the recommended channel is; magenta if a scan fails.
+
+**Usage guide:** [docs/USAGE.md](docs/USAGE.md), and a printable one-page
+[quick reference](docs/quick-reference.pdf) (from
+`docs/quick-reference.html`).
+**Serial console** on the Pico's own USB socket (a USB serial port:
+`/dev/cu.usbmodem<N>` on a Mac, `/dev/ttyACM<N>` on Linux): each scan's
+per-channel figures as log lines. Open it with, for example,
+`screen /dev/cu.usbmodem1101 115200` (any baud rate works; quit with Ctrl-A
+then K). `make pico BUILD_ARGS=-DCONFIG_METER_LOG_LEVEL_DBG=y` also logs
+every network each scan hears.
+
+Scans are **passive** by default: the radio listens on each channel long
+enough to hear every network's beacons, instead of sending probe requests
+and moving on quickly, which misses weaker networks.
+`-DCONFIG_METER_SCAN_PASSIVE=n` switches back to active scans.
+
+**Keep it away from USB 3 hubs.** USB 3 hubs, ports and short cables give
+off broadband noise across the 2.4 GHz band. Next to a hub, the meter
+heard only a network at −41 dBm. On a 1 m cable, away from the hub, it
+heard every network down to −92 dBm. If only strong networks show up,
+move the meter away from USB 3 equipment, or power it from a USB charger.
+The Display Pack also sits over the Pico W's antenna (the end opposite the
+USB socket), which costs a little range.
 
 Everything is built in Docker, as in
 [pi-zephyr-inet-radio](https://github.com/Rob-McKay/pi-zephyr-inet-radio), with
@@ -113,19 +139,22 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
   (amber), −70 dBm and above **busy** (red).
 - The **recommended channel** is the one of 1, 6 and 11 with the least
   interference. On a tie it is the one with fewer networks, then the lower
-  channel.
+  channel. It is the channel to move a router to, so it is usually one
+  with little or nothing on it ("Use ch 1: clear").
 
 ## Repository layout
 
 | Path | What |
 |---|---|
-| `app/src/main.c` | Scan loop, buttons, console report |
+| `app/src/main.c` | Redraw loop, buttons, LED |
+| `app/src/scan_task.c` | Scan thread: scans on a schedule into the history; console report |
 | `app/src/scanner.c` | Wi-Fi scans through Zephyr's `net_mgmt` Wi-Fi API |
 | `app/src/chan_stats.c` | Channel statistics (no Zephyr dependencies) |
+| `app/src/ap_history.c` | Networks heard over recent scans, with their age and fade (no Zephyr dependencies) |
 | `app/src/ui.c`, `gfx.c`, `text_raster.c` | The screens; drawing straight to the panel through a one-line band buffer (no frame buffer); text in Zephyr's CFB fonts |
-| `app/src/controls.c`, `status_led.c` | Buttons (input subsystem, `gpio-keys`) and RGB LED and backlight (LED API, `gpio-leds`) |
+| `app/src/controls.c`, `status_led.c` | Buttons (input subsystem, `gpio-keys`); RGB LED (LED API, `pwm-leds`) and backlight (`gpio-leds`) |
 | `app/boards/rpi_pico_rp2040_w.overlay` | Display Pack 2.0 devicetree |
-| `tests/meter_units` | Unit tests: channel statistics and text rendering (native_sim, AddressSanitizer) |
+| `tests/meter_units` | Unit tests: channel statistics, network history and fading, text rendering (native_sim, AddressSanitizer) |
 | `tests/ui_render` | The screens drawn on a fake 320x240 panel: pixel checks and screenshots |
 | `cmake/toolchain.cmake` | Compiler choice: ATfE for the Pico, host clang for native_sim |
 | `cmake/strict.cmake`, `.clang-tidy` | Warnings as errors and clang-tidy on every file ([docs/CODING.md](docs/CODING.md)) |
@@ -155,3 +184,15 @@ Display Pack**. Things to check first on hardware:
   the picture is garbled.
 - Scan times. The scan timeout is `CONFIG_METER_SCAN_TIMEOUT_S` (default
   15 s); a scan that runs over it is shown with what it heard.
+
+## Licence
+
+Apache License 2.0, the same licence as Zephyr: see [LICENSE](LICENSE), the
+licence text as published by the Apache Software Foundation
+(https://www.apache.org/licenses/LICENSE-2.0.txt). Every source file
+carries `SPDX-License-Identifier: Apache-2.0`.
+
+Third-party parts keep their own licences: Zephyr and its modules (Apache
+2.0), and the Infineon CYW43439 Wi-Fi firmware and CLM blob that the Docker
+image fetches with `west blobs` (Infineon's licence, in hal_infineon's
+`zephyr/blobs/license.txt`), which are built into the firmware image.

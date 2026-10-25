@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Rob McKay
 # SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.20.0)
@@ -12,6 +13,8 @@ meter_strict_warnings(app)
 target_sources(app PRIVATE
   src/main.c
   src/chan_stats.c
+  src/ap_history.c
+  src/scan_task.c
   src/scanner.c
   src/ui.c
   src/gfx.c
@@ -19,3 +22,6 @@ target_sources(app PRIVATE
   src/controls.c
   src/status_led.c
 )
+
+# Flow control for the console on the USB port (scripts/build.sh).
+target_sources_ifdef(CONFIG_USBD_CDC_ACM_CLASS app PRIVATE src/usb_console.c)

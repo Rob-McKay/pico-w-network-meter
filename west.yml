@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+#
 # West manifest for the Pico W network meter.
 #
 # This repository is the manifest ("T2" topology): `west init -l` from here

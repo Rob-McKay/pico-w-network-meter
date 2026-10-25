@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Rob McKay
 # SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.20.0)
@@ -14,5 +15,6 @@ target_include_directories(app PRIVATE ${APP_SRC})
 target_sources(app PRIVATE
   src/main.c
   ${APP_SRC}/chan_stats.c
+  ${APP_SRC}/ap_history.c
   ${APP_SRC}/text_raster.c
 )

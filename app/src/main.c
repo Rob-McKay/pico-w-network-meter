@@ -1,18 +1,24 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Pico W network meter: scans the 2.4 GHz Wi-Fi band every
- * CONFIG_METER_SCAN_INTERVAL_S seconds and shows per-channel statistics on
- * a Pimoroni Pico Display Pack 2.0, and on the serial console.
+ * CONFIG_METER_SCAN_INTERVAL_S seconds (scan_task.c) and shows per-channel
+ * statistics on a Pimoroni Pico Display Pack 2.0, and on the serial
+ * console.
+ *
+ * Networks stay on screen after they were last heard: at full brightness
+ * for CONFIG_METER_FADE_START_S seconds, then fading to black by
+ * CONFIG_METER_FADE_END_S. The screen is redrawn every
+ * CONFIG_METER_REDRAW_MS while anything changes.
  *
  * Buttons: A next screen, B previous screen, X scan now.
  * RGB LED: blue while scanning, then green, amber or red for how busy the
- * recommended channel is; magenta for an error.
+ * recommended channel is; magenta if the latest scan failed.
  */
 
-#include <errno.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 #include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
@@ -20,54 +26,24 @@
 
 #include "chan_stats.h"
 #include "controls.h"
+#include "scan_task.h"
 #include "scanner.h"
 #include "status_led.h"
 #include "ui.h"
 
 LOG_MODULE_REGISTER(meter, CONFIG_METER_LOG_LEVEL);
 
-/* The scan in progress, and the last complete one, which is on screen. */
-static struct chan_stats scanning;
-static struct chan_stats shown;
-
 /**
- * @brief Log a scan's channel statistics on the console.
+ * @brief Map how busy a channel is to the LED status that shows it.
  *
- * @param s Statistics.
- * @param scan_no Scan number.
- */
-static void report(const struct chan_stats *s, unsigned int scan_no)
-{
-	LOG_INF("Scan %u: %u networks on 2.4 GHz, %u other, best channel %u", scan_no,
-		(unsigned int)s->ap_count, (unsigned int)(s->ignored + s->dropped),
-		chan_stats_recommend(s));
-	for (uint8_t ch = CHAN_FIRST; ch <= CHAN_LAST; ch++) {
-		struct chan_info info;
-
-		chan_stats_channel(s, ch, &info);
-		if (info.ap_count > 0U || info.interference != CHAN_RSSI_NONE) {
-			LOG_INF("  ch %2u: %u networks, strongest %4d dBm, interference %4d dBm",
-				ch, info.ap_count, info.best_rssi, info.interference);
-		}
-	}
-	for (size_t i = 0; i < s->ap_count; i++) {
-		LOG_DBG("  %-32s ch %2u %4d dBm", s->aps[i].ssid, s->aps[i].channel,
-			s->aps[i].rssi);
-	}
-}
-
-/**
- * @brief Pick the LED status for a scan: how busy the best channel is.
+ * @param level How busy.
+ * @return Green, amber or red status.
  *
- * @param s Statistics.
- * @return The status.
+ * @sideeffects None; errno unchanged.
  */
-static enum status scan_status(const struct chan_stats *s)
+static enum status level_status(enum chan_level level)
 {
-	struct chan_info best;
-
-	chan_stats_channel(s, chan_stats_recommend(s), &best);
-	switch (chan_stats_level(best.interference)) {
+	switch (level) {
 	case CHAN_LEVEL_BUSY:
 		return STATUS_BUSY;
 	case CHAN_LEVEL_MODERATE:
@@ -78,79 +54,98 @@ static enum status scan_status(const struct chan_stats *s)
 }
 
 /**
- * @brief Run one scan and show it.
+ * @brief Pick the LED status: scanning (or no scan finished yet), failed,
+ *        or how busy the recommended channel is.
  *
- * A scan that times out still shows what it heard. A failed one leaves the
- * last results on screen.
+ * @param s The networks showing.
+ * @param state The scan thread's progress.
+ * @return The status.
  *
- * @param[in,out] scan_no Scans shown so far; incremented if this one is.
- * @param view Screen to draw.
+ * @sideeffects None; errno unchanged.
  */
-static void scan_once(unsigned int *scan_no, enum ui_view view)
+static enum status led_status(const struct chan_stats *s, const struct scan_task_state *state)
 {
-	int ret;
+	struct chan_info best;
 
-	status_set(STATUS_SCANNING);
-	ret = scanner_run(&scanning, K_SECONDS(CONFIG_METER_SCAN_TIMEOUT_S));
-	if (ret != 0 && ret != -EAGAIN) {
-		char msg[32];
+	if (state->busy || state->scans == 0U) {
+		return STATUS_SCANNING;
+	}
+	if (state->last_error != 0) {
+		return STATUS_ERROR;
+	}
+	chan_stats_channel(s, chan_stats_recommend(s), &best);
 
-		LOG_WRN("Scan failed: %d", ret);
-		(void)snprintf(msg, sizeof(msg), "Scan failed (%d)", ret);
-		ui_message(msg);
-		status_set(STATUS_ERROR);
+	return level_status(chan_stats_level(best.interference));
+}
+
+/**
+ * @brief Act on a button: A and B change the screen, X scans now.
+ *
+ * @param key Key code from controls_wait(), or a negative errno.
+ * @param[in,out] view Screen shown.
+ * @return True if the screen changed.
+ *
+ * @sideeffects Writes @p view through its pointer; X wakes the scan thread
+ *              (scan_task_request()). errno unchanged.
+ */
+static bool handle_key(int key, enum ui_view *view)
+{
+	switch (key) {
+	case INPUT_KEY_A:
+		*view = (enum ui_view)(((int)*view + 1) % UI_VIEW_COUNT);
+		return true;
+	case INPUT_KEY_B:
+		*view = (enum ui_view)(((int)*view + UI_VIEW_COUNT - 1) % UI_VIEW_COUNT);
+		return true;
+	case INPUT_KEY_X:
+		scan_task_request();
+		return false;
+	default:
+		return false;
+	}
+}
+
+/* What the screen shows, to redraw only when something changes. */
+struct screen {
+	enum ui_view view;
+	bool full;                /* the whole screen needs drawing */
+	unsigned int drawn_scans; /* scan count on screen */
+	struct chan_stats shown;  /* networks on screen */
+};
+
+/**
+ * @brief Redraw the screen if the networks, their fading, the scan count
+ *        or the view have changed.
+ *
+ * @param[in,out] scr What is on screen.
+ * @param next The networks to show.
+ * @param scans Scans finished so far.
+ *
+ * @sideeffects Draws on the panel (ui_show()) and updates @p scr. errno may be set by
+ *              snprintf() (only on an output error).
+ */
+static void update_screen(struct screen *scr, const struct chan_stats *next, unsigned int scans)
+{
+	if (!scr->full && scans == scr->drawn_scans && chan_stats_equal(next, &scr->shown)) {
 		return;
 	}
-	if (ret == -EAGAIN) {
-		LOG_WRN("Scan timed out: showing partial results");
-	}
-
-	shown = scanning;
-	(*scan_no)++;
-	ui_show(view, &shown, *scan_no, *scan_no == 1U);
-	report(&shown, *scan_no);
-	status_set(scan_status(&shown));
+	scr->shown = *next;
+	ui_show(scr->view, &scr->shown, scans, scr->full);
+	scr->drawn_scans = scans;
+	scr->full = false;
 }
 
 /**
- * @brief Handle buttons until the next scan is due.
+ * @brief Start the display, LEDs and buttons.
  *
- * @param[in,out] view Screen shown; A and B change it.
- * @param scan_no Scans shown so far (0: nothing to redraw yet).
- */
-static void wait_for_next_scan(enum ui_view *view, unsigned int scan_no)
-{
-	int64_t due = k_uptime_get() + ((int64_t)CONFIG_METER_SCAN_INTERVAL_S * MSEC_PER_SEC);
-
-	for (int64_t now = k_uptime_get(); now < due; now = k_uptime_get()) {
-		int key = controls_wait(K_MSEC(due - now));
-
-		if (key == INPUT_KEY_X) {
-			return;
-		}
-		if (key == INPUT_KEY_A) {
-			*view = (enum ui_view)(((int)*view + 1) % UI_VIEW_COUNT);
-		} else if (key == INPUT_KEY_B) {
-			*view = (enum ui_view)(((int)*view + UI_VIEW_COUNT - 1) % UI_VIEW_COUNT);
-		} else {
-			continue;
-		}
-		if (scan_no > 0U) {
-			ui_show(*view, &shown, scan_no, true);
-		}
-	}
-}
-
-/**
- * @brief Entry point: start the display and Wi-Fi, then scan for ever.
+ * Failures are logged; the meter carries on with what works.
  *
- * @return 0 if the Wi-Fi interface is missing (nothing else to do).
+ * @sideeffects Initialises the button queue, the display (cleared) and the LEDs (backlight on,
+ *              RGB LED off), and writes "Scanning..." in the footer; logs failures. errno may
+ *              be set by snprintf() (only on an output error).
  */
-int main(void)
+static void start_io(void)
 {
-	enum ui_view view = UI_VIEW_CHANNELS;
-	unsigned int scan_no = 0;
-
 	controls_init();
 	/* Clear the panel before the backlight shows its power-on contents. */
 	if (ui_init() != 0) {
@@ -160,15 +155,41 @@ int main(void)
 		LOG_ERR("LEDs not ready");
 	}
 	ui_message("Scanning...");
+}
 
+/**
+ * @brief Entry point: start the display and Wi-Fi, then redraw for ever.
+ *
+ * @return 0 if the Wi-Fi interface is missing (nothing else to do).
+ *
+ * @sideeffects Runs for ever: starts the scan thread, and drives the display, the RGB LED and
+ *              the button queue; returns only if there is no Wi-Fi interface. errno may be set
+ *              by snprintf() (only on an output error).
+ */
+int main(void)
+{
+	/* Static: struct screen holds a whole scan, too big for the stack. */
+	static struct screen scr = {.view = UI_VIEW_CHANNELS, .full = true};
+	static struct chan_stats next;
+
+	start_io();
 	if (scanner_init() != 0) {
 		ui_message("No Wi-Fi interface");
 		status_set(STATUS_ERROR);
 		return 0;
 	}
+	scan_task_start();
 
 	for (;;) {
-		scan_once(&scan_no, view);
-		wait_for_next_scan(&view, scan_no);
+		struct scan_task_state state;
+
+		if (handle_key(controls_wait(K_MSEC(CONFIG_METER_REDRAW_MS)), &scr.view)) {
+			scr.full = true;
+		}
+		scan_task_snapshot(k_uptime_get(), &next, &state);
+		status_set(led_status(&next, &state));
+		if (state.scans > 0U) { /* "Scanning..." until the first scan ends */
+			update_screen(&scr, &next, state.scans);
+		}
 	}
 }

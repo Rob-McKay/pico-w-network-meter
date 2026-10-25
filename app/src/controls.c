@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,6 +26,9 @@ static atomic_t ready;
  *
  * @param evt Input event.
  * @param user_data Unused.
+ *
+ * @sideeffects Puts the press on the @c presses queue (input thread); a press is dropped if the
+ *              queue is full. errno unchanged.
  */
 static void on_input(struct input_event *evt, void *user_data)
 {
@@ -39,12 +44,21 @@ static void on_input(struct input_event *evt, void *user_data)
 
 INPUT_CALLBACK_DEFINE(NULL, on_input, NULL);
 
+/*
+ * Public interface: documented in controls.h.
+ *
+ * The ready flag is set after the queue is initialised. Zephyr's atomics are sequentially
+ * consistent, so on_input() never sees the flag set before the queue exists.
+ */
 void controls_init(void)
 {
 	k_msgq_init(&presses, (char *)press_buf, sizeof(press_buf[0]), QUEUED_PRESSES);
 	atomic_set(&ready, 1);
 }
 
+/*
+ * Public interface: documented in controls.h.
+ */
 int controls_wait(k_timeout_t timeout)
 {
 	uint16_t code;
