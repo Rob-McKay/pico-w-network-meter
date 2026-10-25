@@ -22,6 +22,11 @@
 #define CHART_BOTTOM (240 - BAR_H - 16 - 4)
 #define AXIS_W       34
 #define COL_W        ((320 - AXIS_W) / 13)
+/* Rows of the chart's grid lines at -60 dBm (labelled) and -50 dBm: CHART_BOTTOM less
+ * 40 and 50 dB of the 70 dB scale, which is 162 pixels tall.
+ */
+#define ROW_MINUS_60 (CHART_BOTTOM - ((40 * 162) / 70))
+#define ROW_MINUS_50 (CHART_BOTTOM - ((50 * 162) / 70))
 #define LIST_TOP     (BAR_H + 2)
 #define LIST_BAR_X   (23 * 10)
 
@@ -123,6 +128,40 @@ ZTEST(meter_ui, test_recommended_highlight)
 	zassert_equal(chan_stats_recommend(&stats), 11);
 	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255));
 	zassert_equal(fake_display_pixel(column_x(6), CHART_BOTTOM + 4), gfx_rgb(0, 0, 0));
+}
+
+/**
+ * @brief Grid lines cross the empty columns and the gaps beside bars, the
+ *        y axis runs down the left of the chart, and a partial redraw keeps
+ *        both.
+ *
+ * @sideeffects Draws on the fake panel. errno may be set by snprintf() (only on an output
+ *              error).
+ */
+ZTEST(meter_ui, test_grid_and_axis)
+{
+	uint16_t labelled = gfx_rgb(80, 80, 80);
+	uint16_t unlabelled = gfx_rgb(40, 40, 40);
+
+	ui_show(UI_VIEW_CHANNELS, &stats, 1, true);
+	ui_show(UI_VIEW_CHANNELS, &stats, 2, false);
+
+	zassert_equal(fake_display_pixel(column_x(13) + (COL_W / 2), ROW_MINUS_60), labelled,
+		      "grid line across an empty column");
+	zassert_equal(fake_display_pixel(column_x(13) + (COL_W / 2), ROW_MINUS_50), unlabelled,
+		      "fainter grid line between the labelled ones");
+	zassert_equal(fake_display_pixel(column_x(13) + (COL_W / 2), ROW_MINUS_60 + 1),
+		      gfx_rgb(0, 0, 0), "background between grid lines");
+	zassert_equal(fake_display_pixel(column_x(1), ROW_MINUS_60), labelled,
+		      "grid line in the gap beside a bar");
+	zassert_equal(fake_display_pixel(column_x(1) + (COL_W / 2), ROW_MINUS_60),
+		      gfx_rgb(230, 40, 40), "the bar covers the grid line");
+	zassert_equal(fake_display_pixel(AXIS_W - 1, ROW_MINUS_60 + 1), gfx_rgb(150, 150, 150),
+		      "y axis");
+	zassert_equal(fake_display_pixel(AXIS_W - 1, CHART_BOTTOM - 1), gfx_rgb(150, 150, 150),
+		      "y axis reaches the bottom of the bars");
+	zassert_equal(fake_display_pixel(AXIS_W - 1, CHART_BOTTOM), gfx_rgb(0, 0, 0),
+		      "and stops there");
 }
 
 /**

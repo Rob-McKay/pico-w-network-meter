@@ -33,6 +33,8 @@ The four buttons are beside the screen, two on each side.
   signal reaches that channel. That includes networks on the channels
   either side, because a 2.4 GHz network spills over its neighbours up to
   3 channels away.
+- **The scale** on the left is in dBm, the signal reaching the channel,
+  with a grid line every 10 dB; the labelled lines are brighter.
 - **Bar colour** shows how busy the channel is:
   green = clear, amber = moderate, red = busy.
 - **The number above a bar** is how many networks use that channel.
