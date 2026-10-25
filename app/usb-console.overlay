@@ -1,0 +1,30 @@
+/*
+ * Copyright (c) 2026 Rob McKay
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The console on the Pico's own USB port, as a CDC-ACM serial port
+ * (with app/usb-console.conf; scripts/build.sh adds both). Like Zephyr's
+ * cdc-acm-console snippet, but with a 4 KiB transmit FIFO instead of 1 KiB,
+ * so that a scan's burst of log lines fits without output being dropped.
+ *
+ * No hw-flow-control here: with it the driver waits, for ever, for a host
+ * to take the output, and the boot banner then stops the Pico starting at
+ * all until a computer has opened the port (or for good on a USB charger).
+ * src/usb_console.c turns flow control on only while a host has the port
+ * open.
+ */
+
+/ {
+	chosen {
+		zephyr,console = &cdc_acm_console;
+		zephyr,shell-uart = &cdc_acm_console;
+	};
+};
+
+&zephyr_udc0 {
+	cdc_acm_console: cdc_acm_console {
+		compatible = "zephyr,cdc-acm-uart";
+		tx-fifo-size = <4096>;
+	};
+};

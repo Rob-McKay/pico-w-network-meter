@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * The meter's screens (ui.c, gfx.c), drawn on an in-memory 320x240 panel:
@@ -16,12 +18,12 @@
 #include "ui.h"
 
 /* Layout, as ui.c works it out for 320x240. */
-#define BAR_H 20
+#define BAR_H        20
 #define CHART_BOTTOM (240 - BAR_H - 16 - 4)
-#define AXIS_W 34
-#define COL_W ((320 - AXIS_W) / 13)
-#define LIST_TOP (BAR_H + 2)
-#define LIST_BAR_X (23 * 10)
+#define AXIS_W       34
+#define COL_W        ((320 - AXIS_W) / 13)
+#define LIST_TOP     (BAR_H + 2)
+#define LIST_BAR_X   (23 * 10)
 
 static struct chan_stats stats;
 
@@ -33,6 +35,9 @@ static struct chan_stats stats;
  * @param channel Channel.
  * @param rssi dBm.
  * @param secured Not an open network.
+ *
+ * @sideeffects Adds the access point to the test's @c stats. errno may be set by snprintf()
+ *              (only on an output error).
  */
 static void add(uint8_t id, const char *ssid, uint8_t channel, int8_t rssi, bool secured)
 {
@@ -41,6 +46,7 @@ static void add(uint8_t id, const char *ssid, uint8_t channel, int8_t rssi, bool
 		.channel = channel,
 		.rssi = rssi,
 		.secured = secured,
+		.freshness = CHAN_FRESH,
 	};
 
 	(void)snprintf(ap.ssid, sizeof(ap.ssid), "%s", ssid);
@@ -52,6 +58,9 @@ static void add(uint8_t id, const char *ssid, uint8_t channel, int8_t rssi, bool
  *        nothing near 11 (so 11 is recommended).
  *
  * @return NULL: no fixture.
+ *
+ * @sideeffects Starts the fake panel (ui_init()) and fills the test's @c stats. errno may be
+ *              set by snprintf() (only on an output error).
  */
 static void *setup(void)
 {
@@ -72,13 +81,20 @@ static void *setup(void)
  *
  * @param ch Channel.
  * @return x.
+ *
+ * @sideeffects None; errno unchanged.
  */
 static int column_x(int ch)
 {
 	return AXIS_W + ((ch - 1) * COL_W);
 }
 
-/** @brief Bars are coloured by how busy the channel is; empty ones aren't drawn. */
+/**
+ * @brief Bars are coloured by how busy the channel is; empty ones aren't drawn.
+ *
+ * @sideeffects Draws on the fake panel and saves it to out/screens/channels.ppm. errno may be
+ *              set by snprintf() (only on an output error).
+ */
 ZTEST(meter_ui, test_channel_bars)
 {
 	ui_show(UI_VIEW_CHANNELS, &stats, 1, true);
@@ -94,7 +110,12 @@ ZTEST(meter_ui, test_channel_bars)
 	(void)fake_display_save_ppm("out/screens/channels.ppm");
 }
 
-/** @brief The recommended channel's number is highlighted, the others aren't. */
+/**
+ * @brief The recommended channel's number is highlighted, the others aren't.
+ *
+ * @sideeffects Draws on the fake panel. errno may be set by snprintf() (only on an output
+ *              error).
+ */
 ZTEST(meter_ui, test_recommended_highlight)
 {
 	ui_show(UI_VIEW_CHANNELS, &stats, 1, true);
@@ -104,7 +125,12 @@ ZTEST(meter_ui, test_recommended_highlight)
 	zassert_equal(fake_display_pixel(column_x(6), CHART_BOTTOM + 4), gfx_rgb(0, 0, 0));
 }
 
-/** @brief The list shows the strongest network first, with a green bar. */
+/**
+ * @brief The list shows the strongest network first, with a green bar.
+ *
+ * @sideeffects Draws on the fake panel and saves it to out/screens/networks.ppm. errno may be
+ *              set by snprintf() (only on an output error).
+ */
 ZTEST(meter_ui, test_network_list)
 {
 	ui_show(UI_VIEW_NETWORKS, &stats, 2, true);
@@ -113,12 +139,17 @@ ZTEST(meter_ui, test_network_list)
 		      "-42 dBm: green");
 	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (4 * 20) + 8),
 		      gfx_rgb(230, 40, 40), "5th, -88 dBm: red");
-	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (5 * 20) + 8),
-		      gfx_rgb(0, 0, 0), "no 6th network");
+	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (5 * 20) + 8), gfx_rgb(0, 0, 0),
+		      "no 6th network");
 	(void)fake_display_save_ppm("out/screens/networks.ppm");
 }
 
-/** @brief Header and footer bars are drawn edge to edge. */
+/**
+ * @brief Header and footer bars are drawn edge to edge.
+ *
+ * @sideeffects Draws on the fake panel. errno may be set by snprintf() (only on an output
+ *              error).
+ */
 ZTEST(meter_ui, test_bars)
 {
 	uint16_t bar = gfx_rgb(0, 50, 110);
@@ -128,6 +159,29 @@ ZTEST(meter_ui, test_bars)
 	zassert_equal(fake_display_pixel(319, BAR_H - 1), bar);
 	zassert_equal(fake_display_pixel(0, 240 - BAR_H), bar);
 	zassert_equal(fake_display_pixel(319, 239), bar);
+}
+
+/**
+ * @brief Ageing networks are drawn darker; the static labels are not.
+ *
+ * @sideeffects Overwrites its own static copy of the scan; draws on the fake panel and saves it
+ *              to out/screens/faded.ppm. errno may be set by snprintf() (only on an output
+ *              error).
+ */
+ZTEST(meter_ui, test_faded)
+{
+	static struct chan_stats faded;
+
+	faded = stats;
+	for (size_t i = 0; i < faded.ap_count; i++) {
+		faded.aps[i].freshness = 128;
+	}
+	ui_show(UI_VIEW_CHANNELS, &faded, 4, true);
+	zassert_equal(fake_display_pixel(column_x(1) + (COL_W / 2), CHART_BOTTOM - 1),
+		      gfx_fade(gfx_rgb(230, 40, 40), 128), "channel 1's bar at half brightness");
+	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255),
+		      "the recommended channel's highlight does not fade");
+	(void)fake_display_save_ppm("out/screens/faded.ppm");
 }
 
 ZTEST_SUITE(meter_ui, NULL, setup, NULL, NULL, NULL);

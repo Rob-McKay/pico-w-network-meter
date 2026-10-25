@@ -1,9 +1,12 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Drawing on the Display Pack's ST7789V panel (zephyr,display, RGB565 high
  * byte first) without a frame buffer: rectangles and lines of text are
- * sent as they are drawn, through one small band buffer.
+ * sent as they are drawn, through one small band buffer. The buffer is
+ * shared, so drawing is not thread-safe: draw from one thread (main).
  */
 
 #ifndef METER_GFX_H_
@@ -20,8 +23,21 @@
  * @param g Green, 0-255.
  * @param b Blue, 0-255.
  * @return The colour.
+ *
+ * @sideeffects None; errno unchanged.
  */
 uint16_t gfx_rgb(uint8_t r, uint8_t g, uint8_t b);
+
+/**
+ * @brief Darken a colour towards black.
+ *
+ * @param color Colour (gfx_rgb()).
+ * @param level 255 leaves it as it is, 0 makes it black.
+ * @return The darkened colour.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+uint16_t gfx_fade(uint16_t color, uint8_t level);
 
 /**
  * @brief Start the display: clear it to @p bg and turn it on.
@@ -30,6 +46,9 @@ uint16_t gfx_rgb(uint8_t r, uint8_t g, uint8_t b);
  * @retval 0 Ready.
  * @retval -ENODEV The display is not ready.
  * @retval -ENOTSUP The display is not RGB565 or is wider than supported.
+ *
+ * @sideeffects Sets the module's display size (@c disp_w, @c disp_h), clears the panel to @p bg
+ *              through the shared band buffer, and turns the panel on. errno unchanged.
  */
 int gfx_init(uint16_t bg);
 
@@ -37,6 +56,8 @@ int gfx_init(uint16_t bg);
  * @brief Display width.
  *
  * @return Pixels.
+ *
+ * @sideeffects None; errno unchanged.
  */
 int gfx_width(void);
 
@@ -44,6 +65,8 @@ int gfx_width(void);
  * @brief Display height.
  *
  * @return Pixels.
+ *
+ * @sideeffects None; errno unchanged.
  */
 int gfx_height(void);
 
@@ -51,7 +74,10 @@ int gfx_height(void);
  * @brief Find a font by height.
  *
  * @param height Pixels (16 or 24 with the default fonts).
- * @return The font, or the smallest font if none has that height.
+ * @return The font, the smallest font if none has that height, or NULL if
+ *         no fonts are linked in (CONFIG_CHARACTER_FRAMEBUFFER off).
+ *
+ * @sideeffects None; errno unchanged.
  */
 const struct cfb_font *gfx_font(int height);
 
@@ -63,6 +89,8 @@ const struct cfb_font *gfx_font(int height);
  * @param w Width.
  * @param h Height.
  * @param color Colour (gfx_rgb()).
+ *
+ * @sideeffects Overwrites the shared band buffer and draws on the panel. errno unchanged.
  */
 void gfx_fill(int x, int y, int w, int h, uint16_t color);
 
@@ -79,6 +107,8 @@ void gfx_fill(int x, int y, int w, int h, uint16_t color);
  * @param text Text.
  * @param fg Text colour.
  * @param bg Background colour.
+ *
+ * @sideeffects Overwrites the shared band buffer and draws on the panel. errno unchanged.
  */
 void gfx_text(int x, int y, int w, const struct cfb_font *font, const char *text, uint16_t fg,
 	      uint16_t bg);

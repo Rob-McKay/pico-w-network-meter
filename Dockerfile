@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+#
 # Build environment for the Pico W network meter (Raspberry Pi Pico W,
 # RP2040 + CYW43439, with a Pimoroni Pico Display Pack 2.0).
 #
@@ -47,10 +50,12 @@ ENV PIP_CERT=/etc/ssl/certs/ca-certificates.crt \
 
 # Python tooling in a venv (Ubuntu 24.04 forbids system-wide pip installs).
 # clang-tidy comes from PyPI: the build needs 20 or later (.clang-tidy's
-# banned-function list), and Ubuntu 24.04 ships 18.
+# banned-function list), and Ubuntu 24.04 ships 18. clang-format checks the
+# code against Zephyr's .clang-format (scripts/check-style.sh).
 ENV VIRTUAL_ENV=/opt/venv \
     PATH=/opt/venv/bin:$PATH
-RUN python3 -m venv $VIRTUAL_ENV && pip install --no-cache-dir west clang-tidy==23.1.3
+RUN python3 -m venv $VIRTUAL_ENV \
+    && pip install --no-cache-dir west clang-tidy==23.1.3 clang-format==20.1.8
 
 # Arm Toolchain for Embedded (LLVM, picolibc) builds the Pico W firmware
 # (cmake/toolchain.cmake); its armv6m multilib covers the RP2040's

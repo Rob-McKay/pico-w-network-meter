@@ -25,6 +25,8 @@ ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = YES
 SEARCH_INCLUDES        = NO
+# @sideeffects: the global state a function changes (docs/CODING.md).
+ALIASES                = "sideeffects=@par Side effects:^^"
 PREDEFINED             = "ZTEST(s,n)=void s##_##n(void)" \
                          "BUILD_ASSERT(...)=" \
                          "DEVICE_API(t,n)=const struct t##_driver_api n" \
@@ -32,5 +34,7 @@ PREDEFINED             = "ZTEST(s,n)=void s##_##n(void)" \
                          "INPUT_CALLBACK_DEFINE(...)=" \
                          "K_MUTEX_DEFINE(...)=" \
                          "K_SEM_DEFINE(...)=" \
+                         "K_THREAD_STACK_DEFINE(...)=" \
                          "LOG_MODULE_REGISTER(...)=" \
+                         "SYS_INIT(...)=" \
                          "ZTEST_SUITE(...)="

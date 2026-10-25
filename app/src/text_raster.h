@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Draws a line of text into RGB565 pixels for a colour display, with the
@@ -21,6 +23,8 @@
  * @param g Green, 0-255.
  * @param b Blue, 0-255.
  * @return The pixel.
+ *
+ * @sideeffects None; errno unchanged.
  */
 uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b);
 
@@ -38,6 +42,8 @@ uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b);
  * @param width Band width in pixels.
  * @param fg Text colour (raster_rgb()).
  * @param bg Background colour (raster_rgb()).
+ *
+ * @sideeffects None (writes only through @p band); errno unchanged.
  */
 void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
 		 uint16_t fg, uint16_t bg);

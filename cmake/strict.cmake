@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Rob McKay
 # SPDX-License-Identifier: Apache-2.0
 #
 # Checks for this repository's own code (docs/CODING.md):
@@ -14,10 +15,14 @@ option(METER_CLANG_TIDY "Run clang-tidy on this repository's code as it compiles
 # needs clang-tidy 20 or later. The Docker image has 23.1.3 from PyPI.
 set(METER_CLANG_TIDY_MIN_VERSION 20)
 
-# find_program() validator: accept a clang-tidy new enough for .clang-tidy.
+# @brief find_program() validator: accept a clang-tidy new enough for
+#        .clang-tidy.
 #
-# result: set to FALSE in the caller's scope if exe is too old.
-# exe: candidate clang-tidy.
+# @param[out] result Variable in the caller's scope: set to FALSE if @p exe
+#             is too old, left as it is otherwise.
+# @param exe Candidate clang-tidy.
+#
+# @sideeffects Runs @p exe --version; sets @p result in the caller's scope.
 function(meter_clang_tidy_new_enough result exe)
   execute_process(COMMAND ${exe} --version OUTPUT_VARIABLE text ERROR_QUIET)
   string(REGEX MATCH "version ([0-9]+)" version "${text}")
@@ -51,7 +56,7 @@ if(CONFIG_FORTIFY_SOURCE_RUN_TIME AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
   set_compiler_property(PROPERTY security_fortify_run_time _FORTIFY_SOURCE=2)
 endif()
 
-# Apply the checks to every source of a target.
+# @brief Apply the checks to every source of a target.
 #
 # Zephyr's headers and macros use GNU extensions (statement expressions,
 # zero-length arrays, empty variadic macro arguments), so they are included
@@ -60,6 +65,11 @@ endif()
 #
 # clang-tidy runs through scripts/clang-tidy-cross.py, which gives
 # clang-tidy's clang the C library headers of a cross compile (ATfE).
+#
+# @param target CMake target whose sources are this repository's code.
+#
+# @sideeffects Adds compile options and include directories to @p target,
+#              and sets its C_CLANG_TIDY property (with METER_CLANG_TIDY).
 function(meter_strict_warnings target)
   target_compile_options(${target} PRIVATE ${METER_WARNING_FLAGS})
   get_target_property(zephyr_dirs zephyr_interface INTERFACE_INCLUDE_DIRECTORIES)

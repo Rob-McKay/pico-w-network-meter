@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,7 +18,7 @@
 
 #include "fake_display.h"
 
-#define WIDTH DT_INST_PROP(0, width)
+#define WIDTH  DT_INST_PROP(0, width)
 #define HEIGHT DT_INST_PROP(0, height)
 
 /* Host open() flags for an existing file: O_WRONLY | O_TRUNC on Linux, the
@@ -36,6 +38,8 @@ static uint16_t pixels[WIDTH * HEIGHT];
  * @param buf Pixels.
  * @retval 0 Written.
  * @retval -EINVAL The block is not on the panel.
+ *
+ * @sideeffects Writes the pixels into the fake panel's memory (@c pixels). errno unchanged.
  */
 static int fake_write(const struct device *dev, const uint16_t x, const uint16_t y,
 		      const struct display_buffer_descriptor *desc, const void *buf)
@@ -59,6 +63,8 @@ static int fake_write(const struct device *dev, const uint16_t x, const uint16_t
  *
  * @param dev The panel.
  * @param[out] caps Its size and pixel format.
+ *
+ * @sideeffects None (writes only through @p caps); errno unchanged.
  */
 static void fake_get_capabilities(const struct device *dev, struct display_capabilities *caps)
 {
@@ -75,6 +81,8 @@ static void fake_get_capabilities(const struct device *dev, struct display_capab
  *
  * @param dev The panel.
  * @return 0.
+ *
+ * @sideeffects None; errno unchanged.
  */
 static int fake_blanking_off(const struct device *dev)
 {
@@ -98,11 +106,21 @@ DEVICE_DT_INST_DEFINE(0, NULL, NULL, NULL, NULL, POST_KERNEL, CONFIG_DISPLAY_INI
 		      &fake_api);
 #pragma GCC diagnostic pop
 
+/*
+ * Public interface: documented in fake_display.h.
+ */
 uint16_t fake_display_pixel(int x, int y)
 {
 	return pixels[(y * WIDTH) + x];
 }
 
+/*
+ * Public interface: documented in fake_display.h.
+ *
+ * Uses native_sim's host trampolines (nsi_host_*). The open() flags are the host's (Linux)
+ * values, and the file must already exist, as the trampolines give no way to set a new file's
+ * permissions.
+ */
 int fake_display_save_ppm(const char *path)
 {
 	char header[32];

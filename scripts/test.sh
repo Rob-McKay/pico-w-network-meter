@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+#
 # Run the automated tests on native_sim (64-bit host builds). Runs inside
 # the Docker image.
 #
@@ -14,16 +17,18 @@
 # any warning or finding.
 #
 # First, scripts/check-docs.py checks that every function has a Doxygen
-# comment documenting its parameters and return value.
+# comment documenting its parameters and return value, and
+# scripts/check-style.sh that the code follows Zephyr's coding style.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 
 "$here/scripts/check-docs.py"
+"$here/scripts/check-style.sh"
 
 # The UI test writes its screenshots into existing files only.
 mkdir -p "$here/out/screens"
-for f in channels networks; do
+for f in channels networks faded; do
 	: > "$here/out/screens/$f.ppm"
 done
 

@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Wi-Fi scans on the Pico W's CYW43439, through Zephyr's Wi-Fi management
@@ -19,6 +21,9 @@
  *
  * @retval 0 Ready.
  * @retval -ENODEV No Wi-Fi interface.
+ *
+ * @sideeffects Sets @c wifi_iface and registers the scan event callback with net_mgmt; logs a
+ *              missing interface. errno unchanged.
  */
 int scanner_init(void);
 
@@ -33,7 +38,11 @@ int scanner_init(void);
  * @retval 0 Scan complete.
  * @retval -EAGAIN Timed out: @p out has what arrived in time.
  * @retval -EIO The driver reported a failed scan.
+ * @retval -ENODEV scanner_init() has not succeeded.
  * @retval other Negative errno from the scan request.
+ *
+ * @sideeffects Sets and clears the scan target (the scan's results go to @p out), drives the
+ *              radio, logs; blocks the calling thread for up to @p timeout. errno unchanged.
  */
 int scanner_run(struct chan_stats *out, k_timeout_t timeout);
 

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+#
 # Host-side convenience wrapper: everything runs in the Docker image.
 #
 #   make image                 build the Docker image for this machine
@@ -9,6 +12,10 @@
 #                              out/pico/network-meter.uf2 (WIFI_COUNTRY=
 #                              sets the regulatory domain: a WHD country
 #                              name, default UNITED_KINGDOM)
+#                              BUILD_ARGS= passes CMake options, e.g.
+#                              BUILD_ARGS=-DCONFIG_METER_LOG_LEVEL_DBG=y
+#                              to log every scan result on the console
+#                              (options stay set until `make clean`)
 #   make test                  run the unit tests (native_sim) and the
 #                              documentation check
 #   make shell                 interactive shell in the build container
@@ -39,9 +46,11 @@ image-multiarch:
 	docker buildx build $(BUILD_FLAGS) --platform linux/amd64,linux/arm64 \
 		-t $(PUSH_TO) --push .
 
+BUILD_ARGS ?=
+
 pico:
 	docker run --rm $(DOCKER_TTY) -e WIFI_COUNTRY \
-		-v $(CURDIR):/workdir/meter $(IMAGE) scripts/build.sh $@
+		-v $(CURDIR):/workdir/meter $(IMAGE) scripts/build.sh $@ $(BUILD_ARGS)
 
 test:
 	$(DOCKER_RUN) scripts/test.sh

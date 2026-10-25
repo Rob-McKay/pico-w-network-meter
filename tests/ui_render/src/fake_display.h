@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2026 Rob McKay
+ *
  * SPDX-License-Identifier: Apache-2.0
  *
  * An in-memory panel for the UI tests (meter,test-display): it keeps every
@@ -16,6 +18,8 @@
  * @param x Column.
  * @param y Row.
  * @return The pixel, RGB565 high byte first, as written.
+ *
+ * @sideeffects None; errno unchanged.
  */
 uint16_t fake_display_pixel(int x, int y);
 
@@ -29,6 +33,9 @@ uint16_t fake_display_pixel(int x, int y);
  * @retval 0 Saved.
  * @retval -ENOENT No such file.
  * @retval -EIO A write failed.
+ *
+ * @sideeffects Overwrites the host file @p path. errno may be set by snprintf() (only on an
+ *              output error). The host file calls set the host C library's errno, not this one.
  */
 int fake_display_save_ppm(const char *path);
 
