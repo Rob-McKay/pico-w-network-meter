@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Network meter"
+
+config METER_SCAN_INTERVAL_S
+	int "Seconds between scans"
+	default 10
+	range 1 3600
+	help
+	  Time from the end of one scan to the start of the next. Button X
+	  starts a scan at once.
+
+config METER_SCAN_TIMEOUT_S
+	int "Longest wait for a scan, seconds"
+	default 15
+	range 1 120
+	help
+	  A scan of every 2.4 GHz channel takes a few seconds. One that has not
+	  finished by then is shown with what it heard so far.
+
+module = METER
+module-str = Network meter
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+source "Kconfig.zephyr"

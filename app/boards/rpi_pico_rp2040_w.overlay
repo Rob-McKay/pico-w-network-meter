@@ -1,0 +1,146 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Pimoroni Pico Display Pack 2.0 on a Raspberry Pi Pico W: a 2.0" 320x240
+ * IPS panel (ST7789V), four buttons, an RGB LED. The pack plugs onto the
+ * Pico's headers; its pins:
+ *
+ *   Function            Pico GPIO
+ *   LCD CS              17  (SPI0 chip select, driven as a GPIO)
+ *   LCD SCLK            18  (SPI0 SCK)
+ *   LCD MOSI            19  (SPI0 TX)
+ *   LCD DC              16
+ *   Backlight           20
+ *   Button A, B, X, Y   12, 13, 14, 15  (to ground when pressed)
+ *   LED red, green, blue 6, 7, 8       (active low)
+ *
+ * The panel's reset is wired to the Pico's RUN pin, so it has no reset GPIO
+ * here: the driver resets it with a software reset command. None of these
+ * pins clash with the CYW43439's (GPIO 23, 24, 25, 29).
+ *
+ * The panel is 240x320 portrait; mdac (MADCTL) 0x60 turns it to landscape.
+ * If the picture is upside down, use 0xa0; if the colours are inverted,
+ * add inversion-off.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+
+/ {
+	chosen {
+		zephyr,display = &pack_lcd;
+	};
+
+	pack_lcd_bus: mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi0>;
+		dc-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+		write-only;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pack_lcd: st7789v@0 {
+			compatible = "sitronix,st7789v";
+			reg = <0>;
+			mipi-max-frequency = <62500000>;
+			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+			width = <320>;
+			height = <240>;
+			x-offset = <0>;
+			y-offset = <0>;
+			mdac = <0x60>;
+			pixel-format = <PANEL_PIXEL_FORMAT_RGB_565X>;
+			/* Gate, VCOM and gamma as Pimoroni's driver sets them
+			 * for this panel; power and porch settings as Zephyr's
+			 * other ST7789V boards use.
+			 */
+			vcom = <0x1f>;
+			gctrl = <0x35>;
+			vrhs = <0x12>;
+			vdvs = <0x20>;
+			gamma = <0x01>;
+			lcm = <0x2c>;
+			porch-param = [0c 0c 00 33 33];
+			cmd2en-param = [5a 69 02 01];
+			pwctrl1-param = [a4 a1];
+			pvgam-param = [d0 08 11 08 0c 15 39 33 50 36 13 14 29 2d];
+			nvgam-param = [d0 08 10 08 06 06 39 44 51 0b 16 14 2f 31];
+			ram-param = [00 f0];
+			rgb-param = [cd 08 14];
+		};
+	};
+
+	pack_buttons: buttons {
+		compatible = "gpio-keys";
+
+		button_a {
+			gpios = <&gpio0 12 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "A";
+			zephyr,code = <INPUT_KEY_A>;
+		};
+
+		button_b {
+			gpios = <&gpio0 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "B";
+			zephyr,code = <INPUT_KEY_B>;
+		};
+
+		button_x {
+			gpios = <&gpio0 14 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "X";
+			zephyr,code = <INPUT_KEY_X>;
+		};
+
+		button_y {
+			gpios = <&gpio0 15 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Y";
+			zephyr,code = <INPUT_KEY_Y>;
+		};
+	};
+
+	pack_leds: leds {
+		compatible = "gpio-leds";
+
+		pack_led_red: led_red {
+			gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+			label = "RGB LED red";
+		};
+
+		pack_led_green: led_green {
+			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+			label = "RGB LED green";
+		};
+
+		pack_led_blue: led_blue {
+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+			label = "RGB LED blue";
+		};
+
+		pack_backlight: backlight {
+			gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
+			label = "LCD backlight";
+		};
+	};
+};
+
+&pinctrl {
+	/* SPI0 for the panel: clock and data only. The board's default
+	 * also claims GPIO 16 as SPI RX, which is the panel's DC line here,
+	 * and drives CS from the SPI block; CS is a GPIO instead.
+	 */
+	spi0_display_pack: spi0_display_pack {
+		group1 {
+			pinmux = <SPI0_SCK_P18>, <SPI0_TX_P19>;
+		};
+	};
+};
+
+&spi0 {
+	pinctrl-0 = <&spi0_display_pack>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+	clock-frequency = <62500000>;
+	status = "okay";
+};

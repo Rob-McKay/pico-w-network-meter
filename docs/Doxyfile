@@ -1,0 +1,36 @@
+# Doxygen configuration for scripts/check-docs.py: XML output only, read
+# back to check that every function is documented (docs/CODING.md).
+PROJECT_NAME           = "Pico W network meter"
+OUTPUT_DIRECTORY       = build/doxygen
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+XML_PROGRAMLISTING     = NO
+QUIET                  = YES
+INPUT                  = app/src tests/meter_units/src tests/ui_render/src scripts/check-docs.py \
+                         scripts/clang-tidy-cross.py
+FILE_PATTERNS          = *.c *.h *.py
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_LOCAL_CLASSES  = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = NO
+WARN_AS_ERROR          = NO
+WARN_FORMAT            = "$file:$line: $text"
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+SEARCH_INCLUDES        = NO
+PREDEFINED             = "ZTEST(s,n)=void s##_##n(void)" \
+                         "BUILD_ASSERT(...)=" \
+                         "DEVICE_API(t,n)=const struct t##_driver_api n" \
+                         "DEVICE_DT_INST_DEFINE(...)=" \
+                         "INPUT_CALLBACK_DEFINE(...)=" \
+                         "K_MUTEX_DEFINE(...)=" \
+                         "K_SEM_DEFINE(...)=" \
+                         "LOG_MODULE_REGISTER(...)=" \
+                         "ZTEST_SUITE(...)="

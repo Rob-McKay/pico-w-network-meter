@@ -1,0 +1,25 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * A 320x240 RGB565 panel like the Display Pack's, kept in memory by
+ * src/fake_display.c, in place of native_sim's SDL window.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+
+/ {
+	chosen {
+		zephyr,display = &test_display;
+	};
+
+	test_display: test_display {
+		compatible = "meter,test-display";
+		width = <320>;
+		height = <240>;
+		pixel-format = <PANEL_PIXEL_FORMAT_RGB_565X>;
+	};
+};
+
+&sdl_dc {
+	status = "disabled";
+};

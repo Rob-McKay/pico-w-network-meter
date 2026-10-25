@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  In-memory RGB565 panel for the UI tests (tests/ui_render): keeps what is
+  written to it so the tests can check pixels and save screenshots.
+
+compatible: "meter,test-display"
+
+include: display-controller.yaml
+
+properties:
+  pixel-format:
+    type: int
+    required: true
+    description: The panel's pixel format (PANEL_PIXEL_FORMAT_...).

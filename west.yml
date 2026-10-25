@@ -1,0 +1,28 @@
+# West manifest for the Pico W network meter.
+#
+# This repository is the manifest ("T2" topology): `west init -l` from here
+# fetches a pinned Zephyr plus only the modules the app needs.
+#
+# Zephyr is pinned to the same main-branch commit (v4.5.0-rc2) as
+# pi-zephyr-inet-radio, so both projects share one known-good Zephyr. Move
+# the pin to the v4.5.0 tag once it is released.
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: a915b2f12675b48b16d56653ea145dcd8f20cbbf
+      import:
+        name-allowlist:
+          # Cortex-M0+ core support
+          - cmsis_6
+          # RP2040 SoC drivers (GPIO, SPI, PIO, clocks, boot stage 2)
+          - hal_rpi_pico
+          # Infineon AIROC (CYW43439) Wi-Fi driver and its firmware blob
+          - hal_infineon
+
+  self:
+    path: meter

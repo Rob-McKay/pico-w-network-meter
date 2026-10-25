@@ -1,0 +1,5 @@
+tests:
+  meter.units:
+    platform_allow:
+      - native_sim/native/64
+    tags: meter

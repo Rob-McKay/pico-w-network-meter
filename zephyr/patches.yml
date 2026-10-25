@@ -1,0 +1,17 @@
+# Patches to Zephyr modules, applied with "west patch apply" after
+# "west update" (the Dockerfile does both). Each one waits for an upstream
+# pull request; drop it once the west.yml pin includes the merged change.
+patches:
+  # The RP2040's second-stage bootloader is built as a separate CMake
+  # project that is given only the compiler's path. A GCC cross compiler
+  # implies its target; clang (Arm Toolchain for Embedded, Zephyr's LLVM
+  # toolchain) assembles it for the host and fails. The LLVM toolchain's
+  # target triple is now passed on as well. Not yet sent upstream.
+  - path: zephyr/rpi-pico-boot2-clang-target.patch
+    sha256sum: c040c772f734a734f4bb50c041f692488318b96826def70d3d36c547f3fd4fb1
+    module: zephyr
+    author: Claude
+    email: noreply@anthropic.com
+    date: 2026-10-25
+    upstreamable: true
+    merge-status: false
