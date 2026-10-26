@@ -8,8 +8,11 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/sys/reboot.h>
 
 #include "ap_history.h"
+#include "scan_health.h"
 #include "scan_task.h"
 #include "scanner.h"
 
@@ -33,8 +36,9 @@ static K_SEM_DEFINE(scan_now, 0, 1);
 #pragma GCC diagnostic pop
 static struct k_thread scan_thread;
 
-/* The scan in progress: only the scan thread touches it. */
+/* The scan in progress, and the failures in a row: only the scan thread touches them. */
 static struct chan_stats scanning;
+static struct scan_health health;
 
 /* Shared with the display thread, under lock. */
 static K_MUTEX_DEFINE(lock);
@@ -85,7 +89,7 @@ static void set_busy(void)
  * @brief Run one scan into the scan thread's buffer.
  *
  * @retval 0 Done; a scan that timed out counts as done with what it heard.
- * @retval <0 Negative errno: the scan failed.
+ * @retval <0 Negative errno: the scan failed, or couldn't start.
  *
  * @sideeffects Overwrites @c scanning with the scan's results and drives the radio
  *              (scanner_run()); logs a timeout or failure. errno unchanged.
@@ -94,7 +98,7 @@ static int run_scan(void)
 {
 	int ret = scanner_run(&scanning, K_SECONDS(CONFIG_METER_SCAN_TIMEOUT_S));
 
-	if (ret == -EAGAIN) {
+	if (ret == -ETIMEDOUT) {
 		LOG_WRN("Scan timed out: keeping what it heard");
 		ret = 0;
 	} else if (ret != 0) {
@@ -136,13 +140,32 @@ static unsigned int publish(int ret)
 }
 
 /**
+ * @brief Restart the meter, to recover a Wi-Fi driver that has stopped
+ *        working.
+ *
+ * The AIROC driver can run out of packet buffers for good (a leak in it or
+ * its WHD library), after which every scan fails to start. Only a restart
+ * gets them back; it takes a few seconds.
+ *
+ * @sideeffects Logs the reason, flushes the log, and restarts the Pico (sys_reboot()); does
+ *              not return. errno unchanged.
+ */
+static FUNC_NORETURN void recover(void)
+{
+	LOG_ERR("%u scans in a row failed: restarting", health.failures);
+	LOG_PANIC();
+	sys_reboot(SYS_REBOOT_COLD);
+}
+
+/**
  * @brief Run one scan, publish it and log it.
  *
  * @return True if it heard something; false if it failed or heard nothing.
  *
  * @sideeffects Those of set_busy(), run_scan(), publish() and report(): rewrites @c scanning,
- *              updates @c history and @c progress under @c lock, drives the radio, logs. errno
- *              unchanged.
+ *              updates @c history and @c progress under @c lock, drives the radio, logs. Counts
+ *              failures in a row in @c health; after CONFIG_METER_RECOVER_AFTER of them,
+ *              restarts the Pico (recover()). errno unchanged.
  */
 static bool scan_once(void)
 {
@@ -154,6 +177,9 @@ static bool scan_once(void)
 	scan_no = publish(ret);
 	if (ret == 0) {
 		report(&scanning, scan_no);
+	}
+	if (scan_health_record(&health, ret, CONFIG_METER_RECOVER_AFTER)) {
+		recover();
 	}
 
 	return ret == 0 && scanning.ap_count > 0U;

@@ -9,6 +9,7 @@
  */
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -17,6 +18,7 @@
 #include "ap_history.h"
 #include "chan_stats.h"
 #include "rgb565.h"
+#include "scan_health.h"
 #include "text_raster.h"
 
 /* ---- Channel statistics -------------------------------------------------- */
@@ -691,3 +693,42 @@ ZTEST(meter_raster, test_msb_first)
 }
 
 ZTEST_SUITE(meter_raster, NULL, NULL, NULL, NULL, NULL);
+
+/**
+ * @brief The meter restarts only after the given number of failures in a
+ *        row; a scan that works, even one that hears nothing, starts the
+ *        count again.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_health, test_failures_in_a_row)
+{
+	struct scan_health h;
+
+	scan_health_reset(&h);
+	zassert_false(scan_health_record(&h, -EAGAIN, 3));
+	zassert_false(scan_health_record(&h, -EAGAIN, 3));
+	zassert_false(scan_health_record(&h, 0, 3), "a working scan ends the run");
+	zassert_false(scan_health_record(&h, -EAGAIN, 3));
+	zassert_false(scan_health_record(&h, -EINPROGRESS, 3));
+	zassert_true(scan_health_record(&h, -EIO, 3), "third failure in a row");
+	zassert_true(scan_health_record(&h, -EIO, 3), "and every one after it");
+}
+
+/**
+ * @brief A limit of 0 never asks for a restart, and the count doesn't wrap
+ *        round to zero.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_health, test_no_limit)
+{
+	struct scan_health h = {.failures = UINT_MAX - 1U};
+
+	zassert_false(scan_health_record(&h, -EAGAIN, 0));
+	zassert_false(scan_health_record(&h, -EAGAIN, 0));
+	zassert_equal(h.failures, UINT_MAX, "stops at UINT_MAX");
+	zassert_true(scan_health_record(&h, -EAGAIN, 5), "still over a limit");
+}
+
+ZTEST_SUITE(meter_health, NULL, NULL, NULL, NULL, NULL);

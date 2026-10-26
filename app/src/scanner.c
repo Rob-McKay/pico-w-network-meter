@@ -209,7 +209,7 @@ static void arm(struct chan_stats *out)
 /**
  * @brief Stop taking results, and log how the scan went.
  *
- * @param ret 0, or the error so far (failed request, -EAGAIN timeout).
+ * @param ret 0, or the error so far (failed request, -ETIMEDOUT timeout).
  * @return @p ret, or the driver's status if the scan completed.
  *
  * @sideeffects Under @c scan_lock, clears @c target, so later results are dropped; logs the
@@ -256,6 +256,7 @@ static int request_scan(void)
  * Public interface: documented in scanner.h.
  *
  * Arms the scan target before the request, so no result is missed, and disarms it afterwards.
+ * A timeout is -ETIMEDOUT, not -EAGAIN, which the driver returns when a scan can't start.
  * on_done() explains the one race the driver leaves.
  */
 int scanner_run(struct chan_stats *out, k_timeout_t timeout)
@@ -269,7 +270,7 @@ int scanner_run(struct chan_stats *out, k_timeout_t timeout)
 	arm(out);
 	ret = request_scan();
 	if (ret == 0 && k_sem_take(&scan_done, timeout) != 0) {
-		ret = -EAGAIN;
+		ret = -ETIMEDOUT;
 	}
 
 	return disarm(ret);

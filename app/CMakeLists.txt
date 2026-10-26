@@ -15,6 +15,7 @@ target_sources(app PRIVATE
   src/chan_stats.c
   src/ap_history.c
   src/scan_task.c
+  src/scan_health.c
   src/scanner.c
   src/ui.c
   src/gfx.c

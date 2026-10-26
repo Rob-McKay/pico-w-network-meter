@@ -89,7 +89,7 @@ The RGB LED is on the right of the screen.
 | **Green** | The recommended channel is clear |
 | **Amber** | The recommended channel is moderately busy |
 | **Red** | Even the recommended channel is busy |
-| **Magenta** | The last scan failed; it is retried after 2 seconds |
+| **Magenta** | The last scan failed; it is retried after 2 seconds. After 5 failures in a row the meter restarts itself |
 | Off | Starting up |
 
 ## Tips
@@ -121,6 +121,7 @@ Change these when building the firmware: `make pico` with
 |---|---|---|
 | `WIFI_COUNTRY` | `UNITED_KINGDOM` | Which channels may be scanned (the US stops at 11) |
 | `CONFIG_METER_SCAN_INTERVAL_S` | 10 | Seconds between scans |
+| `CONFIG_METER_RECOVER_AFTER` | 5 | Failed scans in a row before the meter restarts itself (0: never) |
 | `CONFIG_METER_FADE_START_S` | 15 | Seconds at full brightness |
 | `CONFIG_METER_FADE_END_S` | 30 | Seconds until faded out |
 | `CONFIG_METER_LED_BRIGHTNESS` | 5 | LED brightness, percent |
