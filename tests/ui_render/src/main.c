@@ -28,7 +28,8 @@
 #define ROW_MINUS_60 (CHART_BOTTOM - ((40 * 162) / 70))
 #define ROW_MINUS_50 (CHART_BOTTOM - ((50 * 162) / 70))
 #define LIST_TOP     (BAR_H + 2)
-#define LIST_BAR_X   (23 * 10)
+#define LIST_CHAN_X  ((15 * 10) + 8)
+#define LIST_BAR_X   (LIST_CHAN_X + (8 * 10))
 
 static struct chan_stats stats;
 
@@ -255,6 +256,41 @@ ZTEST(meter_ui, test_faded)
 	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255),
 		      "the recommended channel's highlight does not fade");
 	(void)fake_display_save_ppm("out/screens/faded.ppm");
+}
+
+/**
+ * @brief A full-length name on a two-digit channel keeps a gap before the
+ *        channel number.
+ *
+ * @sideeffects Draws on the fake panel. errno unchanged.
+ */
+ZTEST(meter_ui, test_name_gap)
+{
+	static struct chan_stats one;
+	struct chan_ap ap = {
+		.ssid = "AVeryLongNetworkName",
+		.bssid = {0x02, 0x1f, 0x3c, 0xa2, 0x7f, 0x40},
+		.channel = 11,
+		.rssi = -50,
+		.secured = true,
+		.freshness = CHAN_FRESH,
+	};
+	bool digits = false;
+
+	chan_stats_reset(&one);
+	zassert_ok(chan_stats_add(&one, &ap));
+	ui_show(UI_VIEW_NETWORKS, &one, 1, true);
+
+	for (int y = LIST_TOP + 2; y < LIST_TOP + 2 + 16; y++) {
+		for (int x = 15 * 10; x < LIST_CHAN_X; x++) {
+			zassert_equal(fake_display_pixel(x, y), gfx_rgb(0, 0, 0),
+				      "gap after the name at %d,%d", x, y);
+		}
+		for (int x = LIST_CHAN_X; x < LIST_CHAN_X + (2 * 10); x++) {
+			digits = digits || fake_display_pixel(x, y) != gfx_rgb(0, 0, 0);
+		}
+	}
+	zassert_true(digits, "the channel's \"11\" starts after the gap");
 }
 
 ZTEST_SUITE(meter_ui, NULL, setup, NULL, NULL, NULL);

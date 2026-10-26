@@ -44,6 +44,8 @@
 #define SSID_CHARS     15
 #define CHAN_CHARS     3
 #define RSSI_CHARS     4
+/* Space between a network's name and its channel, pixels. */
+#define NAME_GAP       8
 /* Longest line of text: the display's width in characters, and a NUL. */
 #define LINE_MAX       40
 
@@ -497,6 +499,20 @@ static uint16_t rssi_colour(int rssi)
 }
 
 /**
+ * @brief Left edge of the channel column in a network list row: after the
+ *        name column and a gap, so a full-length name doesn't run into a
+ *        two-digit channel.
+ *
+ * @return x.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int list_chan_x(void)
+{
+	return (SSID_CHARS * font->width) + NAME_GAP;
+}
+
+/**
  * @brief Left edge of the signal bar in a network list row.
  *
  * @return x.
@@ -505,7 +521,7 @@ static uint16_t rssi_colour(int rssi)
  */
 static int list_bar_x(void)
 {
-	return (SSID_CHARS + CHAN_CHARS + RSSI_CHARS + 1) * font->width;
+	return list_chan_x() + ((CHAN_CHARS + RSSI_CHARS + 1) * font->width);
 }
 
 /**
@@ -538,7 +554,7 @@ static uint16_t name_colour(const struct chan_ap *ap)
  */
 static void draw_network_text(int y, const struct chan_ap *ap)
 {
-	int x_chan = SSID_CHARS * font->width;
+	int x_chan = list_chan_x();
 	int x_rssi = x_chan + (CHAN_CHARS * font->width);
 	uint8_t f = ap->freshness;
 	char text[SSID_CHARS + 1];
