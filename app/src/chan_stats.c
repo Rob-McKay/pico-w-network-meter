@@ -188,11 +188,13 @@ int chan_stats_add(struct chan_stats *s, const struct chan_ap *ap)
  * Public interface: documented in chan_stats.h.
  *
  * Adds up every access point's power in mW (not dBm), each weighted by its overlap with the
- * channel (overlap_mhz()) over CHAN_WIDTH_MHZ.
+ * channel (overlap_mhz()) over CHAN_WIDTH_MHZ: all of them for the interference, those on other
+ * channels for the adjacent figure.
  */
 void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan_info *out)
 {
 	uint64_t power = 0;
+	uint64_t adjacent = 0;
 
 	out->channel = channel;
 	out->ap_count = 0;
@@ -202,20 +204,25 @@ void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan
 	for (size_t i = 0; i < s->ap_count; i++) {
 		const struct chan_ap *ap = &s->aps[i];
 		int overlap = overlap_mhz(ap->channel, channel);
+		uint64_t share =
+			(chan_dbm_to_power(ap->rssi) * (unsigned int)overlap) / CHAN_WIDTH_MHZ;
 
 		if (ap->channel == channel) {
 			out->ap_count++;
 			if (ap->rssi > out->best_rssi) {
 				out->best_rssi = ap->rssi;
 			}
+		} else {
+			adjacent += share;
 		}
 		if (overlap > 0 && ap->freshness > out->freshness) {
 			out->freshness = ap->freshness;
 		}
-		power += (chan_dbm_to_power(ap->rssi) * (unsigned int)overlap) / CHAN_WIDTH_MHZ;
+		power += share;
 	}
 
 	out->interference = (int16_t)chan_power_to_dbm(power);
+	out->adjacent = (int16_t)chan_power_to_dbm(adjacent);
 }
 
 /*

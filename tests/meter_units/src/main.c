@@ -209,6 +209,36 @@ ZTEST(meter_chan, test_channel_overlap)
 }
 
 /**
+ * @brief The adjacent figure counts only the networks on other channels:
+ *        what spills over, not the channel's own.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_channel_adjacent)
+{
+	static struct chan_stats s;
+	struct chan_info info;
+
+	chan_stats_reset(&s);
+	add_ap(&s, 1, 6, -50);
+	chan_stats_channel(&s, 6, &info);
+	zassert_equal(info.interference, -50);
+	zassert_equal(info.adjacent, CHAN_RSSI_NONE, "its own network isn't adjacent");
+	chan_stats_channel(&s, 7, &info);
+	zassert_equal(info.adjacent, info.interference, "all spill-over on 7");
+	zassert_equal(info.adjacent, -51);
+
+	add_ap(&s, 2, 7, -50);
+	chan_stats_channel(&s, 7, &info);
+	zassert_equal(info.adjacent, -51, "7's own network leaves it alone");
+	zassert_equal(info.interference, -48, "but adds to the interference");
+	chan_stats_channel(&s, 6, &info);
+	zassert_equal(info.adjacent, -51, "7's network spills onto 6 at 3/4");
+	zassert_equal(info.best_rssi, -50);
+}
+
+/**
  * @brief Channel 14 sits 12 MHz above 13, not 5.
  *
  * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()

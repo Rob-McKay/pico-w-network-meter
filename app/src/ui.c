@@ -23,6 +23,10 @@
 #define AXIS_W         34
 /* Space each side of a bar in its column, pixels. */
 #define BAR_GAP        3
+/* Width of the strongest network's bar, in the middle of a column, pixels. */
+#define SIGNAL_W       6
+/* Brightness of the interference bar beside it, out of 255. */
+#define DIM_LEVEL      96
 /* Channels on the chart: 1-13 (14 is Japan-only, 802.11b). */
 #define CHART_CHANNELS 13
 /* Range of the chart and of the signal bars, dBm. */
@@ -306,14 +310,13 @@ static void draw_axis(const struct chart *c)
  *
  * @param c Layout.
  * @param x Left edge of the column.
- * @param bar_h Height of the bar.
+ * @param bar_top Top of the taller of the channel's bars.
  * @param info The channel's figures.
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-static void draw_count(const struct chart *c, int x, int bar_h, const struct chan_info *info)
+static void draw_count(const struct chart *c, int x, int bar_top, const struct chan_info *info)
 {
-	int bar_top = c->bottom - bar_h;
 	int label_y = bar_top - FONT_H;
 	char text[8];
 
@@ -326,27 +329,81 @@ static void draw_count(const struct chart *c, int x, int bar_h, const struct cha
 	text_centred(x, label_y, c->col_w, text, gfx_fade(col.text, info->freshness), col.bg);
 }
 
+/* A channel's two bars: their heights in pixels, and colours. */
+struct bars {
+	int signal;       /* the strongest network on the channel: bright */
+	int interference; /* spill-over from networks on other channels: dim */
+	uint16_t bright;
+	uint16_t dim;
+};
+
 /**
- * @brief Draw a channel's bar, with the gaps either side of it showing the
- *        grid.
+ * @brief Work out a channel's bars from its figures.
  *
  * @param c Layout.
- * @param x Left edge of the column.
- * @param bar_h Height of the bar.
  * @param info The channel's figures: its level gives the colour, its
  *        freshness the brightness.
+ * @param[out] b The bars.
+ *
+ * @sideeffects None (writes only through @p b); errno unchanged.
+ */
+static void bars_for(const struct chart *c, const struct chan_info *info, struct bars *b)
+{
+	uint16_t colour = level_colour(chan_stats_level(info->interference));
+
+	b->signal = dbm_length(info->best_rssi, c->bar_max);
+	b->interference = dbm_length(info->adjacent, c->bar_max);
+	b->bright = gfx_fade(colour, info->freshness);
+	b->dim = gfx_fade(b->bright, DIM_LEVEL);
+}
+
+/**
+ * @brief Draw a vertical strip of a channel's bars, from the top of the
+ *        taller one down: the grid, then the dim bar, then the bright one.
+ *
+ * @param c Layout.
+ * @param x Left edge.
+ * @param w Width.
+ * @param b The bars.
+ * @param with_signal The strip is under the bright bar, not just the dim one.
  *
  * @sideeffects Draws on the panel. errno unchanged.
  */
-static void draw_level_bar(const struct chart *c, int x, int bar_h, const struct chan_info *info)
+static void draw_strip(const struct chart *c, int x, int w, const struct bars *b, bool with_signal)
 {
-	int top = c->bottom - bar_h;
-	int bar_w = c->col_w - (2 * BAR_GAP);
-	uint16_t colour = level_colour(chan_stats_level(info->interference));
+	int top = c->bottom - MAX(b->signal, b->interference);
+	int signal = with_signal ? b->signal : 0;
+	int dim_top = c->bottom - MAX(signal, b->interference);
+	int bright_top = c->bottom - signal;
 
-	fill_plot(c, x, BAR_GAP, top, bar_h);
-	gfx_fill(x + BAR_GAP, top, bar_w, bar_h, gfx_fade(colour, info->freshness));
-	fill_plot(c, x + BAR_GAP + bar_w, c->col_w - BAR_GAP - bar_w, top, bar_h);
+	fill_plot(c, x, w, top, dim_top - top);
+	gfx_fill(x, dim_top, w, bright_top - dim_top, b->dim);
+	gfx_fill(x, bright_top, w, signal, b->bright);
+}
+
+/**
+ * @brief Draw a channel's bars: a bright signal bar in the middle of a dim
+ *        interference bar, with the grid around them.
+ *
+ * @param c Layout.
+ * @param x Left edge of the column.
+ * @param b The bars.
+ *
+ * @sideeffects Draws on the panel. errno unchanged.
+ */
+static void draw_bars(const struct chart *c, int x, const struct bars *b)
+{
+	int top = c->bottom - MAX(b->signal, b->interference);
+	int side_w = (c->col_w - (2 * BAR_GAP) - SIGNAL_W) / 2;
+	int mid = x + BAR_GAP + side_w;
+	int right = mid + SIGNAL_W;
+	int end = x + c->col_w - BAR_GAP;
+
+	fill_plot(c, x, BAR_GAP, top, c->bottom - top);
+	draw_strip(c, x + BAR_GAP, side_w, b, false);
+	draw_strip(c, mid, SIGNAL_W, b, true);
+	draw_strip(c, right, end - right, b, false);
+	fill_plot(c, end, x + c->col_w - end, top, c->bottom - top);
 }
 
 /**
@@ -370,7 +427,7 @@ static void draw_channel_number(const struct chart *c, int x, uint8_t channel, b
 }
 
 /**
- * @brief Draw one channel's column: count, bar and channel number.
+ * @brief Draw one channel's column: count, bars and channel number.
  *
  * Every pixel of the column is drawn, so it needs no clearing first.
  *
@@ -383,10 +440,11 @@ static void draw_channel_number(const struct chart *c, int x, uint8_t channel, b
 static void draw_column(const struct chart *c, const struct chan_info *info, bool recommended)
 {
 	int x = AXIS_W + ((info->channel - CHAN_FIRST) * c->col_w);
-	int bar_h = dbm_length(info->interference, c->bar_max);
+	struct bars b;
 
-	draw_count(c, x, bar_h, info);
-	draw_level_bar(c, x, bar_h, info);
+	bars_for(c, info, &b);
+	draw_count(c, x, c->bottom - MAX(b.signal, b.interference), info);
+	draw_bars(c, x, &b);
 	draw_channel_number(c, x, info->channel, recommended);
 }
 

@@ -62,9 +62,10 @@ static void report(const struct chan_stats *s, unsigned int scan_no)
 
 		chan_stats_channel(s, ch, &info);
 		if (info.ap_count > 0U || info.interference != CHAN_RSSI_NONE) {
-			LOG_INF("  ch %2u: %u networks, strongest %4d dBm, interference %4d dBm",
+			LOG_INF("  ch %2u: %u networks, strongest %4d dBm, from other channels %4d "
+				"dBm, total %4d dBm",
 				(unsigned int)ch, (unsigned int)info.ap_count, info.best_rssi,
-				info.interference);
+				info.adjacent, info.interference);
 		}
 	}
 	for (size_t i = 0; i < s->ap_count; i++) {
