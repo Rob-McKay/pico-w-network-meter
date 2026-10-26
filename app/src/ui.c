@@ -28,6 +28,9 @@
 /* Range of the chart and of the signal bars, dBm. */
 #define DBM_MIN        (-100)
 #define DBM_MAX        (-30)
+/* The chart's grid lines are GRID_STEP_DB apart; every LABEL_STEP_DB is labelled. */
+#define GRID_STEP_DB   10
+#define LABEL_STEP_DB  20
 /* Signal strength boundaries of the network list's bars, dBm. */
 #define RSSI_GOOD      (-60)
 #define RSSI_FAIR      (-75)
@@ -46,6 +49,8 @@ static struct {
 	uint16_t bar_bg;
 	uint16_t text;
 	uint16_t dim;
+	uint16_t grid;
+	uint16_t grid_label;
 	uint16_t highlight;
 	uint16_t clear;
 	uint16_t moderate;
@@ -65,6 +70,8 @@ static void init_colours(void)
 	col.bar_bg = gfx_rgb(0, 50, 110);
 	col.text = gfx_rgb(255, 255, 255);
 	col.dim = gfx_rgb(150, 150, 150);
+	col.grid = gfx_rgb(40, 40, 40);
+	col.grid_label = gfx_rgb(80, 80, 80);
 	col.highlight = gfx_rgb(0, 210, 255);
 	col.clear = gfx_rgb(0, 200, 80);
 	col.moderate = gfx_rgb(255, 170, 0);
@@ -211,7 +218,69 @@ static void chart_layout(struct chart *c)
 }
 
 /**
- * @brief Draw the chart's dBm axis labels.
+ * @brief Work out the row of a dBm value on the chart.
+ *
+ * @param c Layout.
+ * @param dbm Value, DBM_MIN to DBM_MAX.
+ * @return y: the top row of a bar reaching @p dbm.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int dbm_row(const struct chart *c, int dbm)
+{
+	return c->bottom - dbm_length(dbm, c->bar_max);
+}
+
+/**
+ * @brief Pick the colour of a grid line: brighter where it is labelled.
+ *
+ * @param dbm The line's value, DBM_MIN or more.
+ * @return Colour.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint16_t grid_colour(int dbm)
+{
+	return ((dbm - DBM_MIN) % LABEL_STEP_DB) == 0 ? col.grid_label : col.grid;
+}
+
+/**
+ * @brief Fill part of a column of the chart with its background: black,
+ *        crossed by the grid lines.
+ *
+ * Each row is drawn once, so a redraw doesn't flicker.
+ *
+ * @param c Layout.
+ * @param x Left edge.
+ * @param w Width.
+ * @param y Top edge.
+ * @param h Height.
+ *
+ * @sideeffects Draws on the panel. errno unchanged.
+ */
+static void fill_plot(const struct chart *c, int x, int w, int y, int h)
+{
+	int end = y + h;
+
+	/* Highest value first, so the lines come in order down the panel. */
+	for (int dbm = DBM_MAX; dbm > DBM_MIN; dbm -= GRID_STEP_DB) {
+		int line = dbm_row(c, dbm);
+
+		if (line >= y && line < end) {
+			gfx_fill(x, y, w, line - y, col.bg);
+			gfx_fill(x, line, w, 1, grid_colour(dbm));
+			y = line + 1;
+		}
+	}
+	gfx_fill(x, y, w, end - y, col.bg);
+}
+
+/**
+ * @brief Draw the chart's dBm axis: a vertical line, labelled every
+ *        LABEL_STEP_DB.
+ *
+ * The labels sit beside the grid lines that fill_plot() draws; the -100
+ * and -30 ends are left unlabelled, as "-100" would not fit.
  *
  * @param c Layout.
  *
@@ -219,18 +288,21 @@ static void chart_layout(struct chart *c)
  */
 static void draw_axis(const struct chart *c)
 {
-	for (int dbm = -40; dbm >= -80; dbm -= 20) {
+	int top = dbm_row(c, DBM_MAX);
+
+	for (int dbm = DBM_MIN + LABEL_STEP_DB; dbm < DBM_MAX; dbm += LABEL_STEP_DB) {
 		char label[8];
-		int y = c->bottom - dbm_length(dbm, c->bar_max) - (FONT_H / 2);
 
 		(void)snprintf(label, sizeof(label), "%d", dbm);
-		gfx_text(0, y, AXIS_W - PAD, font, label, col.dim, col.bg);
+		gfx_text(0, dbm_row(c, dbm) - (FONT_H / 2), AXIS_W - PAD, font, label, col.dim,
+			 col.bg);
 	}
+	gfx_fill(AXIS_W - 1, top, 1, c->bottom - top, col.dim);
 }
 
 /**
  * @brief Draw the space above a channel's bar, with the network count
- *        just above the bar.
+ *        just above the bar if there are any networks on the channel.
  *
  * @param c Layout.
  * @param x Left edge of the column.
@@ -241,18 +313,22 @@ static void draw_axis(const struct chart *c)
  */
 static void draw_count(const struct chart *c, int x, int bar_h, const struct chan_info *info)
 {
-	int label_y = c->bottom - bar_h - FONT_H;
-	char text[8] = "";
+	int bar_top = c->bottom - bar_h;
+	int label_y = bar_top - FONT_H;
+	char text[8];
 
-	if (info->ap_count > 0U) {
-		(void)snprintf(text, sizeof(text), "%u", (unsigned int)info->ap_count);
+	if (info->ap_count == 0U) {
+		fill_plot(c, x, c->col_w, c->top, bar_top - c->top);
+		return;
 	}
-	gfx_fill(x, c->top, c->col_w, label_y - c->top, col.bg);
+	(void)snprintf(text, sizeof(text), "%u", (unsigned int)info->ap_count);
+	fill_plot(c, x, c->col_w, c->top, label_y - c->top);
 	text_centred(x, label_y, c->col_w, text, gfx_fade(col.text, info->freshness), col.bg);
 }
 
 /**
- * @brief Draw a channel's bar, with the gaps either side of it.
+ * @brief Draw a channel's bar, with the gaps either side of it showing the
+ *        grid.
  *
  * @param c Layout.
  * @param x Left edge of the column.
@@ -268,9 +344,9 @@ static void draw_level_bar(const struct chart *c, int x, int bar_h, const struct
 	int bar_w = c->col_w - (2 * BAR_GAP);
 	uint16_t colour = level_colour(chan_stats_level(info->interference));
 
-	gfx_fill(x, top, BAR_GAP, bar_h, col.bg);
+	fill_plot(c, x, BAR_GAP, top, bar_h);
 	gfx_fill(x + BAR_GAP, top, bar_w, bar_h, gfx_fade(colour, info->freshness));
-	gfx_fill(x + BAR_GAP + bar_w, top, c->col_w - BAR_GAP - bar_w, bar_h, col.bg);
+	fill_plot(c, x + BAR_GAP + bar_w, c->col_w - BAR_GAP - bar_w, top, bar_h);
 }
 
 /**
@@ -318,7 +394,7 @@ static void draw_column(const struct chart *c, const struct chan_info *info, boo
  * @brief Draw the channels screen.
  *
  * @param s Scan statistics.
- * @param full Draw the axis labels as well (after a clear).
+ * @param full Draw the axis as well (after a clear).
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
@@ -493,7 +569,7 @@ static void recommend_text(const struct chan_stats *s, char *buf, size_t size)
  *
  * @param s Scan statistics.
  * @param scan_no Scans so far.
- * @param full Draw the axis labels as well (after a clear).
+ * @param full Draw the axis as well (after a clear).
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
