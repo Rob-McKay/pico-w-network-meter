@@ -15,10 +15,11 @@ and shows:
   channel. The number of networks on each channel is shown above its
   bars. The non-overlapping channels 1, 6 and 11 are labelled in bold,
   and the quietest of them is highlighted as the one to use.
-- **Networks**: the strongest networks, with channel, signal strength (dBm)
-  and a signal bar. Open (unsecured) networks are shown in amber; hidden
-  ones in grey, named by the end of their MAC address
-  (`hidden a2:7f:06`).
+- **Networks**: the strongest networks, with channel and signal strength
+  (dBm, green, amber or red). Names of up to 24 characters show whole;
+  longer ones are shortened in the middle, keeping the end. Open
+  (unsecured) networks are shown in amber; hidden ones in grey, named by
+  the end of their MAC address (`hidden a2:7f:06`).
 
 | Channels | Networks |
 |---|---|
@@ -33,7 +34,7 @@ nothing at all, doesn't blank the display; an empty or failed scan is
 retried after 2 s.
 
 **Buttons**: A next screen, B previous screen, X scan now.
-**RGB LED** (dimmed by PWM to 5%): blue while scanning, then green, amber or
+**RGB LED** (dimmed by PWM to 2%): blue while scanning, then green, amber or
 red for how busy the recommended channel is; magenta if a scan fails.
 After 5 failed scans in a row it restarts itself, which recovers a Wi-Fi
 driver that has stopped working (see below).

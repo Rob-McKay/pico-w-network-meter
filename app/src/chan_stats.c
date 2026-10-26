@@ -25,6 +25,8 @@
 #define MANTISSA_DIGITS    4U
 /* Steps of 1 dB in a decade (10 dB). */
 #define DB_PER_DECADE      10
+/* Smallest buffer a name is shortened in the middle for: "ab..yz". */
+#define MIDDLE_CUT_MIN     7U
 /* Interference thresholds of chan_stats_level(), dBm. */
 #define LEVEL_MODERATE_DBM (-85)
 #define LEVEL_BUSY_DBM     (-70)
@@ -362,6 +364,40 @@ bool chan_ap_hidden(const struct chan_ap *ap)
 	return ap->ssid[0] == '\0';
 }
 
+/**
+ * @brief Copy a name, shortened in the middle if it is too long.
+ *
+ * The start gets the odd character when the room left is odd. Into fewer
+ * than MIDDLE_CUT_MIN bytes, the name is cut at the end instead: too
+ * little would be left either side of "..".
+ *
+ * @param name The name.
+ * @param[out] buf The copy, always terminated.
+ * @param size Size of @p buf, at least 1.
+ *
+ * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void copy_middle_cut(const char *name, char *buf, size_t size)
+{
+	size_t len = strlen(name);
+	size_t room = size - 1U;
+
+	if (len <= room || size < MIDDLE_CUT_MIN) {
+		(void)snprintf(buf, size, "%s", name);
+		return;
+	}
+
+	size_t tail = (room - 2U) / 2U;
+	size_t head = room - 2U - tail;
+
+	memcpy(buf, name, head);
+	buf[head] = '.';
+	buf[head + 1U] = '.';
+	memcpy(&buf[head + 2U], &name[len - tail], tail);
+	buf[room] = '\0';
+}
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -371,7 +407,7 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size)
 		return;
 	}
 	if (!chan_ap_hidden(ap)) {
-		(void)snprintf(buf, size, "%s", ap->ssid);
+		copy_middle_cut(ap->ssid, buf, size);
 		return;
 	}
 	(void)snprintf(buf, size, "hidden %02x:%02x:%02x", (unsigned int)ap->bssid[3],

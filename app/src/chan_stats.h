@@ -187,8 +187,13 @@ bool chan_ap_hidden(const struct chan_ap *ap);
  * address), "hidden 12:34:56", which tell the access points apart; the
  * first three only name the maker; that takes 16 bytes.
  *
+ * An SSID too long for @p buf is shortened in the middle, keeping its
+ * start and end, "JurassicFi..UID35630", as the end often tells similar
+ * names apart. Lengths are in bytes, so a name with multi-byte UTF-8
+ * characters may be shortened sooner than it needs to be.
+ *
  * @param ap The access point.
- * @param[out] buf The name, cut to fit and always terminated.
+ * @param[out] buf The name, shortened to fit and always terminated.
  * @param size Size of @p buf; 0 writes nothing.
  *
  * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an

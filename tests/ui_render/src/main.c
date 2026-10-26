@@ -28,8 +28,9 @@
 #define ROW_MINUS_60 (CHART_BOTTOM - ((40 * 162) / 70))
 #define ROW_MINUS_50 (CHART_BOTTOM - ((50 * 162) / 70))
 #define LIST_TOP     (BAR_H + 2)
-#define LIST_CHAN_X  ((15 * 10) + 8)
-#define LIST_BAR_X   (LIST_CHAN_X + (8 * 10))
+#define LIST_NAME_W  (24 * 10)
+#define LIST_CHAN_X  (LIST_NAME_W + 8)
+#define LIST_RSSI_X  (LIST_CHAN_X + (3 * 10))
 
 static struct chan_stats stats;
 
@@ -75,7 +76,7 @@ static void *setup(void)
 	chan_stats_reset(&stats);
 	add(1, "HomeNetwork", 1, -42, true);
 	add(2, "HomeNetwork-Guest", 1, -48, true);
-	add(3, "Neighbour 1", 1, -67, true);
+	add(3, "JurassicFibre_UID35630", 1, -67, true);
 	add(4, "CoffeeShop", 6, -81, false);
 	add(5, "Printer", 4, -88, true);
 	add(6, "", 9, -90, true);
@@ -97,20 +98,21 @@ static int column_x(int ch)
 }
 
 /**
- * @brief Tell whether a line of text on the fake panel has any pixel of a
- *        colour.
+ * @brief Tell whether part of a line of text on the fake panel has any
+ *        pixel of a colour.
  *
  * @param y Top of the line.
- * @param w Width to look across, from the left edge.
+ * @param x0 Left edge of the part to look at.
+ * @param x1 Its right edge, exclusive.
  * @param colour The colour.
- * @return True if any pixel in the line's 16 rows is @p colour.
+ * @return True if any pixel in the part's 16 rows is @p colour.
  *
  * @sideeffects None; errno unchanged.
  */
-static bool row_has_colour(int y, int w, uint16_t colour)
+static bool row_has_colour(int y, int x0, int x1, uint16_t colour)
 {
 	for (int dy = 0; dy < 16; dy++) {
-		for (int x = 0; x < w; x++) {
+		for (int x = x0; x < x1; x++) {
 			if (fake_display_pixel(x, y + dy) == colour) {
 				return true;
 			}
@@ -200,7 +202,8 @@ ZTEST(meter_ui, test_grid_and_axis)
 }
 
 /**
- * @brief The list shows the strongest network first, with a green bar.
+ * @brief The list shows the strongest network first, its signal strength
+ *        in green; a weak one's in red; a hidden network's name in grey.
  *
  * @sideeffects Draws on the fake panel and saves it to out/screens/networks.ppm. errno may be
  *              set by snprintf() (only on an output error).
@@ -209,13 +212,16 @@ ZTEST(meter_ui, test_network_list)
 {
 	ui_show(UI_VIEW_NETWORKS, &stats, 2, true);
 
-	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + 8), gfx_rgb(0, 200, 80),
-		      "-42 dBm: green");
-	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (4 * 20) + 8),
-		      gfx_rgb(230, 40, 40), "5th, -88 dBm: red");
-	zassert_true(row_has_colour(LIST_TOP + (5 * 20) + 2, 15 * 10, gfx_rgb(150, 150, 150)),
-		     "6th: the hidden network, named in grey");
-	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (6 * 20) + 8), gfx_rgb(0, 0, 0),
+	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, gfx_rgb(0, 200, 80)),
+		     "-42 dBm: green");
+	zassert_false(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, gfx_rgb(230, 40, 40)));
+	zassert_true(
+		row_has_colour(LIST_TOP + (4 * 20) + 2, LIST_RSSI_X, 320, gfx_rgb(230, 40, 40)),
+		"5th, -88 dBm: red");
+	zassert_true(
+		row_has_colour(LIST_TOP + (5 * 20) + 2, 0, LIST_NAME_W, gfx_rgb(150, 150, 150)),
+		"6th: the hidden network, named in grey");
+	zassert_false(row_has_colour(LIST_TOP + (6 * 20) + 2, 0, 320, gfx_rgb(255, 255, 255)),
 		      "no 7th network");
 	(void)fake_display_save_ppm("out/screens/networks.ppm");
 }
@@ -261,8 +267,8 @@ ZTEST(meter_ui, test_faded)
 }
 
 /**
- * @brief A full-length name on a two-digit channel keeps a gap before the
- *        channel number.
+ * @brief A name long enough to be shortened fills its column, and still
+ *        leaves a gap before a two-digit channel number.
  *
  * @sideeffects Draws on the fake panel. errno unchanged.
  */
@@ -270,7 +276,7 @@ ZTEST(meter_ui, test_name_gap)
 {
 	static struct chan_stats one;
 	struct chan_ap ap = {
-		.ssid = "AVeryLongNetworkName",
+		.ssid = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345",
 		.bssid = {0x02, 0x1f, 0x3c, 0xa2, 0x7f, 0x40},
 		.channel = 11,
 		.rssi = -50,
@@ -284,7 +290,7 @@ ZTEST(meter_ui, test_name_gap)
 	ui_show(UI_VIEW_NETWORKS, &one, 1, true);
 
 	for (int y = LIST_TOP + 2; y < LIST_TOP + 2 + 16; y++) {
-		for (int x = 15 * 10; x < LIST_CHAN_X; x++) {
+		for (int x = LIST_NAME_W; x < LIST_CHAN_X; x++) {
 			zassert_equal(fake_display_pixel(x, y), gfx_rgb(0, 0, 0),
 				      "gap after the name at %d,%d", x, y);
 		}
