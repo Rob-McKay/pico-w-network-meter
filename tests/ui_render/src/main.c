@@ -141,10 +141,12 @@ ZTEST(meter_ui, test_channel_bars)
 	zassert_equal(fake_display_pixel(column_x(2) + (COL_W / 2), CHART_BOTTOM - 1),
 		      gfx_fade(gfx_rgb(230, 40, 40), 153),
 		      "channel 2: no network of its own, dim spill-over from 1");
-	zassert_equal(fake_display_pixel(column_x(1) + 4, ROW_MINUS_60 + 1), gfx_rgb(0, 0, 0),
-		      "channel 1: little spill-over, so beside the bright bar is background");
-	zassert_equal(fake_display_pixel(column_x(1) + 4, CHART_BOTTOM - 1),
-		      gfx_fade(gfx_rgb(230, 40, 40), 153), "and the dim bar below it");
+	zassert_equal(
+		fake_display_pixel(column_x(1) + 4, ROW_MINUS_60),
+		gfx_fade(gfx_rgb(230, 40, 40), 153),
+		"channel 1: its two weaker networks interfere with the strongest, to -48 dBm");
+	zassert_equal(fake_display_pixel(column_x(1) + 4, CHART_BOTTOM - ((60 * 162) / 70)),
+		      gfx_rgb(0, 0, 0), "background beside the bright bar above that, at -40 dBm");
 	(void)fake_display_save_ppm("out/screens/channels.ppm");
 }
 

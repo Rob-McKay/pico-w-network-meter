@@ -340,7 +340,7 @@ static void draw_count(const struct chart *c, int x, int bar_top, const struct c
 /* A channel's two bars: their heights in pixels, and colours. */
 struct bars {
 	int signal;       /* the strongest network on the channel: bright */
-	int interference; /* spill-over from networks on other channels: dim */
+	int interference; /* every other network reaching the channel: dim */
 	uint16_t bright;
 	uint16_t dim;
 };
@@ -360,7 +360,7 @@ static void bars_for(const struct chart *c, const struct chan_info *info, struct
 	uint16_t colour = level_colour(chan_stats_level(info->interference));
 
 	b->signal = dbm_length(info->best_rssi, c->bar_max);
-	b->interference = dbm_length(info->adjacent, c->bar_max);
+	b->interference = dbm_length(info->others, c->bar_max);
 	b->bright = gfx_fade(colour, info->freshness);
 	b->dim = gfx_fade(b->bright, DIM_LEVEL);
 }

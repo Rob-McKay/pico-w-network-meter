@@ -209,13 +209,14 @@ ZTEST(meter_chan, test_channel_overlap)
 }
 
 /**
- * @brief The adjacent figure counts only the networks on other channels:
- *        what spills over, not the channel's own.
+ * @brief The others figure counts every network but the channel's
+ *        strongest: others on the same channel, and spill-over from
+ *        overlapping channels.
  *
  * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
  *              (only on an output error).
  */
-ZTEST(meter_chan, test_channel_adjacent)
+ZTEST(meter_chan, test_channel_others)
 {
 	static struct chan_stats s;
 	struct chan_info info;
@@ -224,18 +225,24 @@ ZTEST(meter_chan, test_channel_adjacent)
 	add_ap(&s, 1, 6, -50);
 	chan_stats_channel(&s, 6, &info);
 	zassert_equal(info.interference, -50);
-	zassert_equal(info.adjacent, CHAN_RSSI_NONE, "its own network isn't adjacent");
+	zassert_equal(info.others, CHAN_RSSI_NONE,
+		      "the only network doesn't interfere with itself");
 	chan_stats_channel(&s, 7, &info);
-	zassert_equal(info.adjacent, info.interference, "all spill-over on 7");
-	zassert_equal(info.adjacent, -51);
+	zassert_equal(info.others, info.interference, "no network on 7: all of it interferes");
+	zassert_equal(info.others, -51, "6's network at 3/4");
 
-	add_ap(&s, 2, 7, -50);
-	chan_stats_channel(&s, 7, &info);
-	zassert_equal(info.adjacent, -51, "7's own network leaves it alone");
-	zassert_equal(info.interference, -48, "but adds to the interference");
+	add_ap(&s, 2, 6, -60);
 	chan_stats_channel(&s, 6, &info);
-	zassert_equal(info.adjacent, -51, "7's network spills onto 6 at 3/4");
 	zassert_equal(info.best_rssi, -50);
+	zassert_equal(info.others, -60, "the weaker network on the same channel interferes");
+
+	add_ap(&s, 3, 7, -50);
+	chan_stats_channel(&s, 7, &info);
+	zassert_equal(info.best_rssi, -50);
+	zassert_equal(info.others, -51, "6's networks: -50 and -60 at 3/4");
+	zassert_equal(info.interference, -47, "7's own network adds to the total");
+	chan_stats_channel(&s, 6, &info);
+	zassert_equal(info.others, -51, "-60 on 6, and -50 spilling from 7 at 3/4");
 }
 
 /**

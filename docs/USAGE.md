@@ -32,9 +32,11 @@ The four buttons are beside the screen, two on each side.
 - **Two bars per channel**, 1 to 13, one inside the other:
   - **Bright, narrow bar: signal.** The strongest network on that
     channel. No bright bar means no network uses the channel.
-  - **Dim, wide bar: interference.** Signal spilling over from networks
-    on other channels, because a 2.4 GHz network overlaps its neighbours
-    up to 3 channels away.
+  - **Dim, wide bar: interference.** Every other network the channel
+    hears: other networks on the same channel, and those on nearby
+    channels spilling over (a 2.4 GHz network overlaps its neighbours up
+    to 3 channels away). A channel with one network and nothing nearby
+    has no dim bar.
 - **The scale** on the left is in dBm, the signal reaching the channel,
   with a grid line every 10 dB; the labelled lines are brighter.
 - **Bar colour** shows how busy the channel is, counting both:
