@@ -15,10 +15,11 @@ and shows:
   channel. The number of networks on each channel is shown above its
   bars. The non-overlapping channels 1, 6 and 11 are labelled in bold,
   and the quietest of them is highlighted as the one to use.
-- **Networks**: the strongest networks, with channel, signal strength (dBm)
-  and a signal bar. Open (unsecured) networks are shown in amber; hidden
-  ones in grey, named by the end of their MAC address
-  (`hidden a2:7f:06`).
+- **Networks**: the strongest networks, with channel and signal strength
+  (dBm, green, amber or red). Names of up to 24 characters show whole;
+  longer ones are shortened in the middle, keeping the end. Open
+  (unsecured) networks are shown in amber; hidden ones in grey, named by
+  the end of their MAC address (`hidden a2:7f:06`).
 
 | Channels | Networks |
 |---|---|

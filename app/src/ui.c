@@ -29,19 +29,21 @@
 #define DIM_LEVEL      153
 /* Channels on the chart: 1-13 (14 is Japan-only, 802.11b). */
 #define CHART_CHANNELS 13
-/* Range of the chart and of the signal bars, dBm. */
+/* Range of the chart, dBm. */
 #define DBM_MIN        (-100)
 #define DBM_MAX        (-30)
 /* The chart's grid lines are GRID_STEP_DB apart; every LABEL_STEP_DB is labelled. */
 #define GRID_STEP_DB   10
 #define LABEL_STEP_DB  20
-/* Signal strength boundaries of the network list's bars, dBm. */
+/* Signal strength boundaries of the network list's colours, dBm. */
 #define RSSI_GOOD      (-60)
 #define RSSI_FAIR      (-75)
 /* A row of the network list, pixels. */
 #define ROW_H          20
-/* Columns of the network list, in characters. */
-#define SSID_CHARS     15
+/* Columns of the network list, in characters: with NAME_GAP, 318 of the
+ * panel's 320 pixels in the 10-pixel font.
+ */
+#define SSID_CHARS     24
 #define CHAN_CHARS     3
 #define RSSI_CHARS     4
 /* Space between a network's name and its channel, pixels. */
@@ -513,18 +515,6 @@ static int list_chan_x(void)
 }
 
 /**
- * @brief Left edge of the signal bar in a network list row.
- *
- * @return x.
- *
- * @sideeffects None; errno unchanged.
- */
-static int list_bar_x(void)
-{
-	return list_chan_x() + ((CHAN_CHARS + RSSI_CHARS + 1) * font->width);
-}
-
-/**
  * @brief Pick the colour of a network's name.
  *
  * @param ap The network.
@@ -542,10 +532,11 @@ static uint16_t name_colour(const struct chan_ap *ap)
 }
 
 /**
- * @brief Draw a network's name, channel and RSSI as text.
+ * @brief Draw a network's name, channel and signal strength as text,
+ *        across the whole row.
  *
- * Names are coloured by name_colour(); everything fades with the
- * network's freshness.
+ * Names are coloured by name_colour() and signal strengths by
+ * rssi_colour(); everything fades with the network's freshness.
  *
  * @param y Top edge of the text.
  * @param ap The network.
@@ -564,29 +555,8 @@ static void draw_network_text(int y, const struct chan_ap *ap)
 	(void)snprintf(text, sizeof(text), "%*u", CHAN_CHARS - 1, (unsigned int)ap->channel);
 	gfx_text(x_chan, y, x_rssi - x_chan, font, text, gfx_fade(col.dim, f), col.bg);
 	(void)snprintf(text, sizeof(text), "%*d", RSSI_CHARS, ap->rssi);
-	gfx_text(x_rssi, y, list_bar_x() - x_rssi, font, text, gfx_fade(col.text, f), col.bg);
-}
-
-/**
- * @brief Draw a network's signal bar, PAD in from the text's top and
- *        bottom, with the space around it.
- *
- * @param y Top edge of the text beside it.
- * @param ap The network.
- *
- * @sideeffects Draws on the panel. errno unchanged.
- */
-static void draw_signal_bar(int y, const struct chan_ap *ap)
-{
-	int x = list_bar_x();
-	int w = gfx_width() - x;
-	int len = dbm_length(ap->rssi, w - PAD);
-	int bar_h = FONT_H - (2 * PAD);
-
-	gfx_fill(x, y, w, PAD, col.bg);
-	gfx_fill(x, y + PAD, len, bar_h, gfx_fade(rssi_colour(ap->rssi), ap->freshness));
-	gfx_fill(x + len, y + PAD, w - len, bar_h, col.bg);
-	gfx_fill(x, y + FONT_H - PAD, w, PAD, col.bg);
+	gfx_text(x_rssi, y, gfx_width() - x_rssi, font, text, gfx_fade(rssi_colour(ap->rssi), f),
+		 col.bg);
 }
 
 /**
@@ -609,7 +579,6 @@ static void draw_network(int y, const struct chan_ap *ap)
 	}
 	gfx_fill(0, y, w, PAD, col.bg);
 	draw_network_text(y + PAD, ap);
-	draw_signal_bar(y + PAD, ap);
 	gfx_fill(0, y + PAD + FONT_H, w, ROW_H - PAD - FONT_H, col.bg);
 }
 

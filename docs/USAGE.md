@@ -62,11 +62,13 @@ The strongest networks, one per row:
   if it is secured. A hidden network, which doesn't broadcast its name, is
   shown in grey as "hidden" and the last three bytes of its MAC address
   (BSSID), such as `hidden a2:7f:06`, which tell its access points apart.
+  Names up to 24 characters, such as `JurassicFibre_UID35630`, are shown
+  whole; longer ones are shortened in the middle with `..`, keeping the
+  start and the end, which often tells similar names apart.
 - **Channel.**
 - **Signal strength** in dBm. Closer to 0 is stronger: −40 is very strong,
-  −90 is barely there.
-- **Signal bar:** green = good (−60 dBm or better), amber = fair (down to
-  −75 dBm), red = weak.
+  −90 is barely there. Its colour: green = good (−60 dBm or better),
+  amber = fair (down to −75 dBm), red = weak.
 
 The footer gives how many networks are showing, and how many results were
 ignored ("other"): those not on a 2.4 GHz channel, or past the 64 the

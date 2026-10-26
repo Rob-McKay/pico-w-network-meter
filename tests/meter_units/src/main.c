@@ -444,7 +444,7 @@ ZTEST(meter_chan, test_standard_channels)
 ZTEST(meter_chan, test_ap_name)
 {
 	struct chan_ap ap = make_ap(0xab, 6, -50);
-	char name[16];
+	char name[CHAN_SSID_MAX + 1];
 
 	zassert_false(chan_ap_hidden(&ap));
 	chan_ap_name(&ap, name, sizeof(name));
@@ -459,6 +459,18 @@ ZTEST(meter_chan, test_ap_name)
 
 	chan_ap_name(&ap, name, 7);
 	zassert_str_equal(name, "hidden", "cut to fit, terminated");
+
+	(void)snprintf(ap.ssid, sizeof(ap.ssid), "%s", "JurassicFibre_UID35630");
+	chan_ap_name(&ap, name, 16);
+	zassert_str_equal(name, "Jurassi..D35630", "too long: cut in the middle, end kept");
+	chan_ap_name(&ap, name, 23);
+	zassert_str_equal(name, "JurassicFibre_UID35630", "fits: whole");
+	chan_ap_name(&ap, name, 22);
+	zassert_str_equal(name, "JurassicFi.._UID35630", "one short: the start gets the odd one");
+	chan_ap_name(&ap, name, 7);
+	zassert_str_equal(name, "Ju..30", "smallest middle cut");
+	chan_ap_name(&ap, name, 6);
+	zassert_str_equal(name, "Juras", "too small for that: cut at the end");
 	name[0] = 'x';
 	chan_ap_name(&ap, name, 0);
 	zassert_equal(name[0], 'x', "size 0 writes nothing");
