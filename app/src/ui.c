@@ -25,8 +25,8 @@
 #define BAR_GAP        3
 /* Width of the strongest network's bar, in the middle of a column, pixels. */
 #define SIGNAL_W       6
-/* Brightness of the interference bar beside it, out of 255. */
-#define DIM_LEVEL      96
+/* Brightness of the interference bar beside it, out of 255: 60%. */
+#define DIM_LEVEL      153
 /* Channels on the chart: 1-13 (14 is Japan-only, 802.11b). */
 #define CHART_CHANNELS 13
 /* Range of the chart and of the signal bars, dBm. */
