@@ -48,4 +48,22 @@ uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b);
 void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
 		 uint16_t fg, uint16_t bg);
 
+/**
+ * @brief Draw a line of bold text across a band of pixels.
+ *
+ * As raster_text(), with each glyph's ink also drawn one pixel to the
+ * right, within its own cell: the bitmap fonts have no bold face.
+ *
+ * @param font Font (vertically packed, as the CFB fonts are).
+ * @param text Line of text.
+ * @param[out] band Pixels: @p width x the font's height.
+ * @param width Band width in pixels.
+ * @param fg Text colour (raster_rgb()).
+ * @param bg Background colour (raster_rgb()).
+ *
+ * @sideeffects None (writes only through @p band); errno unchanged.
+ */
+void raster_text_bold(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
+		      uint16_t fg, uint16_t bg);
+
 #endif /* METER_TEXT_RASTER_H_ */

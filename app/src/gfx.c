@@ -194,13 +194,25 @@ void gfx_fill(int x, int y, int w, int h, uint16_t color)
 	}
 }
 
-/*
- * Public interface: documented in gfx.h.
+/**
+ * @brief Draw a line of text in a box one font height tall, plain or bold.
  *
  * Draws whole lines of text only: a box clipped to less than the font's height is skipped.
+ *
+ * @param x Left edge of the box.
+ * @param y Top edge of the box.
+ * @param w Box width, clipped to the display.
+ * @param font Font.
+ * @param text Text.
+ * @param fg Text colour.
+ * @param bg Background colour.
+ * @param bold Bold (raster_text_bold()).
+ *
+ * @sideeffects Overwrites the shared band buffer and draws on the panel (write_band()). errno
+ *              unchanged.
  */
-void gfx_text(int x, int y, int w, const struct cfb_font *font, const char *text, uint16_t fg,
-	      uint16_t bg)
+static void text_box(int x, int y, int w, const struct cfb_font *font, const char *text,
+		     uint16_t fg, uint16_t bg, bool bold)
 {
 	int h = font->height;
 
@@ -208,6 +220,28 @@ void gfx_text(int x, int y, int w, const struct cfb_font *font, const char *text
 		return;
 	}
 
-	raster_text(font, text, band, (size_t)w, fg, bg);
+	if (bold) {
+		raster_text_bold(font, text, band, (size_t)w, fg, bg);
+	} else {
+		raster_text(font, text, band, (size_t)w, fg, bg);
+	}
 	write_band(x, y, w, h);
+}
+
+/*
+ * Public interface: documented in gfx.h.
+ */
+void gfx_text(int x, int y, int w, const struct cfb_font *font, const char *text, uint16_t fg,
+	      uint16_t bg)
+{
+	text_box(x, y, w, font, text, fg, bg, false);
+}
+
+/*
+ * Public interface: documented in gfx.h.
+ */
+void gfx_text_bold(int x, int y, int w, const struct cfb_font *font, const char *text, uint16_t fg,
+		   uint16_t bg)
+{
+	text_box(x, y, w, font, text, fg, bg, true);
 }

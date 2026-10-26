@@ -40,9 +40,11 @@ The four buttons are beside the screen, two on each side.
 - **Bar colour** shows how busy the channel is, counting both:
   green = clear, amber = moderate, red = busy.
 - **The number above a bar** is how many networks use that channel.
+- **Bold channel numbers** are the standard channels 1, 6 and 11. Those
+  three are the only channels that don't overlap each other, so routers
+  should use one of them.
 - **The highlighted channel number** is the recommended channel: the
-  quietest of 1, 6 and 11. Those three are the only channels that don't
-  overlap each other, so routers should use one of them.
+  quietest of 1, 6 and 11.
 - **Footer:** "Use ch 6: clear" names the recommended channel and how busy
   it is. "Nothing heard" means no networks are showing. The scan count is
   on the right.
@@ -55,7 +57,9 @@ The four buttons are beside the screen, two on each side.
 The strongest networks, one per row:
 
 - **Name.** Shown in amber if the network is open (no password), white
-  if it is secured.
+  if it is secured. A hidden network, which doesn't broadcast its name, is
+  shown in grey as "hidden" and the last three bytes of its MAC address
+  (BSSID), such as `hidden a2:7f:06`, which tell its access points apart.
 - **Channel.**
 - **Signal strength** in dBm. Closer to 0 is stronger: −40 is very strong,
   −90 is barely there.
@@ -63,7 +67,8 @@ The strongest networks, one per row:
   −75 dBm), red = weak.
 
 The footer gives how many networks are showing, and how many results were
-ignored ("other"), such as hidden networks.
+ignored ("other"): those not on a 2.4 GHz channel, or past the 64 the
+meter keeps.
 
 ## Fading
 

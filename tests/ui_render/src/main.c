@@ -47,7 +47,7 @@ static struct chan_stats stats;
 static void add(uint8_t id, const char *ssid, uint8_t channel, int8_t rssi, bool secured)
 {
 	struct chan_ap ap = {
-		.bssid = {0x02, 0, 0, 0, 0, id},
+		.bssid = {0x02, 0x1f, 0x3c, 0xa2, 0x7f, id},
 		.channel = channel,
 		.rssi = rssi,
 		.secured = secured,
@@ -60,7 +60,7 @@ static void add(uint8_t id, const char *ssid, uint8_t channel, int8_t rssi, bool
 
 /**
  * @brief Start the display and fill in a scan: busy on 1, a little on 4-6,
- *        nothing near 11 (so 11 is recommended).
+ *        a weak hidden network on 9, little near 11 (so 11 is recommended).
  *
  * @return NULL: no fixture.
  *
@@ -77,6 +77,7 @@ static void *setup(void)
 	add(3, "Neighbour 1", 1, -67, true);
 	add(4, "CoffeeShop", 6, -81, false);
 	add(5, "Printer", 4, -88, true);
+	add(6, "", 9, -90, true);
 
 	return NULL;
 }
@@ -92,6 +93,30 @@ static void *setup(void)
 static int column_x(int ch)
 {
 	return AXIS_W + ((ch - 1) * COL_W);
+}
+
+/**
+ * @brief Tell whether a line of text on the fake panel has any pixel of a
+ *        colour.
+ *
+ * @param y Top of the line.
+ * @param w Width to look across, from the left edge.
+ * @param colour The colour.
+ * @return True if any pixel in the line's 16 rows is @p colour.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static bool row_has_colour(int y, int w, uint16_t colour)
+{
+	for (int dy = 0; dy < 16; dy++) {
+		for (int x = 0; x < w; x++) {
+			if (fake_display_pixel(x, y + dy) == colour) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 /**
@@ -185,8 +210,10 @@ ZTEST(meter_ui, test_network_list)
 		      "-42 dBm: green");
 	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (4 * 20) + 8),
 		      gfx_rgb(230, 40, 40), "5th, -88 dBm: red");
-	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (5 * 20) + 8), gfx_rgb(0, 0, 0),
-		      "no 6th network");
+	zassert_true(row_has_colour(LIST_TOP + (5 * 20) + 2, 15 * 10, gfx_rgb(150, 150, 150)),
+		     "6th: the hidden network, named in grey");
+	zassert_equal(fake_display_pixel(LIST_BAR_X + 1, LIST_TOP + (6 * 20) + 8), gfx_rgb(0, 0, 0),
+		      "no 7th network");
 	(void)fake_display_save_ppm("out/screens/networks.ppm");
 }
 

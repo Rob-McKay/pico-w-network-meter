@@ -187,15 +187,20 @@ static void draw_footer(const char *left, unsigned int scan_no)
  * @param text Text.
  * @param fg Text colour.
  * @param bg Background colour.
+ * @param bold Bold text.
  *
  * @sideeffects Draws on the panel. errno unchanged.
  */
-static void text_centred(int x, int y, int w, const char *text, uint16_t fg, uint16_t bg)
+static void text_centred(int x, int y, int w, const char *text, uint16_t fg, uint16_t bg, bool bold)
 {
 	int off = MAX((w - ((int)strlen(text) * font->width)) / 2, 0);
 
 	gfx_fill(x, y, off, font->height, bg);
-	gfx_text(x + off, y, w - off, font, text, fg, bg);
+	if (bold) {
+		gfx_text_bold(x + off, y, w - off, font, text, fg, bg);
+	} else {
+		gfx_text(x + off, y, w - off, font, text, fg, bg);
+	}
 }
 
 /* Where the channel chart goes. */
@@ -326,7 +331,8 @@ static void draw_count(const struct chart *c, int x, int bar_top, const struct c
 	}
 	(void)snprintf(text, sizeof(text), "%u", (unsigned int)info->ap_count);
 	fill_plot(c, x, c->col_w, c->top, label_y - c->top);
-	text_centred(x, label_y, c->col_w, text, gfx_fade(col.text, info->freshness), col.bg);
+	text_centred(x, label_y, c->col_w, text, gfx_fade(col.text, info->freshness), col.bg,
+		     false);
 }
 
 /* A channel's two bars: their heights in pixels, and colours. */
@@ -407,8 +413,8 @@ static void draw_bars(const struct chart *c, int x, const struct bars *b)
 }
 
 /**
- * @brief Draw a channel's number under its bar, highlighted if it is the
- *        recommended channel.
+ * @brief Draw a channel's number under its bar: bold for the standard
+ *        channels 1, 6 and 11, highlighted for the recommended one.
  *
  * @param c Layout.
  * @param x Left edge of the column.
@@ -423,7 +429,7 @@ static void draw_channel_number(const struct chart *c, int x, uint8_t channel, b
 
 	(void)snprintf(text, sizeof(text), "%u", (unsigned int)channel);
 	text_centred(x, c->bottom + PAD, c->col_w, text, recommended ? col.bg : col.text,
-		     recommended ? col.highlight : col.bg);
+		     recommended ? col.highlight : col.bg, chan_is_standard(channel));
 }
 
 /**
@@ -503,10 +509,27 @@ static int list_bar_x(void)
 }
 
 /**
+ * @brief Pick the colour of a network's name.
+ *
+ * @param ap The network.
+ * @return Amber if it is open, grey if it is hidden, otherwise white.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint16_t name_colour(const struct chan_ap *ap)
+{
+	if (!ap->secured) {
+		return col.moderate;
+	}
+
+	return chan_ap_hidden(ap) ? col.dim : col.text;
+}
+
+/**
  * @brief Draw a network's name, channel and RSSI as text.
  *
- * Open networks' names are amber; everything fades with the network's
- * freshness.
+ * Names are coloured by name_colour(); everything fades with the
+ * network's freshness.
  *
  * @param y Top edge of the text.
  * @param ap The network.
@@ -520,9 +543,8 @@ static void draw_network_text(int y, const struct chan_ap *ap)
 	uint8_t f = ap->freshness;
 	char text[SSID_CHARS + 1];
 
-	(void)snprintf(text, sizeof(text), "%s", ap->ssid[0] != '\0' ? ap->ssid : "(hidden)");
-	gfx_text(0, y, x_chan, font, text, gfx_fade(ap->secured ? col.text : col.moderate, f),
-		 col.bg);
+	chan_ap_name(ap, text, sizeof(text));
+	gfx_text(0, y, x_chan, font, text, gfx_fade(name_colour(ap), f), col.bg);
 	(void)snprintf(text, sizeof(text), "%*u", CHAN_CHARS - 1, (unsigned int)ap->channel);
 	gfx_text(x_chan, y, x_rssi - x_chan, font, text, gfx_fade(col.dim, f), col.bg);
 	(void)snprintf(text, sizeof(text), "%*d", RSSI_CHARS, ap->rssi);
