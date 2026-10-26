@@ -6,9 +6,10 @@ channel meter. Every 10 seconds it scans for the Wi-Fi networks it can hear
 and shows:
 
 - **Channels**: for each 2.4 GHz channel (1-13), a bright bar for the
-  strongest network on the channel (*signal*) inside a dim bar for the
-  spill-over from networks on overlapping channels (*interference*),
-  against a dBm scale with a grid line every 10 dB. Both are green, amber
+  strongest network on the channel (*signal*) inside a dim bar for every
+  other network reaching it, on the same channel or spilling over from
+  overlapping ones (*interference*), against a dBm scale with a grid line
+  every 10 dB. Both are green, amber
   or red as the channel gets busier, judged on the combined signal of
   every network heard, weighted by how far each one's 20 MHz overlaps the
   channel. The number of networks on each channel is shown above its

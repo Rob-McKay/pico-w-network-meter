@@ -65,7 +65,7 @@ struct chan_info {
 	uint8_t ap_count;     /**< networks whose primary channel this is */
 	int8_t best_rssi;     /**< strongest of those, or CHAN_RSSI_NONE */
 	int16_t interference; /**< overlap-weighted power, dBm, or CHAN_RSSI_NONE */
-	int16_t adjacent;     /**< the same from networks on other channels only */
+	int16_t others;       /**< the same without the strongest network on the channel */
 	uint8_t freshness;    /**< freshest network reaching the channel, or 0 */
 };
 
@@ -108,7 +108,10 @@ int chan_stats_add(struct chan_stats *s, const struct chan_ap *ap);
  * @brief Work out one channel's figures.
  *
  * @c interference counts every network that overlaps the channel, its own
- * included; @c adjacent only those on other channels, which spill over.
+ * included. @c others leaves out the channel's strongest network (@c
+ * best_rssi): it is what interferes with that network, from other
+ * networks on the same channel and those spilling over from overlapping
+ * channels.
  *
  * @param s Statistics.
  * @param channel CHAN_FIRST..CHAN_LAST.
