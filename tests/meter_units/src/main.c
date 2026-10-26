@@ -17,6 +17,7 @@
 
 #include "ap_history.h"
 #include "chan_stats.h"
+#include "paging.h"
 #include "rgb565.h"
 #include "scan_health.h"
 #include "text_raster.h"
@@ -849,3 +850,40 @@ ZTEST(meter_health, test_no_limit)
 }
 
 ZTEST_SUITE(meter_health, NULL, NULL, NULL, NULL, NULL);
+
+/**
+ * @brief Paging moves a page at a time, and stops at the first and last
+ *        pages.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_paging, test_move)
+{
+	zassert_equal(paging_move(0, true, 25, 10), 10);
+	zassert_equal(paging_move(10, true, 25, 10), 20);
+	zassert_equal(paging_move(20, true, 25, 10), 20, "20-24 is the last page");
+	zassert_equal(paging_move(20, false, 25, 10), 10);
+	zassert_equal(paging_move(0, false, 25, 10), 0, "already at the top");
+	zassert_equal(paging_move(0, true, 10, 10), 0, "one page: nowhere to go");
+	zassert_equal(paging_move(0, true, 0, 10), 0, "empty list");
+	zassert_equal(paging_move(7, true, 25, 0), 7, "no rows: unchanged");
+}
+
+/**
+ * @brief A page stays within a list that shrinks, and on a page boundary.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_paging, test_clamp)
+{
+	zassert_equal(paging_clamp(20, 25, 10), 20);
+	zassert_equal(paging_clamp(20, 15, 10), 10, "shrunk to two pages");
+	zassert_equal(paging_clamp(20, 20, 10), 10, "exactly two pages");
+	zassert_equal(paging_clamp(20, 0, 10), 0, "emptied");
+	zassert_equal(paging_clamp(13, 25, 10), 10, "rounded to a page start");
+	zassert_equal(paging_clamp(SIZE_MAX, 25, 10), 20, "no overflow");
+	zassert_equal(paging_move(SIZE_MAX, true, 25, 10), 20, "no overflow moving either");
+	zassert_equal(paging_clamp(5, 25, 0), 0, "no rows");
+}
+
+ZTEST_SUITE(meter_paging, NULL, NULL, NULL, NULL, NULL);

@@ -13,7 +13,9 @@
  * CONFIG_METER_FADE_END_S. The screen is redrawn every
  * CONFIG_METER_REDRAW_MS while anything changes.
  *
- * Buttons: A next screen, B previous screen, X scan now.
+ * Buttons: A next screen, B previous screen. On the channels screen X scans
+ * now; on the networks screen X and Y page up and down a list too long for
+ * the screen.
  * RGB LED: blue while scanning, then green, amber or red for how busy the
  * recommended channel is; magenta if the latest scan failed.
  */
@@ -26,6 +28,7 @@
 
 #include "chan_stats.h"
 #include "controls.h"
+#include "paging.h"
 #include "scan_task.h"
 #include "scanner.h"
 #include "status_led.h"
@@ -78,40 +81,81 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 	return level_status(chan_stats_level(best.interference));
 }
 
-/**
- * @brief Act on a button: A and B change the screen, X scans now.
- *
- * @param key Key code from controls_wait(), or a negative errno.
- * @param[in,out] view Screen shown.
- * @return True if the screen changed.
- *
- * @sideeffects Writes @p view through its pointer; X wakes the scan thread
- *              (scan_task_request()). errno unchanged.
- */
-static bool handle_key(int key, enum ui_view *view)
-{
-	switch (key) {
-	case INPUT_KEY_A:
-		*view = (enum ui_view)(((int)*view + 1) % UI_VIEW_COUNT);
-		return true;
-	case INPUT_KEY_B:
-		*view = (enum ui_view)(((int)*view + UI_VIEW_COUNT - 1) % UI_VIEW_COUNT);
-		return true;
-	case INPUT_KEY_X:
-		scan_task_request();
-		return false;
-	default:
-		return false;
-	}
-}
-
 /* What the screen shows, to redraw only when something changes. */
 struct screen {
 	enum ui_view view;
+	size_t first;             /* networks screen: first row shown */
 	bool full;                /* the whole screen needs drawing */
 	unsigned int drawn_scans; /* scan count on screen */
 	struct chan_stats shown;  /* networks on screen */
 };
+
+/**
+ * @brief Change the screen shown, back to the top of its list.
+ *
+ * @param[in,out] scr What is on screen.
+ * @param step 1 for the next screen, -1 for the previous one.
+ *
+ * @sideeffects None (writes only through @p scr); errno unchanged.
+ */
+static void change_view(struct screen *scr, int step)
+{
+	scr->view = (enum ui_view)(((int)scr->view + UI_VIEW_COUNT + step) % UI_VIEW_COUNT);
+	scr->first = 0;
+}
+
+/**
+ * @brief Page the networks screen up or down.
+ *
+ * @param[in,out] scr What is on screen.
+ * @param down Down a page if true, up if false.
+ * @return True if the page changed.
+ *
+ * @sideeffects None (writes only through @p scr); errno unchanged.
+ */
+static bool page_networks(struct screen *scr, bool down)
+{
+	size_t was = scr->first;
+
+	scr->first = paging_move(scr->first, down, scr->shown.ap_count, ui_network_rows());
+
+	return scr->first != was;
+}
+
+/**
+ * @brief Act on a button: A and B change the screen; X and Y page the
+ *        networks screen, and X scans now on the channels screen.
+ *
+ * @param key Key code from controls_wait(), or a negative errno.
+ * @param[in,out] scr What is on screen.
+ * @return True if the screen needs redrawing in full.
+ *
+ * @sideeffects Writes @p scr through its pointer; X on the channels screen wakes the scan
+ *              thread (scan_task_request()). errno unchanged.
+ */
+static bool handle_key(int key, struct screen *scr)
+{
+	bool networks = scr->view == UI_VIEW_NETWORKS;
+
+	switch (key) {
+	case INPUT_KEY_A:
+		change_view(scr, 1);
+		return true;
+	case INPUT_KEY_B:
+		change_view(scr, -1);
+		return true;
+	case INPUT_KEY_X:
+		if (networks) {
+			return page_networks(scr, false);
+		}
+		scan_task_request();
+		return false;
+	case INPUT_KEY_Y:
+		return networks && page_networks(scr, true);
+	default:
+		return false;
+	}
+}
 
 /**
  * @brief Redraw the screen if the networks, their fading, the scan count
@@ -120,6 +164,9 @@ struct screen {
  * @param[in,out] scr What is on screen.
  * @param next The networks to show.
  * @param scans Scans finished so far.
+ *
+ * The networks screen's page is kept within the list, which may have
+ * shrunk.
  *
  * @sideeffects Draws on the panel (ui_show()) and updates @p scr. errno may be set by
  *              snprintf() (only on an output error).
@@ -130,7 +177,8 @@ static void update_screen(struct screen *scr, const struct chan_stats *next, uns
 		return;
 	}
 	scr->shown = *next;
-	ui_show(scr->view, &scr->shown, scans, scr->full);
+	scr->first = paging_clamp(scr->first, scr->shown.ap_count, ui_network_rows());
+	ui_show(scr->view, &scr->shown, scans, scr->first, scr->full);
 	scr->drawn_scans = scans;
 	scr->full = false;
 }
@@ -183,7 +231,7 @@ int main(void)
 	for (;;) {
 		struct scan_task_state state;
 
-		if (handle_key(controls_wait(K_MSEC(CONFIG_METER_REDRAW_MS)), &scr.view)) {
+		if (handle_key(controls_wait(K_MSEC(CONFIG_METER_REDRAW_MS)), &scr)) {
 			scr.full = true;
 		}
 		scan_task_snapshot(k_uptime_get(), &next, &state);

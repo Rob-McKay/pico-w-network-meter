@@ -30,6 +30,7 @@
 #define METER_UI_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "chan_stats.h"
 
@@ -64,11 +65,24 @@ int ui_init(void);
  * @param view Screen to show.
  * @param s The scan's statistics.
  * @param scan_no Scans so far, shown in the footer.
+ * @param first The networks screen's first row: the strongest network to
+ *        show first, counting from 0; kept within the list (paging_clamp()).
+ *        Unused by the other screens.
  * @param full Redraw the whole screen.
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, bool full);
+void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, size_t first,
+	     bool full);
+
+/**
+ * @brief Count the networks the networks screen has room for: a page.
+ *
+ * @return Rows, after ui_init().
+ *
+ * @sideeffects None; errno unchanged.
+ */
+size_t ui_network_rows(void);
 
 /**
  * @brief Show a status message in the footer until the next ui_show().

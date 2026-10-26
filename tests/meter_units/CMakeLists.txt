@@ -17,5 +17,6 @@ target_sources(app PRIVATE
   ${APP_SRC}/chan_stats.c
   ${APP_SRC}/ap_history.c
   ${APP_SRC}/scan_health.c
+  ${APP_SRC}/paging.c
   ${APP_SRC}/text_raster.c
 )

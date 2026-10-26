@@ -11,6 +11,7 @@
 #include <zephyr/sys/util.h>
 
 #include "gfx.h"
+#include "paging.h"
 #include "ui.h"
 
 /* Header and footer bars, pixels. */
@@ -582,23 +583,61 @@ static void draw_network(int y, const struct chan_ap *ap)
 	gfx_fill(0, y + PAD + FONT_H, w, ROW_H - PAD - FONT_H, col.bg);
 }
 
+/*
+ * Public interface: documented in ui.h.
+ */
+size_t ui_network_rows(void)
+{
+	int rows = (gfx_height() - (2 * BAR_H) - (2 * PAD)) / ROW_H;
+
+	return rows > 0 ? (size_t)rows : 0U;
+}
+
 /**
- * @brief Draw the networks screen.
+ * @brief Draw a page of the network list.
  *
  * @param s Scan statistics.
+ * @param first First network to show, strongest first: the start of a page
+ *        (paging_clamp()).
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-static void show_networks(const struct chan_stats *s)
+static void show_networks(const struct chan_stats *s, size_t first)
 {
 	const struct chan_ap *list[CHAN_MAX_APS];
-	int top = BAR_H + PAD;
-	int rows = (gfx_height() - (2 * BAR_H) - (2 * PAD)) / ROW_H;
-	size_t n = chan_stats_strongest(s, list, MIN((size_t)rows, ARRAY_SIZE(list)));
+	size_t rows = ui_network_rows();
+	size_t n = chan_stats_strongest(s, list, ARRAY_SIZE(list));
 
-	for (int i = 0; i < rows; i++) {
-		draw_network(top + (i * ROW_H), (size_t)i < n ? list[i] : NULL);
+	for (size_t i = 0; i < rows; i++) {
+		draw_network(BAR_H + PAD + ((int)i * ROW_H),
+			     first + i < n ? list[first + i] : NULL);
 	}
+}
+
+/**
+ * @brief Write the networks screen's footer text: how many networks, and
+ *        which are showing when they don't all fit.
+ *
+ * @param s Scan statistics.
+ * @param first First network showing.
+ * @param[out] buf The text.
+ * @param size Size of @p buf.
+ *
+ * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void networks_footer(const struct chan_stats *s, size_t first, char *buf, size_t size)
+{
+	size_t rows = ui_network_rows();
+	unsigned int other = (unsigned int)(s->ignored + s->dropped);
+
+	if (s->ap_count <= rows) {
+		(void)snprintf(buf, size, "%u heard, %u other", (unsigned int)s->ap_count, other);
+		return;
+	}
+	(void)snprintf(buf, size, "%u-%u of %u, %u other", (unsigned int)(first + 1U),
+		       (unsigned int)MIN(first + rows, s->ap_count), (unsigned int)s->ap_count,
+		       other);
 }
 
 /**
@@ -650,21 +689,23 @@ static void show_channels_screen(const struct chan_stats *s, unsigned int scan_n
 }
 
 /**
- * @brief Draw the whole networks screen: header, list and footer.
+ * @brief Draw the whole networks screen: header, a page of the list, and
+ *        footer.
  *
  * @param s Scan statistics.
  * @param scan_no Scans so far.
+ * @param first First network to show; kept within the list (paging_clamp()).
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-static void show_networks_screen(const struct chan_stats *s, unsigned int scan_no)
+static void show_networks_screen(const struct chan_stats *s, unsigned int scan_no, size_t first)
 {
 	char text[LINE_MAX];
 
+	first = paging_clamp(first, s->ap_count, ui_network_rows());
 	draw_bar(0, "Networks", "strongest first");
-	show_networks(s);
-	(void)snprintf(text, sizeof(text), "%u heard, %u other", (unsigned int)s->ap_count,
-		       (unsigned int)(s->ignored + s->dropped));
+	show_networks(s, first);
+	networks_footer(s, first, text, sizeof(text));
 	draw_footer(text, scan_no);
 }
 
@@ -674,7 +715,8 @@ static void show_networks_screen(const struct chan_stats *s, unsigned int scan_n
  * A full redraw clears the area between the header and footer first. Otherwise each element
  * draws every pixel it covers, so a redraw doesn't flicker.
  */
-void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, bool full)
+void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, size_t first,
+	     bool full)
 {
 	if (full) {
 		gfx_fill(0, BAR_H, gfx_width(), gfx_height() - (2 * BAR_H), col.bg);
@@ -682,7 +724,7 @@ void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no
 	if (view == UI_VIEW_CHANNELS) {
 		show_channels_screen(s, scan_no, full);
 	} else {
-		show_networks_screen(s, scan_no);
+		show_networks_screen(s, scan_no, first);
 	}
 }
 

@@ -130,7 +130,7 @@ static bool row_has_colour(int y, int x0, int x1, uint16_t colour)
  */
 ZTEST(meter_ui, test_channel_bars)
 {
-	ui_show(UI_VIEW_CHANNELS, &stats, 1, true);
+	ui_show(UI_VIEW_CHANNELS, &stats, 1, 0, true);
 
 	zassert_equal(fake_display_pixel(column_x(1) + (COL_W / 2), CHART_BOTTOM - 1),
 		      gfx_rgb(230, 40, 40), "channel 1: busy, red");
@@ -160,7 +160,7 @@ ZTEST(meter_ui, test_channel_bars)
  */
 ZTEST(meter_ui, test_recommended_highlight)
 {
-	ui_show(UI_VIEW_CHANNELS, &stats, 1, true);
+	ui_show(UI_VIEW_CHANNELS, &stats, 1, 0, true);
 
 	zassert_equal(chan_stats_recommend(&stats), 11);
 	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255));
@@ -180,8 +180,8 @@ ZTEST(meter_ui, test_grid_and_axis)
 	uint16_t labelled = gfx_rgb(80, 80, 80);
 	uint16_t unlabelled = gfx_rgb(40, 40, 40);
 
-	ui_show(UI_VIEW_CHANNELS, &stats, 1, true);
-	ui_show(UI_VIEW_CHANNELS, &stats, 2, false);
+	ui_show(UI_VIEW_CHANNELS, &stats, 1, 0, true);
+	ui_show(UI_VIEW_CHANNELS, &stats, 2, 0, false);
 
 	zassert_equal(fake_display_pixel(column_x(13) + (COL_W / 2), ROW_MINUS_60), labelled,
 		      "grid line across an empty column");
@@ -210,7 +210,7 @@ ZTEST(meter_ui, test_grid_and_axis)
  */
 ZTEST(meter_ui, test_network_list)
 {
-	ui_show(UI_VIEW_NETWORKS, &stats, 2, true);
+	ui_show(UI_VIEW_NETWORKS, &stats, 2, 0, true);
 
 	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, gfx_rgb(0, 200, 80)),
 		     "-42 dBm: green");
@@ -236,7 +236,7 @@ ZTEST(meter_ui, test_bars)
 {
 	uint16_t bar = gfx_rgb(0, 50, 110);
 
-	ui_show(UI_VIEW_CHANNELS, &stats, 3, true);
+	ui_show(UI_VIEW_CHANNELS, &stats, 3, 0, true);
 	zassert_equal(fake_display_pixel(0, 0), bar);
 	zassert_equal(fake_display_pixel(319, BAR_H - 1), bar);
 	zassert_equal(fake_display_pixel(0, 240 - BAR_H), bar);
@@ -258,7 +258,7 @@ ZTEST(meter_ui, test_faded)
 	for (size_t i = 0; i < faded.ap_count; i++) {
 		faded.aps[i].freshness = 128;
 	}
-	ui_show(UI_VIEW_CHANNELS, &faded, 4, true);
+	ui_show(UI_VIEW_CHANNELS, &faded, 4, 0, true);
 	zassert_equal(fake_display_pixel(column_x(1) + (COL_W / 2), CHART_BOTTOM - 1),
 		      gfx_fade(gfx_rgb(230, 40, 40), 128), "channel 1's bar at half brightness");
 	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255),
@@ -287,7 +287,7 @@ ZTEST(meter_ui, test_name_gap)
 
 	chan_stats_reset(&one);
 	zassert_ok(chan_stats_add(&one, &ap));
-	ui_show(UI_VIEW_NETWORKS, &one, 1, true);
+	ui_show(UI_VIEW_NETWORKS, &one, 1, 0, true);
 
 	for (int y = LIST_TOP + 2; y < LIST_TOP + 2 + 16; y++) {
 		for (int x = LIST_NAME_W; x < LIST_CHAN_X; x++) {
@@ -299,6 +299,53 @@ ZTEST(meter_ui, test_name_gap)
 		}
 	}
 	zassert_true(digits, "the channel's \"11\" starts after the gap");
+}
+
+/**
+ * @brief More networks than fit a page: the second page starts with the
+ *        10th strongest, and a page past the end is pulled back to the last.
+ *
+ * @sideeffects Draws on the fake panel and saves the second page to
+ *              out/screens/networks-page2.ppm. errno may be set by snprintf() (only on an output
+ *              error).
+ */
+ZTEST(meter_ui, test_network_pages)
+{
+	static struct chan_stats many;
+	uint16_t green = gfx_rgb(0, 200, 80);
+	uint16_t red = gfx_rgb(230, 40, 40);
+
+	zassert_equal(ui_network_rows(), 9, "196 pixels of list, 20 to a row");
+	chan_stats_reset(&many);
+	for (uint8_t i = 0; i < 13; i++) {
+		struct chan_ap ap = {
+			.bssid = {0x02, 0x1f, 0x3c, 0xa2, 0x7f, i},
+			.channel = (uint8_t)(1U + (i % 13U)),
+			.rssi = (int8_t)(-40 - (4 * i)), /* 0-5 green, 6-8 amber, 9-12 red */
+			.secured = true,
+			.freshness = CHAN_FRESH,
+		};
+
+		(void)snprintf(ap.ssid, sizeof(ap.ssid), "Network %u", (unsigned int)i + 1U);
+		zassert_ok(chan_stats_add(&many, &ap));
+	}
+
+	ui_show(UI_VIEW_NETWORKS, &many, 1, 0, true);
+	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, green), "page 1: strongest");
+
+	ui_show(UI_VIEW_NETWORKS, &many, 1, 9, true);
+	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, red), "page 2: 10th, red");
+	zassert_true(
+		row_has_colour(LIST_TOP + (3 * 20) + 2, 0, LIST_NAME_W, gfx_rgb(255, 255, 255)),
+		"13th on the fourth row");
+	zassert_false(row_has_colour(LIST_TOP + (4 * 20) + 2, 0, 320, gfx_rgb(255, 255, 255)),
+		      "nothing after the 13th");
+	(void)fake_display_save_ppm("out/screens/networks-page2.ppm");
+
+	ui_show(UI_VIEW_NETWORKS, &many, 1, 30, true);
+	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, red),
+		     "past the end: last page");
+	zassert_false(row_has_colour(LIST_TOP + (4 * 20) + 2, 0, 320, gfx_rgb(255, 255, 255)));
 }
 
 ZTEST_SUITE(meter_ui, NULL, setup, NULL, NULL, NULL);

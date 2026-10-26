@@ -33,7 +33,9 @@ Networks stay on screen after they were last heard: at full brightness for
 nothing at all, doesn't blank the display; an empty or failed scan is
 retried after 2 s.
 
-**Buttons**: A next screen, B previous screen, X scan now.
+**Buttons**: A next screen, B previous screen. On the Channels screen X
+scans now; on the Networks screen X and Y page up and down the list when
+it is longer than the screen.
 **RGB LED** (dimmed by PWM to 2%): blue while scanning, then green, amber or
 red for how busy the recommended channel is; magenta if a scan fails.
 After 5 failed scans in a row it restarts itself, which recovers a Wi-Fi
@@ -169,6 +171,8 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
 | `app/src/scanner.c` | Wi-Fi scans through Zephyr's `net_mgmt` Wi-Fi API |
 | `app/src/chan_stats.c` | Channel statistics (no Zephyr dependencies) |
 | `app/src/ap_history.c` | Networks heard over recent scans, with their age and fade (no Zephyr dependencies) |
+| `app/src/scan_health.c` | Counts failed scans in a row, to restart when the Wi-Fi driver gives up (no Zephyr dependencies) |
+| `app/src/paging.c` | Paging through the network list a screenful at a time (no Zephyr dependencies) |
 | `app/src/ui.c`, `gfx.c`, `text_raster.c` | The screens; drawing straight to the panel through a one-line band buffer (no frame buffer); text in Zephyr's CFB fonts |
 | `app/src/controls.c`, `status_led.c` | Buttons (input subsystem, `gpio-keys`); RGB LED (LED API, `pwm-leds`) and backlight (`gpio-leds`) |
 | `app/boards/rpi_pico_rp2040_w.overlay` | Display Pack 2.0 devicetree |
