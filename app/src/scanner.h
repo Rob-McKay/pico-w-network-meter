@@ -36,10 +36,11 @@ int scanner_init(void);
  * @param[out] out The scan's access points, replacing what it held.
  * @param timeout Longest wait for the scan to finish.
  * @retval 0 Scan complete.
- * @retval -EAGAIN Timed out: @p out has what arrived in time.
+ * @retval -ETIMEDOUT Timed out: @p out has what arrived in time.
  * @retval -EIO The driver reported a failed scan.
  * @retval -ENODEV scanner_init() has not succeeded.
- * @retval other Negative errno from the scan request.
+ * @retval other Negative errno from the scan request (the AIROC driver returns -EAGAIN when
+ *         it can't start a scan, -EINPROGRESS when it thinks one is still running).
  *
  * @sideeffects Sets and clears the scan target (the scan's results go to @p out), drives the
  *              radio, logs; blocks the calling thread for up to @p timeout. errno unchanged.

@@ -37,6 +37,16 @@ config METER_RETRY_S
 	  A scan that fails, or hears no networks at all, is retried after
 	  this long instead of CONFIG_METER_SCAN_INTERVAL_S.
 
+config METER_RECOVER_AFTER
+	int "Failed scans in a row before the meter restarts"
+	default 5
+	range 0 1000
+	help
+	  The Wi-Fi driver can run out of packet buffers for good, after
+	  which no scan can start. After this many failed scans in a row
+	  (about 10 seconds at CONFIG_METER_RETRY_S = 2), the meter
+	  restarts to recover. 0 never restarts.
+
 config METER_FADE_START_S
 	int "Seconds a network stays at full brightness"
 	default 15

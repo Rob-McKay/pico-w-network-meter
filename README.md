@@ -30,6 +30,8 @@ retried after 2 s.
 **Buttons**: A next screen, B previous screen, X scan now.
 **RGB LED** (dimmed by PWM to 5%): blue while scanning, then green, amber or
 red for how busy the recommended channel is; magenta if a scan fails.
+After 5 failed scans in a row it restarts itself, which recovers a Wi-Fi
+driver that has stopped working (see below).
 
 **Usage guide:** [docs/USAGE.md](docs/USAGE.md), and a printable one-page
 [quick reference](docs/quick-reference.pdf) (from
@@ -53,6 +55,14 @@ heard every network down to −92 dBm. If only strong networks show up,
 move the meter away from USB 3 equipment, or power it from a USB charger.
 The Display Pack also sits over the Pico W's antenna (the end opposite the
 USB socket), which costs a little range.
+
+**It restarts itself if the Wi-Fi driver gives up.** After about 12 hours
+of scans, the AIROC Wi-Fi driver ran out of packet buffers for good (the
+console showed `failed to allocate a packet buffer for IOVAR` and
+`Failed to start scan` every 2 seconds). They leak somewhere in the
+driver or its WHD library, and only a restart gets them back. So after 5
+failed scans in a row (`CONFIG_METER_RECOVER_AFTER`), the meter restarts,
+which takes a few seconds.
 
 Everything is built in Docker, as in
 [pi-zephyr-inet-radio](https://github.com/Rob-McKay/pi-zephyr-inet-radio), with

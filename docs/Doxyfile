@@ -28,6 +28,7 @@ SEARCH_INCLUDES        = NO
 # @sideeffects: the global state a function changes (docs/CODING.md).
 ALIASES                = "sideeffects=@par Side effects:^^"
 PREDEFINED             = "ZTEST(s,n)=void s##_##n(void)" \
+                         "FUNC_NORETURN=" \
                          "BUILD_ASSERT(...)=" \
                          "DEVICE_API(t,n)=const struct t##_driver_api n" \
                          "DEVICE_DT_INST_DEFINE(...)=" \
