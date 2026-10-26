@@ -72,28 +72,40 @@ static const uint8_t *glyph_of(const struct cfb_font *font, unsigned char c)
  * @param width Band width.
  * @param x0 Left edge of the glyph in the band.
  * @param fg Text colour.
+ * @param bold Also ink each pixel to the right of the glyph's ink.
  *
  * @sideeffects None (writes only through @p band); errno unchanged.
  */
 static void draw_glyph(const struct cfb_font *font, unsigned char c, uint16_t *band, size_t width,
-		       size_t x0, uint16_t fg)
+		       size_t x0, uint16_t fg, bool bold)
 {
 	const uint8_t *glyph = glyph_of(font, c);
 
 	for (unsigned int x = 0; x < font->width && x0 + x < width; x++) {
 		for (unsigned int y = 0; y < font->height; y++) {
-			if (glyph_pixel(font, glyph, x, y)) {
+			if (glyph_pixel(font, glyph, x, y) ||
+			    (bold && x > 0U && glyph_pixel(font, glyph, x - 1U, y))) {
 				band[(y * width) + x0 + x] = fg;
 			}
 		}
 	}
 }
 
-/*
- * Public interface: documented in text_raster.h.
+/**
+ * @brief Draw a line of text across a band of pixels, plain or bold.
+ *
+ * @param font Font.
+ * @param text Line of text.
+ * @param[out] band Pixels: @p width x the font's height.
+ * @param width Band width in pixels.
+ * @param fg Text colour.
+ * @param bg Background colour.
+ * @param bold Bold (draw_glyph()).
+ *
+ * @sideeffects None (writes only through @p band); errno unchanged.
  */
-void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
-		 uint16_t fg, uint16_t bg)
+static void draw_line(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
+		      uint16_t fg, uint16_t bg, bool bold)
 {
 	size_t x = 0;
 
@@ -104,7 +116,25 @@ void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, 
 		if ((*p & 0xc0U) == 0x80U) {
 			continue; /* UTF-8 continuation: its character is already drawn */
 		}
-		draw_glyph(font, *p, band, width, x, fg);
+		draw_glyph(font, *p, band, width, x, fg, bold);
 		x += font->width;
 	}
+}
+
+/*
+ * Public interface: documented in text_raster.h.
+ */
+void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
+		 uint16_t fg, uint16_t bg)
+{
+	draw_line(font, text, band, width, fg, bg, false);
+}
+
+/*
+ * Public interface: documented in text_raster.h.
+ */
+void raster_text_bold(const struct cfb_font *font, const char *text, uint16_t *band, size_t width,
+		      uint16_t fg, uint16_t bg)
+{
+	draw_line(font, text, band, width, fg, bg, true);
 }

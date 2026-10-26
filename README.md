@@ -12,10 +12,12 @@ and shows:
   or red as the channel gets busier, judged on the combined signal of
   every network heard, weighted by how far each one's 20 MHz overlaps the
   channel. The number of networks on each channel is shown above its
-  bars. The quietest of the non-overlapping channels 1, 6 and 11 is
-  highlighted as the one to use.
+  bars. The non-overlapping channels 1, 6 and 11 are labelled in bold,
+  and the quietest of them is highlighted as the one to use.
 - **Networks**: the strongest networks, with channel, signal strength (dBm)
-  and a signal bar. Open (unsecured) networks are shown in amber.
+  and a signal bar. Open (unsecured) networks are shown in amber; hidden
+  ones in grey, named by the end of their MAC address
+  (`hidden a2:7f:06`).
 
 | Channels | Networks |
 |---|---|
@@ -140,8 +142,9 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
 
 - Each scan's results are kept once per BSSID (access point), at the
   strongest signal reported. Networks the driver reports without a
-  2.4 GHz channel are counted as "other". The CYW43439 driver reports
-  hidden networks that way.
+  2.4 GHz channel are counted as "other". Hidden networks are counted
+  like any other: a carried Zephyr patch (`zephyr/patches.yml`) makes the
+  CYW43439 driver report their channel, signal and BSSID.
 - 2.4 GHz channels are 5 MHz apart but 20 MHz wide. A network on channel
   *n* overlaps channel *n*±1 by 15 MHz, *n*±2 by 10 MHz and *n*±3 by 5 MHz.
   Channel 14 is 12 MHz above 13. A channel's **interference** is the sum of

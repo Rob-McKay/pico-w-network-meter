@@ -113,4 +113,22 @@ void gfx_fill(int x, int y, int w, int h, uint16_t color);
 void gfx_text(int x, int y, int w, const struct cfb_font *font, const char *text, uint16_t fg,
 	      uint16_t bg);
 
+/**
+ * @brief Draw a line of bold text in a box one font height tall.
+ *
+ * As gfx_text(), in bold (raster_text_bold()).
+ *
+ * @param x Left edge of the box.
+ * @param y Top edge of the box.
+ * @param w Box width, clipped to the display.
+ * @param font Font (gfx_font()).
+ * @param text Text.
+ * @param fg Text colour.
+ * @param bg Background colour.
+ *
+ * @sideeffects Overwrites the shared band buffer and draws on the panel. errno unchanged.
+ */
+void gfx_text_bold(int x, int y, int w, const struct cfb_font *font, const char *text, uint16_t fg,
+		   uint16_t bg);
+
 #endif /* METER_GFX_H_ */

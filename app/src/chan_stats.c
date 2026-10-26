@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <zephyr/sys/util.h>
@@ -27,6 +28,9 @@
 /* Interference thresholds of chan_stats_level(), dBm. */
 #define LEVEL_MODERATE_DBM (-85)
 #define LEVEL_BUSY_DBM     (-70)
+
+/* The standard, non-overlapping channels, in order. */
+static const uint8_t standard_channels[] = {1, 6, 11};
 
 /* 10^(r/10) for r = 0..9, times MANTISSA_ONE. */
 static const uint32_t db_mantissa[DB_PER_DECADE] = {
@@ -233,14 +237,13 @@ void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan
  */
 uint8_t chan_stats_recommend(const struct chan_stats *s)
 {
-	static const uint8_t candidates[] = {1, 6, 11};
 	struct chan_info best;
 
-	chan_stats_channel(s, candidates[0], &best);
-	for (size_t i = 1; i < ARRAY_SIZE(candidates); i++) {
+	chan_stats_channel(s, standard_channels[0], &best);
+	for (size_t i = 1; i < ARRAY_SIZE(standard_channels); i++) {
 		struct chan_info c;
 
-		chan_stats_channel(s, candidates[i], &c);
+		chan_stats_channel(s, standard_channels[i], &c);
 		if (c.interference < best.interference ||
 		    (c.interference == best.interference && c.ap_count < best.ap_count)) {
 			best = c;
@@ -333,4 +336,44 @@ enum chan_level chan_stats_level(int interference)
 	}
 
 	return CHAN_LEVEL_CLEAR;
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+bool chan_is_standard(uint8_t channel)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(standard_channels); i++) {
+		if (standard_channels[i] == channel) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ *
+ * An SSID of NULs ends up empty here: the scanner copies it as a C string.
+ */
+bool chan_ap_hidden(const struct chan_ap *ap)
+{
+	return ap->ssid[0] == '\0';
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size)
+{
+	if (size == 0U) {
+		return;
+	}
+	if (!chan_ap_hidden(ap)) {
+		(void)snprintf(buf, size, "%s", ap->ssid);
+		return;
+	}
+	(void)snprintf(buf, size, "hidden %02x:%02x:%02x", (unsigned int)ap->bssid[3],
+		       (unsigned int)ap->bssid[4], (unsigned int)ap->bssid[5]);
 }

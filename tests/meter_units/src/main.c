@@ -415,6 +415,48 @@ ZTEST(meter_chan, test_equal)
 	zassert_false(chan_stats_equal(&a, &b), "fewer networks");
 }
 
+/**
+ * @brief Only 1, 6 and 11 are standard channels.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_standard_channels)
+{
+	for (uint8_t ch = 0; ch <= CHAN_LAST + 1U; ch++) {
+		zassert_equal(chan_is_standard(ch), ch == 1U || ch == 6U || ch == 11U, "ch %u",
+			      (unsigned int)ch);
+	}
+}
+
+/**
+ * @brief A network is named by its SSID; a hidden one by the end of its
+ *        BSSID, which fits the networks screen's 15-character column.
+ *
+ * @sideeffects None. errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_chan, test_ap_name)
+{
+	struct chan_ap ap = make_ap(0xab, 6, -50);
+	char name[16];
+
+	zassert_false(chan_ap_hidden(&ap));
+	chan_ap_name(&ap, name, sizeof(name));
+	zassert_str_equal(name, "ap171");
+
+	ap.ssid[0] = '\0';
+	ap.bssid[3] = 0x12;
+	ap.bssid[4] = 0xcd;
+	zassert_true(chan_ap_hidden(&ap));
+	chan_ap_name(&ap, name, sizeof(name));
+	zassert_str_equal(name, "hidden 12:cd:ab");
+
+	chan_ap_name(&ap, name, 7);
+	zassert_str_equal(name, "hidden", "cut to fit, terminated");
+	name[0] = 'x';
+	chan_ap_name(&ap, name, 0);
+	zassert_equal(name[0], 'x', "size 0 writes nothing");
+}
+
 ZTEST_SUITE(meter_chan, NULL, NULL, NULL, NULL, NULL);
 
 /* ---- History of access points -------------------------------------------- */
@@ -720,6 +762,32 @@ ZTEST(meter_raster, test_msb_first)
 	raster_text(&f, "?", band, 1, FG, BG);
 	zassert_equal(px(band, 1, 0, 0), FG, "no '?': the first character instead");
 	zassert_equal(px(band, 1, 0, 7), BG);
+}
+
+/**
+ * @brief Bold text inks every pixel of the plain text and the one to its
+ *        right, but never across into the next character's cell.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_raster, test_bold)
+{
+	uint16_t plain[6 * 9];
+	uint16_t bold[6 * 9];
+	unsigned int extra = 0;
+
+	raster_text(&tiny, "AB", plain, 6, FG, BG);
+	raster_text_bold(&tiny, "AB", bold, 6, FG, BG);
+	for (size_t y = 0; y < 9; y++) {
+		for (size_t x = 0; x < 6; x++) {
+			bool left_ink = (x % tiny.width) != 0U && px(plain, 6, x - 1U, y) == FG;
+			uint16_t want = (px(plain, 6, x, y) == FG || left_ink) ? FG : BG;
+
+			zassert_equal(px(bold, 6, x, y), want, "x %zu, y %zu", x, y);
+			extra += (px(bold, 6, x, y) != px(plain, 6, x, y)) ? 1U : 0U;
+		}
+	}
+	zassert_true(extra > 0U, "bold differs from plain");
 }
 
 ZTEST_SUITE(meter_raster, NULL, NULL, NULL, NULL, NULL);

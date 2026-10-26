@@ -156,6 +156,44 @@ size_t chan_stats_strongest(const struct chan_stats *s, const struct chan_ap **o
 bool chan_stats_equal(const struct chan_stats *a, const struct chan_stats *b);
 
 /**
+ * @brief Tell whether a channel is one of the standard, non-overlapping
+ *        channels 1, 6 and 11.
+ *
+ * @param channel Channel.
+ * @return True for 1, 6 and 11.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+bool chan_is_standard(uint8_t channel);
+
+/**
+ * @brief Tell whether an access point hides its network's name.
+ *
+ * @param ap The access point.
+ * @return True if its SSID is empty (or all NULs, as some hidden networks
+ *         send it).
+ *
+ * @sideeffects None; errno unchanged.
+ */
+bool chan_ap_hidden(const struct chan_ap *ap);
+
+/**
+ * @brief Name an access point for display.
+ *
+ * A hidden network is named by the last three bytes of its BSSID (its MAC
+ * address), "hidden 12:34:56", which tell the access points apart; the
+ * first three only name the maker; that takes 16 bytes.
+ *
+ * @param ap The access point.
+ * @param[out] buf The name, cut to fit and always terminated.
+ * @param size Size of @p buf; 0 writes nothing.
+ *
+ * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
+ *              output error).
+ */
+void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size);
+
+/**
  * @brief Classify an interference level.
  *
  * @param interference dBm, or CHAN_RSSI_NONE.
