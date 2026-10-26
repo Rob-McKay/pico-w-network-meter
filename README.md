@@ -5,13 +5,15 @@ with a **Pimoroni Pico Display Pack 2.0** that works as a 2.4 GHz Wi-Fi
 channel meter. Every 10 seconds it scans for the Wi-Fi networks it can hear
 and shows:
 
-- **Channels**: a bar for each 2.4 GHz channel (1-13) as tall as the
-  channel's *interference*: the combined signal of every network heard,
-  weighted by how far each one's 20 MHz overlaps the channel. Bars are
-  green, amber or red as the channel gets busier. The number of networks
-  on each channel is shown above its bar, against a dBm scale with a grid
-  line every 10 dB. The quietest of the
-  non-overlapping channels 1, 6 and 11 is highlighted as the one to use.
+- **Channels**: for each 2.4 GHz channel (1-13), a bright bar for the
+  strongest network on the channel (*signal*) inside a dim bar for the
+  spill-over from networks on overlapping channels (*interference*),
+  against a dBm scale with a grid line every 10 dB. Both are green, amber
+  or red as the channel gets busier, judged on the combined signal of
+  every network heard, weighted by how far each one's 20 MHz overlaps the
+  channel. The number of networks on each channel is shown above its
+  bars. The quietest of the non-overlapping channels 1, 6 and 11 is
+  highlighted as the one to use.
 - **Networks**: the strongest networks, with channel, signal strength (dBm)
   and a signal bar. Open (unsecured) networks are shown in amber.
 

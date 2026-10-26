@@ -29,13 +29,15 @@ The four buttons are beside the screen, two on each side.
 
 ![Channels screen](screens/channels.png)
 
-- **One bar per channel**, 1 to 13. The taller the bar, the more Wi-Fi
-  signal reaches that channel. That includes networks on the channels
-  either side, because a 2.4 GHz network spills over its neighbours up to
-  3 channels away.
+- **Two bars per channel**, 1 to 13, one inside the other:
+  - **Bright, narrow bar: signal.** The strongest network on that
+    channel. No bright bar means no network uses the channel.
+  - **Dim, wide bar: interference.** Signal spilling over from networks
+    on other channels, because a 2.4 GHz network overlaps its neighbours
+    up to 3 channels away.
 - **The scale** on the left is in dBm, the signal reaching the channel,
   with a grid line every 10 dB; the labelled lines are brighter.
-- **Bar colour** shows how busy the channel is:
+- **Bar colour** shows how busy the channel is, counting both:
   green = clear, amber = moderate, red = busy.
 - **The number above a bar** is how many networks use that channel.
 - **The highlighted channel number** is the recommended channel: the

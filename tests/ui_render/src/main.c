@@ -112,6 +112,13 @@ ZTEST(meter_ui, test_channel_bars)
 		      gfx_rgb(0, 0, 0), "channel 13: nothing heard, no bar");
 	zassert_equal(fake_display_pixel(column_x(1), CHART_BOTTOM - 1), gfx_rgb(0, 0, 0),
 		      "the gap beside a bar is background");
+	zassert_equal(fake_display_pixel(column_x(2) + (COL_W / 2), CHART_BOTTOM - 1),
+		      gfx_fade(gfx_rgb(230, 40, 40), 153),
+		      "channel 2: no network of its own, dim spill-over from 1");
+	zassert_equal(fake_display_pixel(column_x(1) + 4, ROW_MINUS_60 + 1), gfx_rgb(0, 0, 0),
+		      "channel 1: little spill-over, so beside the bright bar is background");
+	zassert_equal(fake_display_pixel(column_x(1) + 4, CHART_BOTTOM - 1),
+		      gfx_fade(gfx_rgb(230, 40, 40), 153), "and the dim bar below it");
 	(void)fake_display_save_ppm("out/screens/channels.ppm");
 }
 
