@@ -34,7 +34,7 @@ nothing at all, doesn't blank the display; an empty or failed scan is
 retried after 2 s.
 
 **Buttons**: A next screen, B previous screen, X scan now.
-**RGB LED** (dimmed by PWM to 5%): blue while scanning, then green, amber or
+**RGB LED** (dimmed by PWM to 2%): blue while scanning, then green, amber or
 red for how busy the recommended channel is; magenta if a scan fails.
 After 5 failed scans in a row it restarts itself, which recovers a Wi-Fi
 driver that has stopped working (see below).

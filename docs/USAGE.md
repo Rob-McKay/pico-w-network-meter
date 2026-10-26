@@ -135,4 +135,4 @@ Change these when building the firmware: `make pico` with
 | `CONFIG_METER_RECOVER_AFTER` | 5 | Failed scans in a row before the meter restarts itself (0: never) |
 | `CONFIG_METER_FADE_START_S` | 15 | Seconds at full brightness |
 | `CONFIG_METER_FADE_END_S` | 30 | Seconds until faded out |
-| `CONFIG_METER_LED_BRIGHTNESS` | 5 | LED brightness, percent |
+| `CONFIG_METER_LED_BRIGHTNESS` | 2 | LED brightness, percent (1 is the dimmest) |

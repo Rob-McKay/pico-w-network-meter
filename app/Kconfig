@@ -73,10 +73,12 @@ config METER_REDRAW_MS
 
 config METER_LED_BRIGHTNESS
 	int "RGB LED brightness, percent"
-	default 5
+	default 2
 	range 1 100
 	help
-	  The Display Pack's RGB LED is dimmed with PWM.
+	  The Display Pack's RGB LED is dimmed with PWM. Zephyr's LED API
+	  sets brightness in whole percent, so 1 is the dimmest it can be
+	  short of off.
 
 config METER_SCAN_STACK_SIZE
 	int "Scan thread stack size"
