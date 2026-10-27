@@ -134,4 +134,41 @@ ZTEST(meter_event_log, test_foreign_flash)
 	zassert_equal(event_log_count(), 1);
 }
 
+/**
+ * @brief Count the records a dump gives, and check they come oldest first
+ *        (event_log_dump() function).
+ *
+ * @param r The record.
+ * @param arg The previous boot number seen (uint32_t), updated.
+ *
+ * @sideeffects Writes through @p arg. errno unchanged.
+ */
+static void check_order(const struct boot_record *r, void *arg)
+{
+	uint32_t *previous = arg;
+
+	zassert_true(r->boot > *previous, "oldest first");
+	*previous = r->boot;
+}
+
+/**
+ * @brief A dump gives every record in flash, oldest first, not just the
+ *        newest kept in RAM.
+ *
+ * @sideeffects Writes, erases and reads the simulated flash. errno unchanged.
+ */
+ZTEST(meter_event_log, test_dump)
+{
+	uint32_t previous = 0;
+	int n;
+
+	zassert_ok(event_log_init());
+	for (uint32_t i = 0; i < 100; i++) {
+		add_start(BOOT_WIFI_RESTART);
+	}
+	n = event_log_dump(check_order, &previous);
+	zassert_equal(n, 100, "all of them: more than the %u in RAM", EVENT_LOG_RECENT);
+	zassert_equal(previous, 100, "ends with the newest");
+}
+
 ZTEST_SUITE(meter_event_log, NULL, NULL, erase, NULL, NULL);

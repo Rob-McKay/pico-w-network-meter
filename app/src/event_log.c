@@ -56,9 +56,35 @@ static void remember(const struct boot_record *r)
 }
 
 /**
+ * @brief Read one record from flash.
+ *
+ * @param ctx The entry.
+ * @param[out] r The record.
+ * @retval 0 Read.
+ * @retval <0 Not a record (another size or format), or unreadable.
+ *
+ * @sideeffects Reads the storage partition. errno unchanged.
+ */
+static int read_record(const struct fcb_entry_ctx *ctx, struct boot_record *r)
+{
+	uint8_t bytes[BOOT_RECORD_SIZE];
+	int ret;
+
+	if (ctx->loc.fe_data_len != sizeof(bytes)) {
+		return -EINVAL;
+	}
+	ret = flash_area_read(ctx->fap, FCB_ENTRY_FA_DATA_OFF(ctx->loc), bytes, sizeof(bytes));
+	if (ret != 0) {
+		return ret;
+	}
+
+	return boot_record_decode(bytes, sizeof(bytes), r);
+}
+
+/**
  * @brief Read one record from flash into the RAM copy (fcb_walk() callback).
  *
- * Entries that aren't records (another size or format) are skipped.
+ * Entries that aren't records are skipped.
  *
  * @param ctx The entry.
  * @param arg Unused.
@@ -68,16 +94,44 @@ static void remember(const struct boot_record *r)
  */
 static int read_entry(struct fcb_entry_ctx *ctx, void *arg)
 {
-	uint8_t bytes[BOOT_RECORD_SIZE];
 	struct boot_record r;
 
 	ARG_UNUSED(arg);
-	if (ctx->loc.fe_data_len != sizeof(bytes) ||
-	    flash_area_read(ctx->fap, FCB_ENTRY_FA_DATA_OFF(ctx->loc), bytes, sizeof(bytes)) != 0 ||
-	    boot_record_decode(bytes, sizeof(bytes), &r) != 0) {
-		return 0;
+	if (read_record(ctx, &r) == 0) {
+		remember(&r);
 	}
-	remember(&r);
+
+	return 0;
+}
+
+/* What event_log_dump() walks the log with. */
+struct dump {
+	event_log_each_fn each;
+	void *arg;
+	int count;
+};
+
+/**
+ * @brief Pass one record from flash to event_log_dump()'s function
+ *        (fcb_walk() callback).
+ *
+ * Entries that aren't records are skipped.
+ *
+ * @param ctx The entry.
+ * @param arg The walk (struct dump).
+ * @return 0: carry on walking.
+ *
+ * @sideeffects Reads the storage partition; those of the walk's function. errno unchanged.
+ */
+static int dump_entry(struct fcb_entry_ctx *ctx, void *arg)
+{
+	struct dump *d = arg;
+	struct boot_record r;
+
+	if (read_record(ctx, &r) == 0) {
+		d->each(&r, d->arg);
+		d->count++;
+	}
 
 	return 0;
 }
@@ -248,4 +302,23 @@ const struct boot_record *event_log_get(size_t i)
 	}
 
 	return &recent[(recent_start + recent_count - 1U - i) % EVENT_LOG_RECENT];
+}
+
+/*
+ * Public interface: documented in event_log.h.
+ */
+int event_log_dump(event_log_each_fn each, void *arg)
+{
+	struct dump d = {.each = each, .arg = arg};
+	int ret;
+
+	if (!log_open) {
+		return -ENODEV;
+	}
+	ret = fcb_walk(&fcb, NULL, dump_entry, &d);
+	if (ret < 0) {
+		return ret;
+	}
+
+	return d.count;
 }

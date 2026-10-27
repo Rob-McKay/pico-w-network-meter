@@ -39,7 +39,8 @@ retried after 2 s.
 
 **Buttons**: A next screen, B previous screen. On the Channels screen X
 scans now; on the Networks and Events screens X and Y page up and down the
-list when it is longer than the screen.
+list when it is longer than the screen. On the Events screen, X and Y
+pressed together print the whole log on the serial console.
 **RGB LED** (dimmed by PWM to 2%): blue while scanning, then green, amber or
 red for how busy the recommended channel is; magenta if a scan fails.
 After 5 failed scans in a row it restarts itself, which recovers a Wi-Fi
@@ -97,7 +98,11 @@ note in RAM that start-up doesn't clear (`app/src/reset_note.c`):
 The note also keeps how long the run has lasted, updated twice a second,
 so the log says how long each run lasted before its restart. The events
 screen shows the newest 64 starts; the console prints the newest 10 at
-start-up.
+start-up. Pressing X and Y together on the events screen prints every start
+in flash, oldest first, with its raw details (cause, run length in
+seconds, error or crash reason, and the Wi-Fi failure count or crash
+address), a line at a time as the console takes them; if nothing reads the
+console for a second, the dump stops rather than freeze the screen.
 
 **A watchdog restarts it if it hangs.** Zephyr's task watchdog gives the
 main thread 5 s and the scan thread a scan and its wait plus 30 s to check

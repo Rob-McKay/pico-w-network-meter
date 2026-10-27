@@ -29,7 +29,8 @@ void controls_init(void);
  *
  * @param timeout Longest wait.
  * @return The button's key code (INPUT_KEY_A, INPUT_KEY_B, INPUT_KEY_X or
- *         INPUT_KEY_Y), or -EAGAIN if none was pressed in time.
+ *         INPUT_KEY_Y), KEYS_X_AND_Y for X and Y pressed together (keys.h),
+ *         or -EAGAIN if none was pressed in time.
  *
  * @sideeffects Takes the oldest press off the @c presses queue; blocks the calling thread for
  *              up to @p timeout. errno unchanged.

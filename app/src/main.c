@@ -19,7 +19,8 @@
  *
  * Buttons: A next screen, B previous screen. On the channels screen X scans
  * now; on the networks and events screens X and Y page up and down a list
- * too long for the screen.
+ * too long for the screen. On the events screen, X and Y together print the
+ * whole log on the console.
  * RGB LED: blue while scanning, then green, amber or red for how busy the
  * recommended channel is; magenta if the latest scan failed.
  */
@@ -29,11 +30,13 @@
 #include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
 
 #include "boot_record.h"
 #include "chan_stats.h"
 #include "controls.h"
 #include "event_log.h"
+#include "keys.h"
 #include "paging.h"
 #include "reset_note.h"
 #include "scan_task.h"
@@ -48,6 +51,15 @@ LOG_MODULE_REGISTER(meter, CONFIG_METER_LOG_LEVEL);
 #define STARTS_ON_CONSOLE 10U
 /* Longest description of a start, and a NUL. */
 #define START_TEXT_MAX    40
+
+/* Longest wait for the console to take a line of a log dump, in 10 ms
+ * steps: 1 s.
+ */
+#define DUMP_WAIT_STEPS   100
+#define DUMP_WAIT_STEP_MS 10
+
+/* The main thread's watchdog channel; set by main() before the loop. */
+static int main_watch = -1;
 
 /* The main thread's watchdog deadline: it goes round every CONFIG_METER_REDRAW_MS. */
 #define MAIN_DEADLINE_MS 5000U
@@ -161,16 +173,90 @@ static bool page_list(struct screen *scr, bool down)
 }
 
 /**
+ * @brief Wait for the console to take what has been logged, feeding the
+ *        watchdog meanwhile.
+ *
+ * @return True if it did, false if it is still busy after a second (no
+ *         one reading it).
+ *
+ * @sideeffects Sleeps the main thread, in 10 ms steps, up to 1 s; feeds @c main_watch. errno
+ *              unchanged.
+ */
+static bool wait_for_console(void)
+{
+	for (int i = 0; i < DUMP_WAIT_STEPS && log_data_pending(); i++) {
+		watchdog_feed(main_watch);
+		k_msleep(DUMP_WAIT_STEP_MS);
+	}
+	watchdog_feed(main_watch);
+
+	return !log_data_pending();
+}
+
+/**
+ * @brief Log one start with all its details (event_log_dump() function).
+ *
+ * Stops logging once the console has stopped keeping up.
+ *
+ * @param r The start.
+ * @param arg The dump's flag (bool): set once the console stops keeping up.
+ *
+ * @sideeffects Logs the start; those of wait_for_console(). errno may be set by snprintf()
+ *              (only on an output error).
+ */
+static void log_one_start(const struct boot_record *r, void *arg)
+{
+	bool *stalled = arg;
+	char text[START_TEXT_MAX];
+
+	if (*stalled) {
+		return;
+	}
+	boot_record_describe(r, text, sizeof(text));
+	LOG_INF("%s: cause %u, ran %u s, detail %d, arg 0x%08x", text, (unsigned int)r->cause,
+		(unsigned int)r->uptime_s, (int)r->detail, (unsigned int)r->arg);
+	*stalled = !wait_for_console();
+}
+
+/**
+ * @brief Log the whole event log from flash, oldest first, with all the
+ *        details, a line at a time as the console takes them.
+ *
+ * @sideeffects Reads the flash log; logs it, and says on the footer that it did; blocks the
+ *              main thread while the console takes it, feeding the watchdog. errno may be set
+ *              by snprintf() (only on an output error).
+ */
+static void dump_log(void)
+{
+	bool stalled = false;
+	int n;
+
+	LOG_INF("Event log, oldest first:");
+	stalled = !wait_for_console();
+	n = event_log_dump(log_one_start, &stalled);
+	if (n < 0) {
+		LOG_ERR("Event log unavailable: %d", n);
+	} else if (stalled) {
+		LOG_WRN("Event log dump stopped: the console isn't reading");
+	} else {
+		LOG_INF("End of event log: %d starts", n);
+	}
+	ui_message("Event log sent to the console");
+}
+
+/**
  * @brief Act on a button: A and B change the screen; X and Y page the
  *        networks and events screens, and X scans now on the channels
- *        screen.
+ *        screen; X and Y together on the events screen dump the log.
  *
  * @param key Key code from controls_wait(), or a negative errno.
  * @param[in,out] scr What is on screen.
  * @return True if the screen needs redrawing in full.
  *
  * @sideeffects Writes @p scr through its pointer; X on the channels screen wakes the scan
- *              thread (scan_task_request()). errno unchanged.
+ *              thread (scan_task_request()); X and Y together on the events screen log the
+ *              whole event log (dump_log()). errno may be set by snprintf() (only on an output
+ *              error).
  */
 static bool handle_key(int key, struct screen *scr)
 {
@@ -191,6 +277,11 @@ static bool handle_key(int key, struct screen *scr)
 		return false;
 	case INPUT_KEY_Y:
 		return list && page_list(scr, true);
+	case KEYS_X_AND_Y:
+		if (scr->view == UI_VIEW_EVENTS) {
+			dump_log();
+		}
+		return false;
 	default:
 		return false;
 	}
@@ -282,9 +373,9 @@ static void log_start(void)
  * @return 0 if the Wi-Fi interface is missing (nothing else to do).
  *
  * @sideeffects Runs for ever: logs the start (log_start()), starts the watchdog and the scan
- *              thread, and drives the display, the RGB LED and the button queue; feeds the
- *              main thread's watchdog channel and keeps the restart note's uptime. Returns
- *              only if there is no Wi-Fi interface. errno may be set by snprintf() (only on an
+ *              thread, and drives the display, the RGB LED and the button queue; sets and feeds
+ *              the main thread's watchdog channel (@c main_watch) and keeps the restart note's
+ * uptime. Returns only if there is no Wi-Fi interface. errno may be set by snprintf() (only on an
  *              output error).
  */
 int main(void)
@@ -292,7 +383,6 @@ int main(void)
 	/* Static: struct screen holds a whole scan, too big for the stack. */
 	static struct screen scr = {.view = UI_VIEW_CHANNELS, .full = true};
 	static struct chan_stats next;
-	int watch;
 
 	log_start();
 	start_io();
@@ -302,13 +392,13 @@ int main(void)
 		return 0;
 	}
 	(void)watchdog_init();
-	watch = watchdog_add(BOOT_WATCHED_MAIN, MAIN_DEADLINE_MS);
+	main_watch = watchdog_add(BOOT_WATCHED_MAIN, MAIN_DEADLINE_MS);
 	scan_task_start();
 
 	for (;;) {
 		struct scan_task_state state;
 
-		watchdog_feed(watch);
+		watchdog_feed(main_watch);
 		reset_note_alive(k_uptime_get());
 
 		if (handle_key(controls_wait(K_MSEC(CONFIG_METER_REDRAW_MS)), &scr)) {

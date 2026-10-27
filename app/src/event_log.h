@@ -81,4 +81,20 @@ size_t event_log_count(void);
  */
 const struct boot_record *event_log_get(size_t i);
 
+/** Takes one record of event_log_dump()'s walk. */
+typedef void (*event_log_each_fn)(const struct boot_record *r, void *arg);
+
+/**
+ * @brief Pass every record in flash, oldest first, to a function: the
+ *        whole log, not only the newest kept in RAM.
+ *
+ * @param each The function.
+ * @param arg Passed on to it.
+ * @return How many records it was given, or a negative errno: -ENODEV if
+ *         the log isn't open, or from the flash.
+ *
+ * @sideeffects Reads the storage partition; those of @p each. errno unchanged.
+ */
+int event_log_dump(event_log_each_fn each, void *arg);
+
 #endif /* METER_EVENT_LOG_H_ */

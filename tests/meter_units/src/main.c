@@ -13,11 +13,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/ztest.h>
 
 #include "ap_history.h"
 #include "boot_record.h"
 #include "chan_stats.h"
+#include "keys.h"
 #include "paging.h"
 #include "rgb565.h"
 #include "scan_health.h"
@@ -1056,3 +1058,44 @@ ZTEST(meter_boot, test_from_note)
 }
 
 ZTEST_SUITE(meter_boot, NULL, NULL, NULL, NULL, NULL);
+
+/**
+ * @brief Single presses pass through; releases give nothing.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_keys, test_single)
+{
+	struct keys_state s = {.x = false, .y = false};
+
+	zassert_equal(keys_event(&s, INPUT_KEY_A, true), INPUT_KEY_A);
+	zassert_equal(keys_event(&s, INPUT_KEY_A, false), -1);
+	zassert_equal(keys_event(&s, INPUT_KEY_X, true), INPUT_KEY_X);
+	zassert_equal(keys_event(&s, INPUT_KEY_X, false), -1);
+	zassert_equal(keys_event(&s, INPUT_KEY_Y, true), INPUT_KEY_Y, "X was released first");
+}
+
+/**
+ * @brief X and Y together give KEYS_X_AND_Y, in either order; other keys
+ *        held don't.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_keys, test_x_and_y)
+{
+	struct keys_state s = {.x = false, .y = false};
+
+	zassert_equal(keys_event(&s, INPUT_KEY_X, true), INPUT_KEY_X, "the first press acts");
+	zassert_equal(keys_event(&s, INPUT_KEY_Y, true), KEYS_X_AND_Y);
+	zassert_equal(keys_event(&s, INPUT_KEY_Y, false), -1);
+	zassert_equal(keys_event(&s, INPUT_KEY_Y, true), KEYS_X_AND_Y, "X still held");
+	zassert_equal(keys_event(&s, INPUT_KEY_X, false), -1);
+	zassert_equal(keys_event(&s, INPUT_KEY_X, true), KEYS_X_AND_Y, "Y held: other order");
+	zassert_equal(keys_event(&s, INPUT_KEY_X, false), -1);
+	zassert_equal(keys_event(&s, INPUT_KEY_Y, false), -1);
+
+	zassert_equal(keys_event(&s, INPUT_KEY_A, true), INPUT_KEY_A);
+	zassert_equal(keys_event(&s, INPUT_KEY_X, true), INPUT_KEY_X, "A held isn't Y");
+}
+
+ZTEST_SUITE(meter_keys, NULL, NULL, NULL, NULL, NULL);

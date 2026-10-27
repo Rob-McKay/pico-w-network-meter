@@ -26,6 +26,7 @@ target_sources(app PRIVATE
   src/gfx.c
   src/text_raster.c
   src/controls.c
+  src/keys.c
   src/status_led.c
 )
 

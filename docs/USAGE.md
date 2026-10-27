@@ -22,6 +22,7 @@ The four buttons are beside the screen, two on each side.
 | **B** | Previous screen |
 | **X** | Channels screen: scan now, without waiting for the next scan. Networks and Events screens: previous page |
 | **Y** | Networks and Events screens: next page |
+| **X** and **Y** together | Events screen: print the whole log on the serial console |
 
 ## Screens
 
@@ -99,6 +100,20 @@ restarted itself, how long it had been running before:
 The log is kept in flash, so it survives power cuts and firmware updates.
 The screen shows the newest 64 (9 to a page: **Y** next page, **X**
 previous). The serial console prints the newest 10 when the meter starts.
+
+To see the whole log with every detail, open the serial console (see
+[Tips](#tips)) and press **X** and **Y** together on the Events screen. It
+prints every start kept in flash, oldest first, such as:
+
+```
+#13 Wi-Fi restart after 2h31m: cause 2, ran 9060 s, detail -11, arg 0x00000005
+```
+
+where *detail* is the error (Wi-Fi), the reason (crash) or which part hung
+(watchdog: 0 main, 1 scan), and *arg* is how many scans failed in a row
+(Wi-Fi) or the program address of the crash. The footer says when it has
+been sent. Press X first and it pages up a moment before; that does no
+harm.
 
 ## Fading
 

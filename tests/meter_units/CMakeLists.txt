@@ -19,5 +19,6 @@ target_sources(app PRIVATE
   ${APP_SRC}/scan_health.c
   ${APP_SRC}/paging.c
   ${APP_SRC}/boot_record.c
+  ${APP_SRC}/keys.c
   ${APP_SRC}/text_raster.c
 )
