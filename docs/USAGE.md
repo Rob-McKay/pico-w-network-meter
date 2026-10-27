@@ -20,8 +20,8 @@ The four buttons are beside the screen, two on each side.
 |---|---|
 | **A** | Next screen |
 | **B** | Previous screen |
-| **X** | Scan now, without waiting for the next scan |
-| **Y** | Not used |
+| **X** | Channels screen: scan now, without waiting for the next scan. Networks screen: previous page |
+| **Y** | Networks screen: next page |
 
 ## Screens
 
@@ -70,9 +70,16 @@ The strongest networks, one per row:
   −90 is barely there. Its colour: green = good (−60 dBm or better),
   amber = fair (down to −75 dBm), red = weak.
 
-The footer gives how many networks are showing, and how many results were
-ignored ("other"): those not on a 2.4 GHz channel, or past the 64 the
-meter keeps.
+The screen has room for 9 networks. When more are heard, **Y** pages down
+the list and **X** back up, and the footer shows which are on screen,
+such as "10-13 of 13".
+
+![Second page of the networks screen](screens/networks-page2.png)
+
+The footer gives how many networks are showing ("heard"), and how many
+results were ignored ("other"): those not on a 2.4 GHz channel, or past
+the 64 the meter keeps. Each access point counts once, so a router with a
+guest network counts twice.
 
 ## Fading
 
@@ -108,8 +115,8 @@ The RGB LED is on the right of the screen.
 - **Choosing a channel:** set your router to the channel the meter
   recommends. Check it from where you actually use Wi-Fi, not right next
   to the router.
-- **Walk around:** the readings change from room to room. Press **X** for
-  an immediate scan after moving.
+- **Walk around:** the readings change from room to room. Press **X** on
+  the Channels screen for an immediate scan after moving.
 - **Only 2.4 GHz:** the Pico W's radio cannot hear 5 GHz networks.
 - **Keep away from USB 3 hubs:** they give off noise across the 2.4 GHz
   band that drowns out all but the strongest networks. Use a long cable or
