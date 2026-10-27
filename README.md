@@ -216,6 +216,7 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
 | `app/src/watchdog.c` | Task watchdog per thread, with the hardware watchdog behind it |
 | `app/src/ui.c`, `gfx.c`, `text_raster.c` | The screens; drawing straight to the panel through a one-line band buffer (no frame buffer); text in Zephyr's CFB fonts |
 | `app/src/controls.c`, `status_led.c` | Buttons (input subsystem, `gpio-keys`); RGB LED (LED API, `pwm-leds`) and backlight (`gpio-leds`) |
+| `app/src/keys.c` | X and Y pressed together, from key presses and releases (no Zephyr dependencies) |
 | `app/boards/rpi_pico_rp2040_w.overlay` | Display Pack 2.0 devicetree |
 | `tests/meter_units` | Unit tests: channel statistics, network history and fading, text rendering (native_sim, AddressSanitizer) |
 | `tests/ui_render` | The screens drawn on a fake 320x240 panel: pixel checks and screenshots |
