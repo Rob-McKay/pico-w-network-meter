@@ -5,11 +5,11 @@
 <title>Network meter: quick reference</title>
 <!-- Source of docs/quick-reference.pdf: open in a browser and print to A4 PDF. -->
 <style>
-  @page { size: A4; margin: 10mm 12mm; }
+  @page { size: A4; margin: 8mm 12mm; }
   body { font: 9.5pt/1.35 "Helvetica Neue", Arial, sans-serif; color: #111; margin: 0; }
   h1 { font-size: 18pt; margin: 0 0 2mm; }
   .sub { color: #555; margin: 0 0 5mm; }
-  h2 { font-size: 11.5pt; margin: 3.5mm 0 1.5mm; border-bottom: 1px solid #ccc; padding-bottom: 1mm; }
+  h2 { font-size: 11.5pt; margin: 3mm 0 1.5mm; border-bottom: 1px solid #ccc; padding-bottom: 1mm; }
   table { border-collapse: collapse; width: 100%; }
   td, th { text-align: left; padding: 0.8mm 2mm; vertical-align: top; border-bottom: 1px solid #eee; }
   th { width: 22%; white-space: nowrap; }
@@ -34,8 +34,8 @@
     <table>
       <tr><th><span class="key">A</span></th><td>Next screen</td></tr>
       <tr><th><span class="key">B</span></th><td>Previous screen</td></tr>
-      <tr><th><span class="key">X</span></th><td>Channels: scan now. Networks: previous page</td></tr>
-      <tr><th><span class="key">Y</span></th><td>Networks: next page</td></tr>
+      <tr><th><span class="key">X</span></th><td>Channels: scan now. Networks, Events: previous page</td></tr>
+      <tr><th><span class="key">Y</span></th><td>Networks, Events: next page</td></tr>
     </table>
   </div>
   <div>
@@ -78,16 +78,23 @@
   </div>
 </div>
 
-<h2>Fading</h2>
-<p>A network stays at full brightness for <b>15 s</b> after it was last heard, then fades and is gone by <b>30 s</b>. Dim bars and rows are old data. A network that is heard again is bright again straight away.</p>
+<div class="cols">
+  <div>
+    <h2>Events screen</h2>
+    <p>Each start of the meter, newest first, and why: <b>power on</b> (white); <b>Wi-Fi restart</b> (amber: it restarted itself after 5 failed scans); <b>crash</b>, <b>scan/main hung</b> (the watchdog) or an unexplained <b>restart</b> (red), each with how long it had been running. Kept in flash: survives power cuts.</p>
+  </div>
+  <div>
+    <h2>Fading</h2>
+    <p>A network stays at full brightness for <b>15 s</b> after it was last heard, then fades and is gone by <b>30 s</b>. Dim bars and rows are old data. A network that is heard again is bright again straight away.</p>
+  </div>
+</div>
 
 <h2>Good to know</h2>
 <ul>
-  <li>Scans run every 10 s. Press <span class="key">X</span> on the Channels screen after moving to a new spot.</li>
-  <li>Measure where you use Wi-Fi, not next to the router.</li>
+  <li>Scans run every 10 s (<span class="key">X</span> on Channels: now). Measure where you use Wi-Fi, not by the router.</li>
   <li>2.4 GHz only: the Pico W cannot hear 5 GHz networks.</li>
   <li>Keep it away from USB 3 hubs: their noise drowns out all but the strongest networks. Use a long cable or a USB charger.</li>
-  <li>Serial log: over the Pico's USB socket, <code>/dev/cu.usbmodem&hellip;</code> on a Mac (<code>screen /dev/cu.usbmodem&lt;N&gt; 115200</code>).</li>
+  <li>Serial log on the Pico's USB socket: <code>screen /dev/cu.usbmodem&lt;N&gt; 115200</code> on a Mac.</li>
 </ul>
 </body>
 </html>

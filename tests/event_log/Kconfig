@@ -1,0 +1,8 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+
+module = METER
+module-str = Network meter
+source "subsys/logging/Kconfig.template.log_config"
+
+source "Kconfig.zephyr"

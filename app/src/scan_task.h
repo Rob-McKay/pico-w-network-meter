@@ -27,10 +27,11 @@ struct scan_task_state {
 /**
  * @brief Start scanning.
  *
- * Call once, after scanner_init() has succeeded.
+ * Call once, after scanner_init() and watchdog_init() have succeeded.
  *
- * @sideeffects Starts the scan thread (@c scan_thread, named "scan"), which begins scanning at
- *              once. errno unchanged.
+ * @sideeffects Adds the scan thread's watchdog channel (@c scan_watch, SCAN_DEADLINE_MS) and
+ *              starts the thread (@c scan_thread, named "scan"), which begins scanning at once.
+ *              errno unchanged.
  */
 void scan_task_start(void);
 

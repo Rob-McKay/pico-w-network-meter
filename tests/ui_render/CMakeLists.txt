@@ -19,5 +19,6 @@ target_sources(app PRIVATE
   ${APP_SRC}/gfx.c
   ${APP_SRC}/chan_stats.c
   ${APP_SRC}/paging.c
+  ${APP_SRC}/boot_record.c
   ${APP_SRC}/text_raster.c
 )

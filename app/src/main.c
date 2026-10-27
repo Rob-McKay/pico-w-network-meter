@@ -13,9 +13,13 @@
  * CONFIG_METER_FADE_END_S. The screen is redrawn every
  * CONFIG_METER_REDRAW_MS while anything changes.
  *
+ * Each start is logged in flash with why it happened (event_log.c,
+ * reset_note.c), and shown on the events screen. A watchdog restarts the
+ * meter if a thread stops responding (watchdog.c).
+ *
  * Buttons: A next screen, B previous screen. On the channels screen X scans
- * now; on the networks screen X and Y page up and down a list too long for
- * the screen.
+ * now; on the networks and events screens X and Y page up and down a list
+ * too long for the screen.
  * RGB LED: blue while scanning, then green, amber or red for how busy the
  * recommended channel is; magenta if the latest scan failed.
  */
@@ -26,15 +30,29 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include "boot_record.h"
 #include "chan_stats.h"
 #include "controls.h"
+#include "event_log.h"
 #include "paging.h"
+#include "reset_note.h"
 #include "scan_task.h"
 #include "scanner.h"
 #include "status_led.h"
 #include "ui.h"
+#include "watchdog.h"
 
 LOG_MODULE_REGISTER(meter, CONFIG_METER_LOG_LEVEL);
+
+/* Starts printed on the console at start-up, newest first. */
+#define STARTS_ON_CONSOLE 10U
+/* Longest description of a start, and a NUL. */
+#define START_TEXT_MAX    40
+
+/* The main thread's watchdog deadline: it goes round every CONFIG_METER_REDRAW_MS. */
+#define MAIN_DEADLINE_MS 5000U
+BUILD_ASSERT(MAIN_DEADLINE_MS >= 4U * CONFIG_METER_REDRAW_MS,
+	     "the main thread's watchdog deadline must allow several redraws");
 
 /**
  * @brief Map how busy a channel is to the LED status that shows it.
@@ -84,7 +102,7 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 /* What the screen shows, to redraw only when something changes. */
 struct screen {
 	enum ui_view view;
-	size_t first;             /* networks screen: first row shown */
+	size_t first;             /* networks or events screen: first row shown */
 	bool full;                /* the whole screen needs drawing */
 	unsigned int drawn_scans; /* scan count on screen */
 	struct chan_stats shown;  /* networks on screen */
@@ -105,7 +123,27 @@ static void change_view(struct screen *scr, int step)
 }
 
 /**
- * @brief Page the networks screen up or down.
+ * @brief Count the rows of the list on screen.
+ *
+ * @param scr What is on screen.
+ * @return Networks or events; 0 on the channels screen.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static size_t list_length(const struct screen *scr)
+{
+	switch (scr->view) {
+	case UI_VIEW_NETWORKS:
+		return scr->shown.ap_count;
+	case UI_VIEW_EVENTS:
+		return event_log_count();
+	default:
+		return 0;
+	}
+}
+
+/**
+ * @brief Page the list on screen up or down.
  *
  * @param[in,out] scr What is on screen.
  * @param down Down a page if true, up if false.
@@ -113,18 +151,19 @@ static void change_view(struct screen *scr, int step)
  *
  * @sideeffects None (writes only through @p scr); errno unchanged.
  */
-static bool page_networks(struct screen *scr, bool down)
+static bool page_list(struct screen *scr, bool down)
 {
 	size_t was = scr->first;
 
-	scr->first = paging_move(scr->first, down, scr->shown.ap_count, ui_network_rows());
+	scr->first = paging_move(scr->first, down, list_length(scr), ui_list_rows());
 
 	return scr->first != was;
 }
 
 /**
  * @brief Act on a button: A and B change the screen; X and Y page the
- *        networks screen, and X scans now on the channels screen.
+ *        networks and events screens, and X scans now on the channels
+ *        screen.
  *
  * @param key Key code from controls_wait(), or a negative errno.
  * @param[in,out] scr What is on screen.
@@ -135,7 +174,7 @@ static bool page_networks(struct screen *scr, bool down)
  */
 static bool handle_key(int key, struct screen *scr)
 {
-	bool networks = scr->view == UI_VIEW_NETWORKS;
+	bool list = scr->view != UI_VIEW_CHANNELS;
 
 	switch (key) {
 	case INPUT_KEY_A:
@@ -145,13 +184,13 @@ static bool handle_key(int key, struct screen *scr)
 		change_view(scr, -1);
 		return true;
 	case INPUT_KEY_X:
-		if (networks) {
-			return page_networks(scr, false);
+		if (list) {
+			return page_list(scr, false);
 		}
 		scan_task_request();
 		return false;
 	case INPUT_KEY_Y:
-		return networks && page_networks(scr, true);
+		return list && page_list(scr, true);
 	default:
 		return false;
 	}
@@ -165,8 +204,7 @@ static bool handle_key(int key, struct screen *scr)
  * @param next The networks to show.
  * @param scans Scans finished so far.
  *
- * The networks screen's page is kept within the list, which may have
- * shrunk.
+ * The page shown is kept within the list, which may have shrunk.
  *
  * @sideeffects Draws on the panel (ui_show()) and updates @p scr. errno may be set by
  *              snprintf() (only on an output error).
@@ -177,7 +215,7 @@ static void update_screen(struct screen *scr, const struct chan_stats *next, uns
 		return;
 	}
 	scr->shown = *next;
-	scr->first = paging_clamp(scr->first, scr->shown.ap_count, ui_network_rows());
+	scr->first = paging_clamp(scr->first, list_length(scr), ui_list_rows());
 	ui_show(scr->view, &scr->shown, scans, scr->first, scr->full);
 	scr->drawn_scans = scans;
 	scr->full = false;
@@ -206,30 +244,72 @@ static void start_io(void)
 }
 
 /**
+ * @brief Log this start in flash, with why it happened, and show the log
+ *        on the console and the events screen.
+ *
+ * Takes the note the run before left (reset_note_take()) first, before
+ * anything else can restart the meter.
+ *
+ * @sideeffects Those of reset_note_take(), event_log_init() and event_log_add(): starts this
+ *              run's note, reads and writes the flash log; logs the newest starts; gives the
+ *              UI its event source (ui_set_events()). errno may be set by snprintf() (only on
+ *              an output error).
+ */
+static void log_start(void)
+{
+	struct boot_note note;
+	struct boot_record r;
+	char text[START_TEXT_MAX];
+
+	reset_note_take(&note);
+	if (event_log_init() != 0) {
+		return;
+	}
+	boot_record_from_note(&note, event_log_last_boot() + 1U, &r);
+	(void)event_log_add(&r);
+	for (size_t i = 0; i < MIN(event_log_count(), (size_t)STARTS_ON_CONSOLE); i++) {
+		const struct boot_record *e = event_log_get(i);
+
+		boot_record_describe(e, text, sizeof(text));
+		LOG_INF("Start %s (detail %d, 0x%08x)", text, (int)e->detail, (unsigned int)e->arg);
+	}
+	ui_set_events(event_log_count(), event_log_get);
+}
+
+/**
  * @brief Entry point: start the display and Wi-Fi, then redraw for ever.
  *
  * @return 0 if the Wi-Fi interface is missing (nothing else to do).
  *
- * @sideeffects Runs for ever: starts the scan thread, and drives the display, the RGB LED and
- *              the button queue; returns only if there is no Wi-Fi interface. errno may be set
- *              by snprintf() (only on an output error).
+ * @sideeffects Runs for ever: logs the start (log_start()), starts the watchdog and the scan
+ *              thread, and drives the display, the RGB LED and the button queue; feeds the
+ *              main thread's watchdog channel and keeps the restart note's uptime. Returns
+ *              only if there is no Wi-Fi interface. errno may be set by snprintf() (only on an
+ *              output error).
  */
 int main(void)
 {
 	/* Static: struct screen holds a whole scan, too big for the stack. */
 	static struct screen scr = {.view = UI_VIEW_CHANNELS, .full = true};
 	static struct chan_stats next;
+	int watch;
 
+	log_start();
 	start_io();
 	if (scanner_init() != 0) {
 		ui_message("No Wi-Fi interface");
 		status_set(STATUS_ERROR);
 		return 0;
 	}
+	(void)watchdog_init();
+	watch = watchdog_add(BOOT_WATCHED_MAIN, MAIN_DEADLINE_MS);
 	scan_task_start();
 
 	for (;;) {
 		struct scan_task_state state;
+
+		watchdog_feed(watch);
+		reset_note_alive(k_uptime_get());
 
 		if (handle_key(controls_wait(K_MSEC(CONFIG_METER_REDRAW_MS)), &scr)) {
 			scr.full = true;

@@ -20,8 +20,8 @@ The four buttons are beside the screen, two on each side.
 |---|---|
 | **A** | Next screen |
 | **B** | Previous screen |
-| **X** | Channels screen: scan now, without waiting for the next scan. Networks screen: previous page |
-| **Y** | Networks screen: next page |
+| **X** | Channels screen: scan now, without waiting for the next scan. Networks and Events screens: previous page |
+| **Y** | Networks and Events screens: next page |
 
 ## Screens
 
@@ -80,6 +80,25 @@ The footer gives how many networks are showing ("heard"), and how many
 results were ignored ("other"): those not on a 2.4 GHz channel, or past
 the 64 the meter keeps. Each access point counts once, so a router with a
 guest network counts twice.
+
+### Events
+
+![Events screen](screens/events.png)
+
+Each time the meter started, newest first, numbered, and why. Where it
+restarted itself, how long it had been running before:
+
+| Event | Colour | Meaning |
+|---|---|---|
+| **power on** | white | Power was applied, or came back after a cut |
+| **Wi-Fi restart after …** | amber | The Wi-Fi driver stopped working, so the meter restarted itself (after 5 failed scans in a row) |
+| **crash N after …** | red | A fatal error (number N): the meter restarted itself |
+| **scan hung / main hung after …** | red | A part of the meter stopped responding, and the watchdog restarted it |
+| **restart after …** | red | Restarted with no reason recorded: the reset button, a debugger, or the hardware watchdog |
+
+The log is kept in flash, so it survives power cuts and firmware updates.
+The screen shows the newest 64 (9 to a page: **Y** next page, **X**
+previous). The serial console prints the newest 10 when the meter starts.
 
 ## Fading
 

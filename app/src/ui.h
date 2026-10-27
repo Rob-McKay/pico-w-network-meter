@@ -32,12 +32,14 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "boot_record.h"
 #include "chan_stats.h"
 
 /** A screen. */
 enum ui_view {
 	UI_VIEW_CHANNELS,
 	UI_VIEW_NETWORKS,
+	UI_VIEW_EVENTS,
 	UI_VIEW_COUNT,
 };
 
@@ -65,9 +67,9 @@ int ui_init(void);
  * @param view Screen to show.
  * @param s The scan's statistics.
  * @param scan_no Scans so far, shown in the footer.
- * @param first The networks screen's first row: the strongest network to
- *        show first, counting from 0; kept within the list (paging_clamp()).
- *        Unused by the other screens.
+ * @param first The networks or events screen's first row, counting from 0:
+ *        the strongest network or newest event to show first; kept within
+ *        the list (paging_clamp()). Unused by the channels screen.
  * @param full Redraw the whole screen.
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
@@ -75,14 +77,27 @@ int ui_init(void);
 void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, size_t first,
 	     bool full);
 
+/** Gets the events screen's records: 0 for the newest. */
+typedef const struct boot_record *(*ui_event_get_fn)(size_t i);
+
 /**
- * @brief Count the networks the networks screen has room for: a page.
+ * @brief Give the events screen its records.
+ *
+ * @param count How many there are.
+ * @param get Gets one, newest first (event_log_get()); NULL for none.
+ *
+ * @sideeffects Sets the UI's event source (main thread only). errno unchanged.
+ */
+void ui_set_events(size_t count, ui_event_get_fn get);
+
+/**
+ * @brief Count the rows of the networks and events screens: a page.
  *
  * @return Rows, after ui_init().
  *
  * @sideeffects None; errno unchanged.
  */
-size_t ui_network_rows(void);
+size_t ui_list_rows(void);
 
 /**
  * @brief Show a status message in the footer until the next ui_show().

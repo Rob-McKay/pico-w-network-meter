@@ -57,6 +57,12 @@ access; nothing is shared through plain globals. The display code
 and say so. Struct copies are compared field by field (`chan_stats_equal()`),
 never with `memcmp()`, which would also compare padding.
 
+Two pieces of state are written from any thread or interrupt, because a
+restart can start anywhere: the restart note (`reset_note.c`) is written
+with interrupts locked, and a note that already holds a restart's reason
+is never overwritten by the main loop's uptime update. The event log
+(`event_log.c`) is main-thread only.
+
 ## 1. Every function has a Doxygen comment
 
 - `@brief`: one line saying what the function does;

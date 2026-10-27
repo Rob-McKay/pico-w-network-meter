@@ -16,6 +16,7 @@
 #include <zephyr/ztest.h>
 
 #include "ap_history.h"
+#include "boot_record.h"
 #include "chan_stats.h"
 #include "paging.h"
 #include "rgb565.h"
@@ -887,3 +888,171 @@ ZTEST(meter_paging, test_clamp)
 }
 
 ZTEST_SUITE(meter_paging, NULL, NULL, NULL, NULL, NULL);
+
+/**
+ * @brief A record survives its flash format, including extreme values.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_boot, test_record_round_trip)
+{
+	static const int32_t details[] = {0, -11, INT32_MIN, INT32_MAX, -1};
+	uint8_t bytes[BOOT_RECORD_SIZE];
+
+	for (size_t i = 0; i < ARRAY_SIZE(details); i++) {
+		struct boot_record in = {
+			.boot = 0xfedcba98U,
+			.uptime_s = UINT32_MAX,
+			.detail = details[i],
+			.arg = 0x10001234U,
+			.cause = BOOT_CRASH,
+		};
+		struct boot_record out;
+
+		boot_record_encode(&in, bytes);
+		zassert_ok(boot_record_decode(bytes, sizeof(bytes), &out));
+		zassert_equal(out.boot, in.boot);
+		zassert_equal(out.uptime_s, in.uptime_s);
+		zassert_equal(out.detail, in.detail, "detail %d", (int)in.detail);
+		zassert_equal(out.arg, in.arg);
+		zassert_equal(out.cause, in.cause);
+	}
+	zassert_equal(bytes[0], 1, "format version first");
+	zassert_equal(bytes[4], 0x98, "little-endian");
+}
+
+/**
+ * @brief Anything that isn't a record is refused: wrong size, version or
+ *        cause.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_boot, test_record_refused)
+{
+	struct boot_record in = {.boot = 1, .cause = BOOT_POWER_ON};
+	struct boot_record out;
+	uint8_t bytes[BOOT_RECORD_SIZE];
+
+	boot_record_encode(&in, bytes);
+	zassert_equal(boot_record_decode(bytes, sizeof(bytes) - 1U, &out), -EINVAL);
+	bytes[0] = 2;
+	zassert_equal(boot_record_decode(bytes, sizeof(bytes), &out), -EINVAL, "version");
+	bytes[0] = 1;
+	bytes[1] = BOOT_NONE;
+	zassert_equal(boot_record_decode(bytes, sizeof(bytes), &out), -EINVAL, "no cause");
+	bytes[1] = BOOT_CAUSE_COUNT;
+	zassert_equal(boot_record_decode(bytes, sizeof(bytes), &out), -EINVAL, "unknown cause");
+	(void)memset(bytes, 0xff, sizeof(bytes));
+	zassert_equal(boot_record_decode(bytes, sizeof(bytes), &out), -EINVAL, "erased flash");
+}
+
+/**
+ * @brief Each kind of start is described in a line, with how long the run
+ *        before it lasted.
+ *
+ * @sideeffects None. errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_boot, test_describe)
+{
+	struct boot_record r = {.boot = 12, .cause = BOOT_POWER_ON};
+	char text[40];
+
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 power on");
+
+	r.cause = BOOT_WIFI_RESTART;
+	r.uptime_s = (2U * 3600U) + (31U * 60U) + 59U;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 Wi-Fi restart after 2h31m");
+
+	r.cause = BOOT_CRASH;
+	r.detail = 3;
+	r.uptime_s = 59;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 crash 3 after 0m59s");
+
+	r.cause = BOOT_WATCHDOG;
+	r.detail = BOOT_WATCHED_SCAN;
+	r.uptime_s = (3U * 86400U) + (4U * 3600U);
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 scan hung after 3d04h");
+
+	r.cause = BOOT_UNEXPLAINED;
+	r.uptime_s = 3600;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 restart after 1h00m");
+
+	boot_record_describe(&r, text, 4);
+	zassert_str_equal(text, "#12", "cut to fit");
+	text[0] = 'x';
+	boot_record_describe(&r, text, 0);
+	zassert_equal(text[0], 'x', "size 0 writes nothing");
+}
+
+/**
+ * @brief A sealed note is valid; any change to it, or RAM's contents after
+ *        a power cut, isn't.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_boot, test_note_valid)
+{
+	struct boot_note n = {
+		.uptime_s = 100,
+		.detail = -11,
+		.arg = 5,
+		.cause = BOOT_WIFI_RESTART,
+	};
+	struct boot_note garbage;
+
+	boot_note_seal(&n);
+	zassert_true(boot_note_valid(&n));
+	n.uptime_s++;
+	zassert_false(boot_note_valid(&n), "changed after sealing");
+	boot_note_seal(&n);
+	n.cause = BOOT_CAUSE_COUNT;
+	boot_note_seal(&n);
+	zassert_false(boot_note_valid(&n), "unknown cause");
+
+	(void)memset(&garbage, 0xa5, sizeof(garbage));
+	zassert_false(boot_note_valid(&garbage), "RAM after power-on");
+}
+
+/**
+ * @brief A start is worked out from the note: none means power-on, one
+ *        without a cause an unexplained restart, otherwise its cause.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_boot, test_from_note)
+{
+	struct boot_note n;
+	struct boot_record r;
+
+	(void)memset(&n, 0, sizeof(n));
+	boot_record_from_note(&n, 7, &r);
+	zassert_equal(r.cause, BOOT_POWER_ON, "no valid note: the power was off");
+	zassert_equal(r.boot, 7);
+	zassert_equal(r.uptime_s, 0);
+
+	n = (struct boot_note){.uptime_s = 9000, .cause = BOOT_NONE};
+	boot_note_seal(&n);
+	boot_record_from_note(&n, 8, &r);
+	zassert_equal(r.cause, BOOT_UNEXPLAINED, "running when it restarted");
+	zassert_equal(r.uptime_s, 9000);
+
+	n = (struct boot_note){
+		.uptime_s = 600,
+		.detail = -11,
+		.arg = 5,
+		.cause = BOOT_WIFI_RESTART,
+	};
+	boot_note_seal(&n);
+	boot_record_from_note(&n, 9, &r);
+	zassert_equal(r.cause, BOOT_WIFI_RESTART);
+	zassert_equal(r.detail, -11);
+	zassert_equal(r.arg, 5);
+	zassert_equal(r.uptime_s, 600);
+}
+
+ZTEST_SUITE(meter_boot, NULL, NULL, NULL, NULL, NULL);
