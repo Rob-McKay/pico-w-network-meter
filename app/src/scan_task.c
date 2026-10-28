@@ -16,6 +16,7 @@
 #include "scan_task.h"
 #include "scanner.h"
 #include "watchdog.h"
+#include "wifi_buffers.h"
 
 LOG_MODULE_REGISTER(scan_task, CONFIG_METER_LOG_LEVEL);
 
@@ -51,6 +52,12 @@ static int scan_watch = -1;
 /* The scan in progress, and the failures in a row: only the scan thread touches them. */
 static struct chan_stats scanning;
 static struct scan_health health;
+
+/* CONFIG_METER_DEBUG_WIFI_BUFFERS: the driver's buffers in use before the
+ * scan before, and how long that scan took. Scan thread only.
+ */
+static int buffers_before = -1;
+static int64_t last_scan_ms;
 
 /* Shared with the display thread, under lock. */
 static K_MUTEX_DEFINE(lock);
@@ -174,12 +181,60 @@ static FUNC_NORETURN void recover(int ret)
 }
 
 /**
+ * @brief Count the scans finished so far.
+ *
+ * @return @c progress.scans.
+ *
+ * @sideeffects Takes and releases @c lock. errno unchanged.
+ */
+static unsigned int scans_done(void)
+{
+	unsigned int scans;
+
+	k_mutex_lock(&lock, K_FOREVER);
+	scans = progress.scans;
+	k_mutex_unlock(&lock);
+
+	return scans;
+}
+
+/**
+ * @brief Log the Wi-Fi driver's buffers in use, warning if more are than
+ *        before the scan before (CONFIG_METER_DEBUG_WIFI_BUFFERS).
+ *
+ * Counted before a scan, when the driver should be idle, so a buffer still
+ * in use is one the scan before lost.
+ *
+ * @param scan_no The scan about to run.
+ *
+ * @sideeffects Reads the driver's buffer pool (wifi_buffers_in_use()); logs; updates
+ *              @c buffers_before. Nothing without CONFIG_METER_DEBUG_WIFI_BUFFERS. errno
+ *              unchanged.
+ */
+static void check_buffers(unsigned int scan_no)
+{
+	int in_use;
+
+	if (!IS_ENABLED(CONFIG_METER_DEBUG_WIFI_BUFFERS)) {
+		return;
+	}
+	in_use = wifi_buffers_in_use();
+	LOG_INF("Wi-Fi buffers in use before scan %u: %d (scan before took %d ms)", scan_no, in_use,
+		(int)last_scan_ms);
+	if (buffers_before >= 0 && in_use > buffers_before) {
+		LOG_WRN("Wi-Fi buffers: %d lost by scan %u", in_use - buffers_before, scan_no - 1U);
+	}
+	buffers_before = in_use;
+}
+
+/**
  * @brief Run one scan, publish it and log it.
  *
  * @return True if it heard something; false if it failed or heard nothing.
  *
- * @sideeffects Those of set_busy(), run_scan(), publish() and report(): rewrites @c scanning,
- *              updates @c history and @c progress under @c lock, drives the radio, logs. Counts
+ * @sideeffects Those of check_buffers(), set_busy(), run_scan(), publish() and report(): writes
+ *              @c last_scan_ms, rewrites @c scanning, updates @c history and @c progress under
+ *              @c lock, drives the radio, logs. Counts
  *              failures in a row in @c health; after CONFIG_METER_RECOVER_AFTER of them,
  *              restarts the Pico (recover(ret)). errno unchanged.
  */
@@ -187,9 +242,13 @@ static bool scan_once(void)
 {
 	int ret;
 	unsigned int scan_no;
+	int64_t start;
 
+	check_buffers(scans_done() + 1U);
 	set_busy();
+	start = k_uptime_get();
 	ret = run_scan();
+	last_scan_ms = k_uptime_get() - start;
 	scan_no = publish(ret);
 	if (ret == 0) {
 		report(&scanning, scan_no);

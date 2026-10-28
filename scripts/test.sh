@@ -14,6 +14,8 @@
 #   tests/event_log     the event log of starts (event_log.c) on native_sim's
 #                       simulated flash: kept across a reopen, rotated when
 #                       full, started afresh on foreign data
+#   tests/wifi_buffers  the debug count of the Wi-Fi driver's buffers in use
+#                       (wifi_buffers.c), on a pool shaped like the driver's
 #
 # Every build compiles our code with -Wall -Wextra -Wpedantic -Werror and
 # runs clang-tidy on it (cmake/strict.cmake), so the builds below fail on
@@ -36,7 +38,7 @@ for f in channels networks networks-page2 events faded; do
 done
 
 cd "$here"
-for t in meter_units ui_render event_log; do
+for t in meter_units ui_render event_log wifi_buffers; do
 	build_dir="$here/build/test-$t"
 	west build -p auto -b native_sim/native/64 -d "$build_dir" "$here/tests/$t"
 	if [ "$t" = event_log ]; then

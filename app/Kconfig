@@ -47,6 +47,14 @@ config METER_RECOVER_AFTER
 	  (about 10 seconds at CONFIG_METER_RETRY_S = 2), the meter
 	  restarts to recover. 0 never restarts.
 
+config METER_DEBUG_WIFI_BUFFERS
+	bool "Log the Wi-Fi driver's packet buffers in use, every scan"
+	help
+	  For finding the AIROC driver's buffer leak: logs how many of
+	  its 20 packet buffers are in use before each scan, and warns
+	  when that has grown since the scan before. Reads Zephyr
+	  internals; for debug builds only.
+
 config METER_FADE_START_S
 	int "Seconds a network stays at full brightness"
 	default 15

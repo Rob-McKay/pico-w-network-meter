@@ -21,6 +21,7 @@ target_sources(app PRIVATE
   src/event_log.c
   src/reset_note.c
   src/watchdog.c
+  src/wifi_buffers.c
   src/scanner.c
   src/ui.c
   src/gfx.c

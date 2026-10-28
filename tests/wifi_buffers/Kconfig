@@ -1,0 +1,8 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+
+config METER_DEBUG_WIFI_BUFFERS
+	bool
+	default y
+
+source "Kconfig.zephyr"

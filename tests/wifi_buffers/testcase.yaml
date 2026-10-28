@@ -1,0 +1,8 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  meter.wifi_buffers:
+    platform_allow:
+      - native_sim/native/64
+    tags: meter

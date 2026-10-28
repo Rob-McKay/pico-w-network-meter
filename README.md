@@ -55,6 +55,10 @@ per-channel figures as log lines. Open it with, for example,
 `screen /dev/cu.usbmodem1101 115200` (any baud rate works; quit with Ctrl-A
 then K). `make pico BUILD_ARGS=-DCONFIG_METER_LOG_LEVEL_DBG=y` also logs
 every network each scan hears.
+`make pico BUILD_ARGS=-DCONFIG_METER_DEBUG_WIFI_BUFFERS=y` logs how many of
+the Wi-Fi driver's 20 packet buffers are in use before each scan, and
+warns when a scan has lost one (`app/src/wifi_buffers.c`; for finding the
+driver's buffer leak).
 
 Scans are **passive** by default: the radio listens on each channel long
 enough to hear every network's beacons, instead of sending probe requests
