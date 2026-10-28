@@ -176,14 +176,19 @@ static bool page_list(struct screen *scr, bool down)
  * @brief Wait for the console to take what has been logged, feeding the
  *        watchdog meanwhile.
  *
+ * Wakes the log thread first: left alone, it sleeps for
+ * CONFIG_LOG_PROCESS_THREAD_SLEEP_MS (1 s) until CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD
+ * messages are waiting, so every line would take the whole wait.
+ *
  * @return True if it did, false if it is still busy after a second (no
  *         one reading it).
  *
- * @sideeffects Sleeps the main thread, in 10 ms steps, up to 1 s; feeds @c main_watch. errno
- *              unchanged.
+ * @sideeffects Wakes the log thread (log_thread_trigger()); sleeps the main thread, in 10 ms
+ *              steps, up to 1 s; feeds @c main_watch. errno unchanged.
  */
 static bool wait_for_console(void)
 {
+	log_thread_trigger();
 	for (int i = 0; i < DUMP_WAIT_STEPS && log_data_pending(); i++) {
 		watchdog_feed(main_watch);
 		k_msleep(DUMP_WAIT_STEP_MS);
