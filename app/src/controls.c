@@ -12,6 +12,7 @@
 #include <zephyr/sys/atomic.h>
 
 #include "controls.h"
+#include "keys.h"
 
 /* Presses not yet taken by controls_wait(). */
 #define QUEUED_PRESSES 4
@@ -20,26 +21,36 @@
 static uint16_t press_buf[QUEUED_PRESSES];
 static struct k_msgq presses;
 static atomic_t ready;
+/* Keys held down: the input thread only. */
+static struct keys_state held;
 
 /**
- * @brief Queue a button press (input thread).
+ * @brief Queue a button press, or X and Y pressed together (input thread).
  *
  * @param evt Input event.
  * @param user_data Unused.
  *
- * @sideeffects Puts the press on the @c presses queue (input thread); a press is dropped if the
- *              queue is full. errno unchanged.
+ * @sideeffects Updates @c held (keys_event()); puts the press on the @c presses queue (input
+ *              thread); a press is dropped if the queue is full. errno unchanged.
  */
 static void on_input(struct input_event *evt, void *user_data)
 {
-	ARG_UNUSED(user_data);
+	int press;
+	uint16_t code;
 
-	if (atomic_get(&ready) != 0 && evt->type == INPUT_EV_KEY && evt->value != 0) {
-		/* A full queue drops the press: the user pressed faster than
-		 * the screen could follow.
-		 */
-		(void)k_msgq_put(&presses, &evt->code, K_NO_WAIT);
+	ARG_UNUSED(user_data);
+	if (atomic_get(&ready) == 0 || evt->type != INPUT_EV_KEY) {
+		return;
 	}
+	press = keys_event(&held, evt->code, evt->value != 0);
+	if (press < 0) {
+		return;
+	}
+	code = (uint16_t)press;
+	/* A full queue drops the press: the user pressed faster than the screen
+	 * could follow.
+	 */
+	(void)k_msgq_put(&presses, &code, K_NO_WAIT);
 }
 
 INPUT_CALLBACK_DEFINE(NULL, on_input, NULL);

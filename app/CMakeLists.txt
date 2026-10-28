@@ -17,11 +17,16 @@ target_sources(app PRIVATE
   src/scan_task.c
   src/scan_health.c
   src/paging.c
+  src/boot_record.c
+  src/event_log.c
+  src/reset_note.c
+  src/watchdog.c
   src/scanner.c
   src/ui.c
   src/gfx.c
   src/text_raster.c
   src/controls.c
+  src/keys.c
   src/status_led.c
 )
 

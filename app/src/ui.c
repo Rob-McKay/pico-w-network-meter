@@ -68,6 +68,10 @@ static struct {
 
 static const struct cfb_font *font;
 
+/* The events screen's records, from ui_set_events(). */
+static size_t events_count;
+static ui_event_get_fn events_get;
+
 /**
  * @brief Work out the UI's colours in the display's pixel format.
  *
@@ -586,7 +590,7 @@ static void draw_network(int y, const struct chan_ap *ap)
 /*
  * Public interface: documented in ui.h.
  */
-size_t ui_network_rows(void)
+size_t ui_list_rows(void)
 {
 	int rows = (gfx_height() - (2 * BAR_H) - (2 * PAD)) / ROW_H;
 
@@ -605,7 +609,7 @@ size_t ui_network_rows(void)
 static void show_networks(const struct chan_stats *s, size_t first)
 {
 	const struct chan_ap *list[CHAN_MAX_APS];
-	size_t rows = ui_network_rows();
+	size_t rows = ui_list_rows();
 	size_t n = chan_stats_strongest(s, list, ARRAY_SIZE(list));
 
 	for (size_t i = 0; i < rows; i++) {
@@ -628,7 +632,7 @@ static void show_networks(const struct chan_stats *s, size_t first)
  */
 static void networks_footer(const struct chan_stats *s, size_t first, char *buf, size_t size)
 {
-	size_t rows = ui_network_rows();
+	size_t rows = ui_list_rows();
 	unsigned int other = (unsigned int)(s->ignored + s->dropped);
 
 	if (s->ap_count <= rows) {
@@ -702,10 +706,138 @@ static void show_networks_screen(const struct chan_stats *s, unsigned int scan_n
 {
 	char text[LINE_MAX];
 
-	first = paging_clamp(first, s->ap_count, ui_network_rows());
+	first = paging_clamp(first, s->ap_count, ui_list_rows());
 	draw_bar(0, "Networks", "strongest first");
 	show_networks(s, first);
 	networks_footer(s, first, text, sizeof(text));
+	draw_footer(text, scan_no);
+}
+
+/*
+ * Public interface: documented in ui.h.
+ */
+void ui_set_events(size_t count, ui_event_get_fn get)
+{
+	events_count = get != NULL ? count : 0U;
+	events_get = get;
+}
+
+/**
+ * @brief Pick the colour of an event: how much it matters.
+ *
+ * @param r The event.
+ * @return White for a power-on, amber for a Wi-Fi restart, red for a
+ *         crash, a hung thread or an unexplained restart.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint16_t event_colour(const struct boot_record *r)
+{
+	switch (r->cause) {
+	case BOOT_POWER_ON:
+		return col.text;
+	case BOOT_WIFI_RESTART:
+		return col.moderate;
+	default:
+		return col.busy;
+	}
+}
+
+/**
+ * @brief Draw one row of a list as a line of text.
+ *
+ * Every pixel of the row is drawn, so it needs no clearing first.
+ *
+ * @param y Top edge.
+ * @param text The line, or NULL for an empty row.
+ * @param fg Text colour.
+ *
+ * @sideeffects Draws on the panel. errno unchanged.
+ */
+static void draw_text_row(int y, const char *text, uint16_t fg)
+{
+	int w = gfx_width();
+
+	if (text == NULL) {
+		gfx_fill(0, y, w, ROW_H, col.bg);
+		return;
+	}
+	gfx_fill(0, y, w, PAD, col.bg);
+	gfx_text(0, y + PAD, w, font, text, fg, col.bg);
+	gfx_fill(0, y + PAD + FONT_H, w, ROW_H - PAD - FONT_H, col.bg);
+}
+
+/**
+ * @brief Draw one row of the event list.
+ *
+ * @param y Top edge.
+ * @param r The event, or NULL for an empty row.
+ *
+ * @sideeffects Draws on the panel (draw_text_row()). errno may be set by snprintf() (only on
+ *              an output error).
+ */
+static void draw_event(int y, const struct boot_record *r)
+{
+	char text[LINE_MAX];
+
+	if (r == NULL) {
+		draw_text_row(y, NULL, col.bg);
+		return;
+	}
+	boot_record_describe(r, text, sizeof(text));
+	draw_text_row(y, text, event_colour(r));
+}
+
+/**
+ * @brief Draw a page of the event list, newest first.
+ *
+ * With no events, the first row says so.
+ *
+ * @param first First event to show: the start of a page.
+ *
+ * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
+ */
+static void show_events(size_t first)
+{
+	size_t rows = ui_list_rows();
+	int top = BAR_H + PAD;
+
+	for (size_t i = 0; i < rows; i++) {
+		size_t n = first + i;
+		int y = top + ((int)i * ROW_H);
+
+		if (events_count == 0U && i == 0U) {
+			draw_text_row(y, "No events logged", col.dim);
+		} else {
+			draw_event(y, n < events_count ? events_get(n) : NULL);
+		}
+	}
+}
+
+/**
+ * @brief Draw the whole events screen: header, a page of the list, and
+ *        footer.
+ *
+ * @param scan_no Scans so far.
+ * @param first First event to show; kept within the list (paging_clamp()).
+ *
+ * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
+ */
+static void show_events_screen(unsigned int scan_no, size_t first)
+{
+	size_t rows = ui_list_rows();
+	char text[LINE_MAX];
+
+	first = paging_clamp(first, events_count, rows);
+	draw_bar(0, "Events", "newest first");
+	show_events(first);
+	if (events_count <= rows) {
+		(void)snprintf(text, sizeof(text), "%u starts logged", (unsigned int)events_count);
+	} else {
+		(void)snprintf(text, sizeof(text), "%u-%u of %u starts", (unsigned int)(first + 1U),
+			       (unsigned int)MIN(first + rows, events_count),
+			       (unsigned int)events_count);
+	}
 	draw_footer(text, scan_no);
 }
 
@@ -721,10 +853,16 @@ void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no
 	if (full) {
 		gfx_fill(0, BAR_H, gfx_width(), gfx_height() - (2 * BAR_H), col.bg);
 	}
-	if (view == UI_VIEW_CHANNELS) {
+	switch (view) {
+	case UI_VIEW_CHANNELS:
 		show_channels_screen(s, scan_no, full);
-	} else {
+		break;
+	case UI_VIEW_NETWORKS:
 		show_networks_screen(s, scan_no, first);
+		break;
+	default:
+		show_events_screen(scan_no, first);
+		break;
 	}
 }
 

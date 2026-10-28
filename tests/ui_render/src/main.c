@@ -12,6 +12,7 @@
 
 #include <zephyr/ztest.h>
 
+#include "boot_record.h"
 #include "chan_stats.h"
 #include "fake_display.h"
 #include "gfx.h"
@@ -315,7 +316,7 @@ ZTEST(meter_ui, test_network_pages)
 	uint16_t green = gfx_rgb(0, 200, 80);
 	uint16_t red = gfx_rgb(230, 40, 40);
 
-	zassert_equal(ui_network_rows(), 9, "196 pixels of list, 20 to a row");
+	zassert_equal(ui_list_rows(), 9, "196 pixels of list, 20 to a row");
 	chan_stats_reset(&many);
 	for (uint8_t i = 0; i < 13; i++) {
 		struct chan_ap ap = {
@@ -346,6 +347,57 @@ ZTEST(meter_ui, test_network_pages)
 	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, red),
 		     "past the end: last page");
 	zassert_false(row_has_colour(LIST_TOP + (4 * 20) + 2, 0, 320, gfx_rgb(255, 255, 255)));
+}
+
+/* Starts for the events screen, newest first. */
+static const struct boot_record test_events[] = {
+	{.boot = 14, .cause = BOOT_POWER_ON},
+	{.boot = 13, .cause = BOOT_WIFI_RESTART, .uptime_s = 9060, .detail = -11, .arg = 5},
+	{.boot = 12, .cause = BOOT_WIFI_RESTART, .uptime_s = 7380, .detail = -11, .arg = 5},
+	{.boot = 11, .cause = BOOT_WATCHDOG, .uptime_s = 41000, .detail = BOOT_WATCHED_SCAN},
+	{.boot = 10, .cause = BOOT_CRASH, .uptime_s = 600, .detail = 3, .arg = 0x10001234},
+	{.boot = 9, .cause = BOOT_UNEXPLAINED, .uptime_s = 3600},
+	{.boot = 8, .cause = BOOT_POWER_ON},
+};
+
+/**
+ * @brief Get one of the test's events (ui_event_get_fn).
+ *
+ * @param i 0 for the newest.
+ * @return The event, or NULL past the end.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static const struct boot_record *test_event(size_t i)
+{
+	return i < ARRAY_SIZE(test_events) ? &test_events[i] : NULL;
+}
+
+/**
+ * @brief The events screen lists starts newest first, coloured by how much
+ *        they matter; with none logged, it says so.
+ *
+ * @sideeffects Draws on the fake panel, saves it to out/screens/events.ppm, and sets the UI's
+ *              event source. errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_ui, test_events_screen)
+{
+	uint16_t white = gfx_rgb(255, 255, 255);
+	uint16_t amber = gfx_rgb(255, 170, 0);
+	uint16_t red = gfx_rgb(230, 40, 40);
+
+	ui_set_events(ARRAY_SIZE(test_events), test_event);
+	ui_show(UI_VIEW_EVENTS, &stats, 5, 0, true);
+	zassert_true(row_has_colour(LIST_TOP + 2, 0, 320, white), "power on: white");
+	zassert_true(row_has_colour(LIST_TOP + 20 + 2, 0, 320, amber), "Wi-Fi restart: amber");
+	zassert_true(row_has_colour(LIST_TOP + (3 * 20) + 2, 0, 320, red), "hung thread: red");
+	zassert_false(row_has_colour(LIST_TOP + (7 * 20) + 2, 0, 320, white), "7 events only");
+	(void)fake_display_save_ppm("out/screens/events.ppm");
+
+	ui_set_events(0, NULL);
+	ui_show(UI_VIEW_EVENTS, &stats, 5, 0, true);
+	zassert_true(row_has_colour(LIST_TOP + 2, 0, 320, gfx_rgb(150, 150, 150)),
+		     "\"No events logged\", in grey");
 }
 
 ZTEST_SUITE(meter_ui, NULL, setup, NULL, NULL, NULL);
