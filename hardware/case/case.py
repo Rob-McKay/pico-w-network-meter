@@ -67,8 +67,8 @@ SEGMENTS = 48
 
 # --- Pimoroni Pico Display Pack 2.0 ---------------------------------------
 
-## Board: 55.0 mm long (measured) x 34.6 mm (drawing).
-PACK_L = 55.0
+## Board: 55.2 x 34.6 mm (drawing; measured as 55.0-55.2 long).
+PACK_L = 55.2
 PACK_W = 34.6
 PACK_PCB = 1.6
 ## Front of the board to the front of the display glass. MEASURE.
