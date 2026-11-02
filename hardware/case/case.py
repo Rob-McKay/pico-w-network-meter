@@ -6,17 +6,22 @@
 
 The case holds a Raspberry Pi Pico W plugged into a Pimoroni Pico Display
 Pack 2.0, with a Pimoroni LiPo Amigo Pro charger and a 150 mAh LiPo in a
-compartment below the display:
+layer behind the Pico, side by side, so the case is little bigger than the
+Display Pack:
 
     front.stl     the front shell: bezel with the display window, button
-                  and LED holes, side walls, USB openings and screw bosses.
-                  Print face down.
-    back.stl      the back cover: pockets for the charger and battery,
-                  posts that hold the Pico into the Display Pack's sockets,
-                  a window onto the charger's switch, a pin hole for the
-                  Pico's BOOTSEL button. Print outside face down.
-    buttons.stl   four button caps for A, B, X and Y: a flange inside the
-                  bezel keeps each in. Print flange down.
+                  and LED holes, side walls, the charger's USB-C opening and
+                  screw bosses. Print face down.
+    shelf.stl     a shelf between the Pico and the battery layer: posts on
+                  it hold the Pico into the Display Pack's sockets, and the
+                  charger and battery hold it in place. Print flat, posts up.
+    back.stl      the back cover: pockets for the charger and battery and a
+                  window onto the charger's switch. Print outside face down.
+    buttons.stl   four button caps for A, B, X and Y: a tab inside the
+                  bezel keeps each in. Print tab down.
+
+The Pico's own USB socket has no opening, and the charger covers its BOOTSEL
+button: open the case (four screws) to flash new firmware.
 
 Every measurement the case depends on is a constant below, in millimetres.
 The Display Pack's come from Pimoroni's dimension drawing (turned to
@@ -101,15 +106,12 @@ PICO_X = 2.5
 PICO_Y = 7.0
 ## Which end its USB socket is at, looking from the front: the A/B end
 ## (left) or the X/Y end (right). The Pico fits the Display Pack only one
-## way round, as the Display Pack's markings show. MEASURE.
+## way round, as the Display Pack's markings show; this places the shelf's
+## posts and wire slots. MEASURE.
 PICO_USB_LEFT = True
 ## Mounting holes, from its USB end and bottom edge (published).
 PICO_HOLES = [(2.0, 4.8), (2.0, 16.2), (49.0, 4.8), (49.0, 16.2)]
 PICO_HOLE_D = 2.1
-## BOOTSEL button, from its USB end and bottom edge. MEASURE.
-PICO_BOOTSEL = (12.0, 13.0)
-## Opening for a micro-USB plug's moulding.
-PICO_USB_OPENING = (13.0, 8.5)
 
 # --- Pimoroni LiPo Amigo Pro ----------------------------------------------
 
@@ -126,9 +128,12 @@ AMIGO_USB_OPENING = (13.0, 7.5)
 AMIGO_SWITCH = (24.0, 11.5)
 AMIGO_SWITCH_WINDOW = (12.0, 8.0)
 
+## Its height with its connectors and switch (published).
+AMIGO_H = 7.0
+
 # --- 150 mAh LiPo ---------------------------------------------------------
 
-## 27 x 20.5 x 4.3 mm (published).
+## 27 x 20.5 x 4.3 mm (published). It lies turned, 27 mm across the case.
 BATTERY_L = 27.0
 BATTERY_W = 20.5
 BATTERY_T = 4.3
@@ -160,10 +165,16 @@ LED_HOLE_D = 2.5
 
 # --- Layout ---------------------------------------------------------------
 
-## Gap between the charger and the battery, and around the compartment.
-GAP = 2.0
-## Clearance behind the Pico's tallest parts.
-BACK_CLEAR = 1.0
+## Gap between the charger and the battery.
+GAP = 1.5
+## Clearance behind the Pico's tallest parts, and behind the battery layer.
+BACK_CLEAR = 0.5
+## The shelf between the Pico and the battery layer.
+SHELF_T = 1.5
+## Its posts onto the Pico's mounting holes.
+SHELF_POST_D = 3.2
+## Slots in the shelf at the Pico's USB end, for the wires to pins 38 and 39.
+SHELF_SLOT = (8.0, 4.0)
 ## Keep the boards clear of the screw bosses.
 BOSS_CLEAR = BOSS_D + 0.5
 
@@ -173,34 +184,38 @@ Z_PACK_FRONT = Z_GLASS + PACK_DISPLAY_H
 Z_PACK_BACK = Z_PACK_FRONT + PACK_PCB
 Z_PICO_BOTTOM = Z_PACK_BACK + PACK_SOCKET_H
 Z_PICO_TOP = Z_PICO_BOTTOM + PICO_PCB
-## Where the front shell meets the back cover.
-Z_SPLIT = Z_PICO_TOP + PICO_PARTS_H + BACK_CLEAR
+Z_SHELF = Z_PICO_TOP + PICO_PARTS_H + BACK_CLEAR
+Z_LAYER = Z_SHELF + SHELF_T
+## Where the front shell meets the back cover: behind the battery layer.
+Z_SPLIT = Z_LAYER + AMIGO_H + BACK_CLEAR
 DEPTH = Z_SPLIT + WALL
-
-## Inside: the charger and battery along the bottom, clear of the bottom
-## screw bosses; the Display Pack above, clear of the top ones.
-CHIN_Y = BOSS_CLEAR
-CHIN_H = max(AMIGO_W, BATTERY_W) + FIT
+## Inside: the Display Pack, with room at its ends for the corner bosses, so
+## that it slides in past them; behind it the charger (against the left
+## wall, for its USB-C) and the battery, turned, side by side between the
+## bosses.
 INSIDE_L = max(PACK_L + 2 * BOSS_CLEAR,
-               LIP_T + FIT + AMIGO_L + GAP + BATTERY_L + FIT + LIP_T + FIT)
-PACK_X = (INSIDE_L - PACK_L) / 2
-PACK_Y = CHIN_Y + CHIN_H + GAP
-INSIDE_H = PACK_Y + PACK_W + FIT
+               LIP_T + FIT + AMIGO_L + GAP + BATTERY_W + FIT + LIP_T + FIT)
+INSIDE_H = max(PACK_W + FIT, AMIGO_W + FIT + 2 * BOSS_CLEAR, BATTERY_L + FIT + 2 * BOSS_CLEAR)
 LENGTH = INSIDE_L + 2 * WALL
 HEIGHT = INSIDE_H + 2 * WALL
 
 ## Where things are on the case, from its outside bottom-left corner. The
 ## charger's USB end is just inside the back cover's lip.
+BOARD_X = WALL + (INSIDE_L - PACK_L) / 2
+BOARD_Y = WALL + (INSIDE_H - PACK_W) / 2
 AMIGO_X = WALL + FIT / 2 + LIP_T + FIT / 2
-AMIGO_Y = WALL + CHIN_Y
+AMIGO_Y = (HEIGHT - AMIGO_W) / 2
 BATTERY_X = AMIGO_X + AMIGO_L + GAP
-BATTERY_Y = AMIGO_Y
-BOARD_X = WALL + PACK_X
-BOARD_Y = WALL + PACK_Y
+BATTERY_Y = (HEIGHT - BATTERY_L) / 2
 BOSSES = [(WALL + BOSS_D / 2, WALL + BOSS_D / 2),
           (LENGTH - WALL - BOSS_D / 2, WALL + BOSS_D / 2),
           (WALL + BOSS_D / 2, HEIGHT - WALL - BOSS_D / 2),
           (LENGTH - WALL - BOSS_D / 2, HEIGHT - WALL - BOSS_D / 2)]
+## The battery lies on a platform, so that its front is just behind the
+## shelf, like the charger's.
+BATTERY_PLATFORM = Z_SPLIT - Z_LAYER - BATTERY_T - BACK_CLEAR
+## Screws reach this far into the bosses.
+SCREW_DEPTH = 9.0
 
 
 ## @brief Make a box between two corners.
@@ -276,19 +291,18 @@ def pico_point(along, across):
     return BOARD_X + PICO_X + x, BOARD_Y + PICO_Y + across
 
 
-## @brief Cut the two USB openings: the Pico's, in the wall at its USB end,
-#         and the charger's, in the left wall.
+## @brief Cut the charger's USB-C opening, in the left wall.
 #
-# @return The cutting solids, applied to both the front shell and the back
-#         cover's lip.
+# The Pico's own USB socket gets no opening: the case comes open to flash
+# the Pico (four screws), which is also the way to its BOOTSEL button.
+#
+# @return The cutting solid, applied to the front shell, the shelf and the
+#         back cover's lip.
 #
 # @sideeffects None.
 def usb_openings():
-    pico = end_wall_opening(PICO_USB_LEFT, BOARD_Y + PICO_Y + PICO_W / 2,
-                            Z_PICO_TOP + PICO_PARTS_H / 2, PICO_USB_OPENING)
     amigo_z = Z_SPLIT - AMIGO_PCB - AMIGO_USB_H
-    amigo = end_wall_opening(True, AMIGO_Y + AMIGO_W / 2, amigo_z, AMIGO_USB_OPENING)
-    return pico + amigo
+    return end_wall_opening(True, AMIGO_Y + AMIGO_W / 2, amigo_z, AMIGO_USB_OPENING)
 
 
 ## @brief Model the front shell.
@@ -309,15 +323,9 @@ def front_shell():
                    BOARD_X + PACK_L + FIT / 2, BOARD_Y + PACK_W + FIT / 2, Z_PACK_BACK + 1)
     shell += frame_out - frame_in
 
-    # Two ribs that rest just in front of the battery, to hold it down.
-    rib_z = Z_SPLIT - BATTERY_T - 0.3
-    for fx in (0.25, 0.75):
-        x = BATTERY_X + fx * BATTERY_L
-        shell += box(x - 0.6, BATTERY_Y, FRONT, x + 0.6, BATTERY_Y + BATTERY_W, rib_z)
-
     for x, y in BOSSES:
         boss = cylinder(x, y, FRONT, Z_SPLIT, BOSS_D)
-        shell += boss - cylinder(x, y, FRONT + 1.0, Z_SPLIT + 1, SCREW_PILOT_D)
+        shell += boss - cylinder(x, y, Z_SPLIT - SCREW_DEPTH, Z_SPLIT + 1, SCREW_PILOT_D)
 
     m = WINDOW_MARGIN
     shell -= box(BOARD_X + ACTIVE_X[0] - m, BOARD_Y + ACTIVE_Y[0] - m, -1,
@@ -372,22 +380,18 @@ def pocket(x, y, length, width, height, open_left=False):
 
 ## @brief Model the back cover.
 #
-# @return The cover: plate, lip, pockets for the charger and battery,
-#         posts pressing the Pico into its sockets, screw holes, the
-#         charger's switch window and a BOOTSEL pin hole.
+# @return The cover: plate, lip, pockets for the charger and battery (the
+#         battery's on a platform), screw holes and the charger's switch
+#         window.
 #
 # @sideeffects None.
 def back_cover():
     cover = rounded_slab(0, Z_SPLIT, DEPTH) + back_lip()
     cover += pocket(AMIGO_X, AMIGO_Y, AMIGO_L, AMIGO_W, 2.0, open_left=True)
-    cover += pocket(BATTERY_X, BATTERY_Y, BATTERY_L, BATTERY_W, 2.0)
-
-    # Posts at the Pico's mounting holes, with pins into them.
-    pico_top = Z_PICO_TOP
-    for hx, hy in PICO_HOLES:
-        x, y = pico_point(hx, hy)
-        cover += cylinder(x, y, pico_top, Z_SPLIT, 3.2)
-        cover += cylinder(x, y, pico_top - 1.0, pico_top, PICO_HOLE_D - 0.3)
+    platform_z = Z_SPLIT - BATTERY_PLATFORM
+    cover += box(BATTERY_X, BATTERY_Y, platform_z, BATTERY_X + BATTERY_W,
+                 BATTERY_Y + BATTERY_L, Z_SPLIT)
+    cover += pocket(BATTERY_X, BATTERY_Y, BATTERY_W, BATTERY_L, BATTERY_PLATFORM + 2.0)
 
     for x, y in BOSSES:
         cover -= cylinder(x, y, Z_SPLIT - 1, DEPTH + 1, SCREW_CLEAR_D)
@@ -397,10 +401,36 @@ def back_cover():
     sy = AMIGO_Y + AMIGO_SWITCH[1]
     w, h = AMIGO_SWITCH_WINDOW
     cover -= box(sx - w / 2, sy - h / 2, Z_SPLIT - 3, sx + w / 2, sy + h / 2, DEPTH + 1)
-    bootsel_x, bootsel_y = pico_point(*PICO_BOOTSEL)
-    cover -= cylinder(bootsel_x, bootsel_y, Z_SPLIT - 1, DEPTH + 1, 2.0)
 
     return cover - usb_openings()
+
+
+## @brief Model the shelf between the Pico and the battery layer.
+#
+# A plate filling the inside, notched round the bosses, with posts whose
+# pins go into the Pico's mounting holes, and slots at the Pico's USB end
+# for the wires to its pins 38 and 39 (along either edge, whichever its
+# power pins are on). The charger and battery behind it keep it pressed
+# onto the Pico.
+#
+# @return The shelf.
+#
+# @sideeffects None.
+def shelf():
+    plate = rounded_slab(WALL + FIT / 2, Z_SHELF, Z_LAYER, CORNER_R)
+    for x, y in BOSSES:
+        plate -= cylinder(x, y, Z_SHELF - 1, Z_LAYER + 1, BOSS_D + FIT * 2)
+    for hx, hy in PICO_HOLES:
+        x, y = pico_point(hx, hy)
+        plate += cylinder(x, y, Z_PICO_TOP, Z_SHELF, SHELF_POST_D)
+        plate += cylinder(x, y, Z_PICO_TOP - 1.0, Z_PICO_TOP, PICO_HOLE_D - 0.3)
+    w, h = SHELF_SLOT
+    for across in (0.0, PICO_W):
+        x0, y = pico_point(1.0, across)
+        x1, _ = pico_point(1.0 + w, across)
+        x0, x1 = sorted([x0, x1])
+        plate -= box(x0, y - h / 2, Z_SHELF - 1, x1, y + h / 2, Z_LAYER + 1)
+    return plate - usb_openings()
 
 
 ## @brief Model one button cap, standing on its tab, its stem's centre at
@@ -500,21 +530,23 @@ def components():
               Z_PICO_BOTTOM),
         "Pico board": pico_board(px, py),
         "Pico USB socket": pico_usb_socket(),
-        "charger": box(AMIGO_X, AMIGO_Y, Z_SPLIT - 7.0, AMIGO_X + AMIGO_L, AMIGO_Y + AMIGO_W,
-                       Z_SPLIT),
-        "battery": box(BATTERY_X, BATTERY_Y, Z_SPLIT - BATTERY_T, BATTERY_X + BATTERY_L,
-                       BATTERY_Y + BATTERY_W, Z_SPLIT),
+        "charger": box(AMIGO_X, AMIGO_Y, Z_SPLIT - AMIGO_H, AMIGO_X + AMIGO_L,
+                       AMIGO_Y + AMIGO_W, Z_SPLIT),
+        "battery": box(BATTERY_X, BATTERY_Y, Z_SPLIT - BATTERY_PLATFORM - BATTERY_T,
+                       BATTERY_X + BATTERY_W, BATTERY_Y + BATTERY_L,
+                       Z_SPLIT - BATTERY_PLATFORM),
     }
 
 
-## @brief Check the case clears the parts inside it.
+## @brief Check the case clears the parts inside it, the case's parts clear
+#         each other, and the Display Pack can be put in.
 #
 # @return A list of clashes, "<part> hits <case part> (<volume> mm3)";
 #         empty if everything fits.
 #
 # @sideeffects None.
 def check_fit():
-    case = {"front shell": front_shell(), "back cover": back_cover(),
+    case = {"front shell": front_shell(), "shelf": shelf(), "back cover": back_cover(),
             "button caps": placed_button_caps()}
     clashes = []
     for name, block in components().items():
@@ -523,10 +555,20 @@ def check_fit():
             if volume > 0.01:
                 clashes.append(f"{name} hits {case_name} ({volume:.2f} mm3)")
     caps = case["button caps"]
-    for case_name in ("front shell", "back cover"):
+    for case_name in ("front shell", "shelf", "back cover"):
         volume = (caps ^ case[case_name]).volume()
         if volume > 0.01:
             clashes.append(f"button caps hit {case_name} ({volume:.2f} mm3)")
+    # The Display Pack, with the Pico on it, goes in from the back: its
+    # outline, swept from the open back to where it sits, must clear the shell.
+    sweep = box(BOARD_X, BOARD_Y, Z_PACK_FRONT, BOARD_X + PACK_L, BOARD_Y + PACK_W, Z_SPLIT + 1)
+    volume = (sweep ^ case["front shell"]).volume()
+    if volume > 0.01:
+        clashes.append(f"the Display Pack can't go in past the front shell ({volume:.2f} mm3)")
+    for a, b in (("front shell", "shelf"), ("front shell", "back cover"), ("shelf", "back cover")):
+        volume = (case[a] ^ case[b]).volume()
+        if volume > 0.01:
+            clashes.append(f"{a} hits {b} ({volume:.2f} mm3)")
     return clashes
 
 
@@ -640,16 +682,16 @@ def preview_sections(path):
     except ImportError:
         sys.exit("--preview needs matplotlib: pip install matplotlib")
 
-    case = [front_shell(), back_cover(), placed_button_caps()]
+    case = [front_shell(), shelf(), back_cover(), placed_button_caps()]
     colours = ["#1f77b4", "#aec7e8", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
     inside = list(components().items())
     pico_mid_y = BOARD_Y + PICO_Y + PICO_W / 2
     cuts = [
-        ("y", pico_mid_y, "Through the Pico's USB socket (from below)", ("x", "z")),
+        ("y", pico_mid_y, "Through the Pico (from below)", ("x", "z")),
         ("y", AMIGO_Y + AMIGO_W / 2, "Through the charger's USB-C socket", ("x", "z")),
-        ("x", BATTERY_X + BATTERY_L / 2, "Through the battery and Pico (from the side)",
+        ("x", BATTERY_X + BATTERY_W / 2, "Through the battery and Pico (from the side)",
          ("y", "z")),
-        ("z", Z_SPLIT - 1.0, "Inside, from the back, at the back cover", ("x", "y")),
+        ("z", Z_SPLIT - 1.0, "Behind the shelf, from the back", ("x", "y")),
     ]
     fig, axes = plt.subplots(2, 2, figsize=(13, 10))
     for ax, (axis, at, title, labels) in zip(axes.flat, cuts):
@@ -680,7 +722,7 @@ def preview_sections(path):
 #
 # @return 0.
 #
-# @sideeffects Writes front.stl, back.stl and buttons.stl (and PNGs of the
+# @sideeffects Writes front.stl, shelf.stl, back.stl and buttons.stl (and PNGs of the
 #              parts and of sections through the assembly with --preview)
 #              into the output directory, creating it; prints the case's
 #              size, any clash between it and the parts inside, and each
@@ -701,6 +743,7 @@ def main():
         print("  The parts inside fit.")
     parts = {
         "front": (front_shell(), "Front shell (print face down)"),
+        "shelf": (turn_over(shelf(), Z_LAYER), "Shelf (print posts up)"),
         "back": (turn_over(back_cover(), DEPTH), "Back cover (print outside face down)"),
         "buttons": (button_caps(), "Button caps (print flange down)"),
     }

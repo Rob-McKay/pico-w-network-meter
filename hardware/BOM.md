@@ -21,6 +21,7 @@ the wiring.
 | Qty | Part | Notes |
 |---|---|---|
 | 1 | Front shell, `case/stl/front.stl` | PLA or PETG, 0.2 mm layers, 3 walls; print face down, no supports |
+| 1 | Shelf, `case/stl/shelf.stl` | Print flat, posts up |
 | 1 | Back cover, `case/stl/back.stl` | Print outside face down, no supports |
 | 4 | Button caps, `case/stl/buttons.stl` (one print holds all four) | Print tab down; 0.1–0.15 mm layers print the small stems better |
 | 4 | M2 × 8 mm self-tapping screws, pan head | Cover to shell |
@@ -32,8 +33,8 @@ About 30 g of filament in all.
 
 - A USB-C cable and charger: charges the battery, and powers the meter while
   plugged in.
-- A micro-USB cable: flashing the firmware and the serial console (Pico's
-  own socket).
+- A micro-USB cable: flashing the firmware and the serial console (the
+  Pico's own socket, reached with the case open).
 - Soldering iron, solder, wire strippers, a heat gun or lighter for the
   heat-shrink.
 
@@ -42,8 +43,8 @@ About 30 g of filament in all.
 - **Charge rate.** The LiPo Amigo Pro charges at 200 mA as supplied. That
   is 1.3 C for a 150 mAh cell, above the 1 C (150 mA) that many small
   cells allow. Check your cell's datasheet. If it allows only 1 C, use a
-  bigger cell (400–500 mAh; the case's `BATTERY_*` settings and the chin
-  compartment would need enlarging) rather than charging it too fast.
+  bigger cell (400–500 mAh; the case's `BATTERY_*` settings would need
+  changing, and the case would grow) rather than charging it too fast.
   Never bridge the Amigo's FAST CHARGE pads (500 mA) for this cell.
 - **Running time.** The Pico W scanning Wi-Fi with the display lit draws
   roughly 80–100 mA, so 150 mAh lasts about 1½ hours. The meter runs as
