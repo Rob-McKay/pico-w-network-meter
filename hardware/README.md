@@ -11,8 +11,8 @@ A battery-powered build of the meter in a 3D-printed case:
 
 ## The case
 
-70.2 × 42.4 × 29.0 mm: little bigger than the Display Pack, with the
-charger and battery side by side in a layer behind the Pico. It's three
+70.2 × 39.6 × 29.3 mm: little bigger than the Display Pack, with the
+charger and a 350 mAh battery side by side in a layer behind the Pico. It's three
 printed parts, screwed together, plus four button caps.
 
 ![Sections through the assembled case](case/stl/sections.png)
@@ -29,10 +29,11 @@ printed parts, screwed together, plus four button caps.
   the Display Pack's sockets. The charger and battery behind keep the shelf
   pressed onto the Pico. Two slots at the Pico's USB end let the power
   wires through.
-- **Back cover** (`back.stl`): pockets for the charger and the battery (on
-  a platform, so it sits just behind the shelf, like the charger), a
+- **Back cover** (`back.stl`): pockets for the charger and the battery, a
   window onto the charger's power switch, and a lip that lines it up with
-  the shell.
+  the shell. The thinner of the charger and the battery stands on a
+  platform, so that both sit just behind the shelf. With the 350 mAh cell
+  the charger is only 0.8 mm short, which the foam tape under it takes up.
 - **Button caps** (`buttons.stl`): each one has a stem through the bezel
   and a tab behind it, which rests on the button and stops the cap
   falling out.
@@ -111,7 +112,7 @@ needed:
    pins 38 and 39.
 6. **Fit the charger and battery.** Stick the charger into its pocket on
    the back cover with foam tape, USB-C to the open end, components up. Put
-   the battery on its platform.
+   the battery in its pocket.
    - Check the battery's polarity, then plug it into the charger's
      **BAT** socket.
    - Plug the Pico's lead into **DEVICE**.

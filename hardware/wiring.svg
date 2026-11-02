@@ -16,7 +16,7 @@
   <g>
     <rect x="40" y="330" width="170" height="110" rx="8" fill="#f2d6b3" stroke="#8a5a2b" stroke-width="2"/>
     <text x="125" y="368" text-anchor="middle" font-weight="bold">LiPo battery</text>
-    <text x="125" y="390" text-anchor="middle">3.7 V 150 mAh</text>
+    <text x="125" y="390" text-anchor="middle">3.7 V 350 mAh</text>
     <text x="125" y="410" text-anchor="middle">JST-PH lead</text>
   </g>
 

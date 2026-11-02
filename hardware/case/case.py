@@ -5,7 +5,7 @@
 """Generate a 3D-printable case for the network meter, as STL files.
 
 The case holds a Raspberry Pi Pico W plugged into a Pimoroni Pico Display
-Pack 2.0, with a Pimoroni LiPo Amigo Pro charger and a 150 mAh LiPo in a
+Pack 2.0, with a Pimoroni LiPo Amigo Pro charger and a 350 mAh LiPo in a
 layer behind the Pico, side by side, so the case is little bigger than the
 Display Pack:
 
@@ -131,12 +131,13 @@ AMIGO_SWITCH_WINDOW = (12.0, 8.0)
 ## Its height with its connectors and switch (published).
 AMIGO_H = 7.0
 
-# --- 150 mAh LiPo ---------------------------------------------------------
+# --- 350 mAh LiPo ---------------------------------------------------------
 
-## 27 x 20.5 x 4.3 mm (published). It lies turned, 27 mm across the case.
-BATTERY_L = 27.0
+## 32.0 x 20.5 x 7.3 mm. It lies turned, 32 mm across the case. (Pimoroni's
+## 150 mAh cell, 27 x 20.5 x 4.3 mm, fits too.)
+BATTERY_L = 32.0
 BATTERY_W = 20.5
-BATTERY_T = 4.3
+BATTERY_T = 7.3
 
 # --- Fastenings -----------------------------------------------------------
 
@@ -186,16 +187,21 @@ Z_PICO_BOTTOM = Z_PACK_BACK + PACK_SOCKET_H
 Z_PICO_TOP = Z_PICO_BOTTOM + PICO_PCB
 Z_SHELF = Z_PICO_TOP + PICO_PARTS_H + BACK_CLEAR
 Z_LAYER = Z_SHELF + SHELF_T
-## Where the front shell meets the back cover: behind the battery layer.
-Z_SPLIT = Z_LAYER + AMIGO_H + BACK_CLEAR
+## Where the front shell meets the back cover: behind the battery layer, as
+## deep as the thicker of the charger and the battery.
+Z_SPLIT = Z_LAYER + max(AMIGO_H, BATTERY_T) + BACK_CLEAR
 DEPTH = Z_SPLIT + WALL
 ## Inside: the Display Pack, with room at its ends for the corner bosses, so
 ## that it slides in past them; behind it the charger (against the left
-## wall, for its USB-C) and the battery, turned, side by side between the
-## bosses.
+## wall, for its USB-C, and between the left-hand bosses) and the battery,
+## turned, side by side. The battery needs to clear the right-hand bosses
+## only if it reaches them; otherwise just the back cover's lip.
 INSIDE_L = max(PACK_L + 2 * BOSS_CLEAR,
                LIP_T + FIT + AMIGO_L + GAP + BATTERY_W + FIT + LIP_T + FIT)
-INSIDE_H = max(PACK_W + FIT, AMIGO_W + FIT + 2 * BOSS_CLEAR, BATTERY_L + FIT + 2 * BOSS_CLEAR)
+_BATTERY_END = LIP_T + FIT + AMIGO_L + GAP + BATTERY_W + FIT
+_BATTERY_MARGIN = BOSS_CLEAR if _BATTERY_END > INSIDE_L - BOSS_CLEAR else LIP_T + FIT
+INSIDE_H = max(PACK_W + FIT, AMIGO_W + FIT + 2 * BOSS_CLEAR,
+               BATTERY_L + FIT + 2 * _BATTERY_MARGIN)
 LENGTH = INSIDE_L + 2 * WALL
 HEIGHT = INSIDE_H + 2 * WALL
 
@@ -211,9 +217,13 @@ BOSSES = [(WALL + BOSS_D / 2, WALL + BOSS_D / 2),
           (LENGTH - WALL - BOSS_D / 2, WALL + BOSS_D / 2),
           (WALL + BOSS_D / 2, HEIGHT - WALL - BOSS_D / 2),
           (LENGTH - WALL - BOSS_D / 2, HEIGHT - WALL - BOSS_D / 2)]
-## The battery lies on a platform, so that its front is just behind the
-## shelf, like the charger's.
+## The thinner of the charger and the battery lies on a platform, so that
+## its front is just behind the shelf, like the other's. Less than 0.5 mm
+## isn't worth printing: foam tape takes it up.
+AMIGO_PLATFORM = Z_SPLIT - Z_LAYER - AMIGO_H - BACK_CLEAR
+AMIGO_PLATFORM = AMIGO_PLATFORM if AMIGO_PLATFORM >= 0.5 else 0.0
 BATTERY_PLATFORM = Z_SPLIT - Z_LAYER - BATTERY_T - BACK_CLEAR
+BATTERY_PLATFORM = BATTERY_PLATFORM if BATTERY_PLATFORM >= 0.5 else 0.0
 ## Screws reach this far into the bosses.
 SCREW_DEPTH = 9.0
 
@@ -301,7 +311,7 @@ def pico_point(along, across):
 #
 # @sideeffects None.
 def usb_openings():
-    amigo_z = Z_SPLIT - AMIGO_PCB - AMIGO_USB_H
+    amigo_z = Z_SPLIT - AMIGO_PLATFORM - AMIGO_PCB - AMIGO_USB_H
     return end_wall_opening(True, AMIGO_Y + AMIGO_W / 2, amigo_z, AMIGO_USB_OPENING)
 
 
@@ -381,17 +391,18 @@ def pocket(x, y, length, width, height, open_left=False):
 ## @brief Model the back cover.
 #
 # @return The cover: plate, lip, pockets for the charger and battery (the
-#         battery's on a platform), screw holes and the charger's switch
-#         window.
+#         thinner of the two on a platform), screw holes and the charger's
+#         switch window.
 #
 # @sideeffects None.
 def back_cover():
     cover = rounded_slab(0, Z_SPLIT, DEPTH) + back_lip()
-    cover += pocket(AMIGO_X, AMIGO_Y, AMIGO_L, AMIGO_W, 2.0, open_left=True)
-    platform_z = Z_SPLIT - BATTERY_PLATFORM
-    cover += box(BATTERY_X, BATTERY_Y, platform_z, BATTERY_X + BATTERY_W,
-                 BATTERY_Y + BATTERY_L, Z_SPLIT)
-    cover += pocket(BATTERY_X, BATTERY_Y, BATTERY_W, BATTERY_L, BATTERY_PLATFORM + 2.0)
+    for x, y, length, width, platform, open_left in (
+            (AMIGO_X, AMIGO_Y, AMIGO_L, AMIGO_W, AMIGO_PLATFORM, True),
+            (BATTERY_X, BATTERY_Y, BATTERY_W, BATTERY_L, BATTERY_PLATFORM, False)):
+        if platform > 0:
+            cover += box(x, y, Z_SPLIT - platform, x + length, y + width, Z_SPLIT)
+        cover += pocket(x, y, length, width, platform + 2.0, open_left)
 
     for x, y in BOSSES:
         cover -= cylinder(x, y, Z_SPLIT - 1, DEPTH + 1, SCREW_CLEAR_D)
@@ -530,8 +541,8 @@ def components():
               Z_PICO_BOTTOM),
         "Pico board": pico_board(px, py),
         "Pico USB socket": pico_usb_socket(),
-        "charger": box(AMIGO_X, AMIGO_Y, Z_SPLIT - AMIGO_H, AMIGO_X + AMIGO_L,
-                       AMIGO_Y + AMIGO_W, Z_SPLIT),
+        "charger": box(AMIGO_X, AMIGO_Y, Z_SPLIT - AMIGO_PLATFORM - AMIGO_H, AMIGO_X + AMIGO_L,
+                       AMIGO_Y + AMIGO_W, Z_SPLIT - AMIGO_PLATFORM),
         "battery": box(BATTERY_X, BATTERY_Y, Z_SPLIT - BATTERY_PLATFORM - BATTERY_T,
                        BATTERY_X + BATTERY_W, BATTERY_Y + BATTERY_L,
                        Z_SPLIT - BATTERY_PLATFORM),
