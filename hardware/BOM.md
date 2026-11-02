@@ -24,7 +24,8 @@ the wiring.
 | 1 | Shelf, `case/stl/shelf.stl` | Print flat, posts up |
 | 1 | Back cover, `case/stl/back.stl` | Print outside face down, no supports |
 | 5 | Button caps and the PWR plunger, `case/stl/buttons.stl` (one print holds all five) | Print tab down; 0.1–0.15 mm layers print the small stems better |
-| 4 | M2 × 6 mm self-tapping screws, pan head | Through the long side walls into the back cover |
+| 4 | M2 × 6 mm machine screws (bolts), pan or cap head | Through the long side walls into the back cover |
+| 4 | M2 hex nuts, 4.0 mm across the flats, 1.6 mm thick | Drop into the slots in the back cover's blocks, which stop them turning |
 | 1 | Double-sided foam tape, about 20 × 30 mm | Holds the battery to the back of the shelf |
 
 About 30 g of filament in all.

@@ -19,7 +19,7 @@ board.
 A 350 mAh battery and the charger are stacked behind the Pico. From the
 front: the Display Pack, the Pico, a printed shelf, the battery, then the
 charger, top towards the back. It's three printed parts, held together by
-four side screws, plus four button caps and a plunger for the charger's
+four M2 bolts and nuts, plus four button caps and a plunger for the charger's
 PWR button.
 
 ![Sections through the assembled case](case/stl/sections.png)
@@ -30,7 +30,7 @@ PWR button.
   - walls that hug the Display Pack, square inside, and a rib that locates
     its A/B end
   - the charger's USB-C opening in the left wall
-  - clearance holes for four M2 screws through the long walls
+  - clearance holes for four M2 bolts through the long walls
 - **Shelf** (`shelf.stl`): a plate between the Pico and the battery. Its
   four posts have pins into the Pico's mounting holes, holding it into the
   Display Pack's sockets. The battery and charger behind keep the shelf
@@ -43,8 +43,10 @@ PWR button.
   - a hole for the PWR button's plunger, and two small holes onto the LEDs
   - a lip along three sides that lines it up with the shell. There's none
     on the left, so the charger's USB-C end goes right against the wall
-  - four blocks on its rim, beside the charger, that the side screws go
-    into
+  - four blocks on its rim, beside the charger, each with a clearance hole
+    for a bolt and a slot that holds an M2 hex nut and stops it turning.
+    The slots open towards the front, so the nuts drop in from above with
+    the cover lying on its back. `NUT_AF` and `NUT_T` set the nut's size
 - **Button caps** (`buttons.stl`): four caps for A, B, X and Y, each with a
   stem through the bezel and a tab behind it, which rests on the button
   and stops the cap falling out. The fifth piece is the plunger for the
@@ -57,7 +59,7 @@ leads.
 
 The Pico's own USB socket has no opening, and the charger sits over its
 BOOTSEL button. To flash new firmware or watch the serial console, take
-out the four side screws and lift off the back cover (with the charger on it), then
+out the four side bolts and lift off the back cover (with the charger on it), then
 the shelf with the battery stuck to it.
 
 ### Check the measurements first
@@ -141,9 +143,11 @@ needed:
      on its PWR button, and its USB-C socket is at the open end.
    - Check the battery's polarity, then plug it into the charger's **BAT**
      socket, and the Pico's lead into **DEVICE**.
-8. **Close the case.** Turn the shell over onto the cover, so the lip goes
-   inside the walls, and fit the four M2 × 6 mm screws through the long
-   walls into the cover's blocks.
+8. **Close the case.** Lay the cover on its back and drop an M2 nut into
+   the slot in each of its four blocks. Turn the shell over onto the
+   cover, so the lip goes inside the walls, and fit the four M2 × 6 mm
+   bolts through the long walls into the nuts. Don't overtighten: the
+   slots hold the nuts, but PLA is soft.
 9. **Switch on** by pressing the PWR plunger in the back. The charger's ON
    LED shows through its hole beside it, and CHG lights while charging.
 
@@ -151,6 +155,6 @@ The charger's USB-C socket charges the battery, and powers the meter while
 a cable is plugged in.
 
 To flash new firmware:
-1. Take out the screws and lift off the back cover.
+1. Take out the bolts and lift off the back cover.
 2. Unplug the Pico's lead from DEVICE and lift out the shelf.
 3. Hold the Pico's BOOTSEL button while plugging in its micro-USB cable.

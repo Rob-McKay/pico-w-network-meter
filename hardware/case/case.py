@@ -12,21 +12,21 @@ charger, hanging top towards the back so its PWR button and LEDs face out.
 
     front.stl     the front shell: bezel with the display window, button
                   and LED holes, side walls, the charger's USB-C opening and
-                  holes for the screws. The display's active area is in the
+                  holes for the bolts. The display's active area is in the
                   middle of the front. Print face down.
     shelf.stl     a shelf between the Pico and the battery: posts on it hold
                   the Pico into the Display Pack's sockets, and the battery
                   and charger behind hold it in place. Print flat, posts up.
     back.stl      the back cover: posts the charger hangs on, and holes for
                   the PWR button's plunger and onto the charger's LEDs, and
-                  blocks the four side screws go into. Print outside face
-                  down.
+                  blocks with nut traps for the four side bolts. Print
+                  outside face down.
     buttons.stl   four button caps for A, B, X and Y, and a plunger for the
                   charger's PWR button: a tab inside keeps each in. Print
                   tab down.
 
 The Pico's own USB socket has no opening, and the charger covers its BOOTSEL
-button: open the case (four screws) to flash new firmware.
+button: open the case (four bolts) to flash new firmware.
 
 Every measurement the case depends on is a constant below, in millimetres.
 The Display Pack's come from Pimoroni's dimension drawing (turned to
@@ -44,6 +44,7 @@ needs matplotlib, and draws PNG views next to the STL files.
 """
 
 import argparse
+import math
 import os
 import struct
 import sys
@@ -163,16 +164,27 @@ BATTERY_T = 7.3
 
 # --- Fastenings -----------------------------------------------------------
 
-## Four M2 x 6 mm self-tapping screws through the long walls, two in each,
-## into blocks on the back cover's rim beside the charger: the walls hug the
-## Display Pack, leaving no room for screw posts inside.
-SCREW_PILOT_D = 1.6
+## Four M2 x 6 mm bolts through the long walls, two in each, into M2 hex
+## nuts held in blocks on the back cover's rim beside the charger: the walls
+## hug the Display Pack, leaving no room for screw posts inside.
 SCREW_CLEAR_D = 2.4
-## The screws' positions along the case, from each end.
+## The bolts' positions along the case, from each end.
 SCREW_FROM_END = 10.0
-## The blocks: how far in from the wall, and how deep (z).
-SCREW_BLOCK_T = 4.0
+## The blocks: their width (x), how far in from the wall (y), and depth (z).
+SCREW_BLOCK_W = 8.0
+SCREW_BLOCK_T = 4.5
 SCREW_BLOCK_H = 6.0
+## An M2 hex nut: across its flats, and thick. Its slot, across the bolt,
+## is open at the block's end (towards the inside of the case), so the nut
+## drops in; the slot's sides hold its flats, so it can't turn.
+NUT_AF = 4.0
+NUT_T = 1.6
+NUT_FIT = 0.3
+## The nut's middle, in from the block's wall side: the bolt passes right
+## through it and ends inside the block.
+NUT_IN = 2.5
+## The bolts' length under the head.
+BOLT_L = 6.0
 ## A lip on the back cover that fits inside the walls, to line it up.
 LIP_H = 2.0
 LIP_T = 1.2
@@ -341,7 +353,7 @@ def amigo_point(along, across):
 ## @brief Cut the charger's USB-C opening, in the left wall.
 #
 # The Pico's own USB socket gets no opening: the case comes open to flash
-# the Pico (four screws), which is also the way to its BOOTSEL button.
+# the Pico (four bolts), which is also the way to its BOOTSEL button.
 #
 # @return The cutting solid, applied to the front shell, the shelf and the
 #         back cover's lip.
@@ -364,6 +376,25 @@ def usb_openings():
 def screw_hole(x, y0, y1, d):
     hole = Manifold.cylinder(y1 - y0, d / 2, d / 2, SEGMENTS).rotate([-90, 0, 0])
     return hole.translate([x, y0, SCREW_Z])
+
+
+## @brief Make the slot that holds a bolt's hex nut, in a screw block.
+#
+# Across the bolt, as wide as the nut's flats (so it can't turn) and a
+# little thicker than the nut, open at the block's end so the nut drops in,
+# and deep enough that the nut, point down, sits centred on the bolt.
+#
+# @param x The bolt's position along the case.
+# @param y The nut's middle, across the case.
+# @return The slot.
+#
+# @sideeffects None.
+def nut_slot(x, y):
+    w = NUT_AF + NUT_FIT
+    t = NUT_T + NUT_FIT
+    corners = (NUT_AF / math.cos(math.radians(30)) + NUT_FIT) / 2
+    return box(x - w / 2, y - t / 2, Z_SPLIT - SCREW_BLOCK_H - 1, x + w / 2, y + t / 2,
+               SCREW_Z + corners)
 
 
 ## @brief Model the front shell.
@@ -422,7 +453,7 @@ def back_lip():
 
 ## @brief Model the back cover.
 #
-# @return The cover: plate, lip, blocks for the side screws, posts the
+# @return The cover: plate, lip, blocks with nut traps for the side bolts, posts the
 #         charger hangs on (pins in its mounting holes), and holes for the
 #         charger's PWR button plunger and onto its LEDs.
 #
@@ -436,10 +467,12 @@ def back_cover():
 
     i0 = WALL + FIT / 2
     for x in SCREWS_X:
-        w = SCREW_BLOCK_H
-        for y0, y1 in ((i0, i0 + SCREW_BLOCK_T), (HEIGHT - i0 - SCREW_BLOCK_T, HEIGHT - i0)):
-            cover += box(x - w / 2, y0, Z_SPLIT - SCREW_BLOCK_H, x + w / 2, y1, Z_SPLIT)
-            cover -= screw_hole(x, y0 - 1, y1 + 1, SCREW_PILOT_D)
+        for wall_y, inward in ((i0, 1), (HEIGHT - i0, -1)):
+            y0, y1 = sorted([wall_y, wall_y + inward * SCREW_BLOCK_T])
+            cover += box(x - SCREW_BLOCK_W / 2, y0, Z_SPLIT - SCREW_BLOCK_H,
+                         x + SCREW_BLOCK_W / 2, y1, Z_SPLIT)
+            cover -= screw_hole(x, y0 - 1, y1 + 1, SCREW_CLEAR_D)
+            cover -= nut_slot(x, wall_y + inward * NUT_IN)
     x, y = amigo_point(*AMIGO_PWR)
     cover -= cylinder(x, y, Z_SPLIT - 1, DEPTH + 1, BUTTON_STEM_D + FIT)
     for led in AMIGO_LEDS:
@@ -569,6 +602,31 @@ def pico_usb_socket():
     return box(x0, y - 4, Z_PICO_TOP, x1, y + 4, Z_PICO_TOP + 3.0)
 
 
+## @brief Model the four bolts and their nuts, where they sit.
+#
+# Each bolt is a 2 mm rod BOLT_L long from the outside of its wall; each nut
+# a hex prism, point down, in its slot.
+#
+# @return The bolts and nuts.
+#
+# @sideeffects None.
+def bolts_and_nuts():
+    parts = None
+    i0 = WALL + FIT / 2
+    hexagon = CrossSection.circle(NUT_AF / math.sqrt(3), 6).rotate(90)
+    for x in SCREWS_X:
+        for outside, inward in ((0.0, 1), (HEIGHT, -1)):
+            y0, y1 = sorted([outside, outside + inward * BOLT_L])
+            bolt = screw_hole(x, y0, y1, 2.0)
+            ny = (i0 if inward > 0 else HEIGHT - i0) + inward * NUT_IN
+            nut = Manifold.extrude(hexagon, NUT_T).translate([0, 0, -NUT_T / 2])
+            nut = nut.rotate([90, 0, 0]).translate([x, ny, SCREW_Z])
+            nut -= screw_hole(x, ny - NUT_T, ny + NUT_T, 2.0)
+            piece = bolt + nut
+            parts = piece if parts is None else parts + piece
+    return parts
+
+
 ## @brief Model the charger as it hangs, top towards the back cover.
 #
 # Its board, with its mounting holes, and a block for its parts on its top,
@@ -615,6 +673,7 @@ def components():
         "Pico board": pico_board(px, py),
         "Pico USB socket": pico_usb_socket(),
         "charger": charger(),
+        "bolts and nuts": bolts_and_nuts(),
         "battery": box(BATTERY_X, BATTERY_Y, Z_BATTERY, BATTERY_X + BATTERY_L,
                        BATTERY_Y + BATTERY_W, Z_BATTERY + BATTERY_T),
     }
