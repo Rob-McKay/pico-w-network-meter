@@ -11,10 +11,9 @@ A battery-powered build of the meter in a 3D-printed case:
 
 ## The case
 
-63.2 × 39.0 × 36.6 mm. It's 4.4 mm taller than the Display Pack and 8 mm
-longer, the extra length at the A/B end. That puts the display's active
-area in the middle of the front: it's 1.8 mm off the middle of its own
-board.
+59.4 × 39.0 × 36.6 mm: 4.4 mm bigger than the Display Pack each way. The
+display sits in the middle of its board, so it's in the middle of the
+front too.
 
 A 350 mAh battery and the charger are stacked behind the Pico. From the
 front: the Display Pack, the Pico, a printed shelf, the battery, then the
@@ -75,6 +74,7 @@ before printing:
 | Constant | What | Default |
 |---|---|---|
 | `PACK_DISPLAY_H` | Front of the Display Pack's board to the front of the glass | 3.0 mm |
+| `ACTIVE_X`, `ACTIVE_Y` | The display's picture (40.8 × 30.6 mm), which the bezel's window frames. Taken to be in the middle of the board: check with the display lit | 7.1–47.9, 2.0–32.6 mm |
 | `PACK_SOCKET_H` | Height of the header sockets on its back | 7.0 mm |
 | `BUTTON_TOP_H` | Height of a button's top above the board | 1.5 mm |
 | `PICO_USB_LEFT` | Whether the Pico's USB socket is at the A/B end (left, looking at the display) or the X/Y end. This places the shelf's posts and wire slots | A/B end |

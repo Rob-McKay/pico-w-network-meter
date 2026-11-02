@@ -67,21 +67,21 @@ SEGMENTS = 48
 
 # --- Pimoroni Pico Display Pack 2.0 ---------------------------------------
 
-## Board: 55.2 x 34.6 mm (drawing).
-PACK_L = 55.2
+## Board: 55.0 mm long (measured) x 34.6 mm (drawing).
+PACK_L = 55.0
 PACK_W = 34.6
 PACK_PCB = 1.6
 ## Front of the board to the front of the display glass. MEASURE.
 PACK_DISPLAY_H = 3.0
-## Display glass: between the 3.6 mm button strips at the ends (drawing:
-## 47.8 mm long), and across the board (its edges, MEASURE).
-PACK_GLASS_X = (3.6, 51.4)
-PACK_GLASS_Y = (0.2, 34.4)
-## The window: the active area (drawing: 40.8 x 30.6 mm, from 5.4 mm at the
-## A/B end and 2.0 mm from the bottom edge), with a margin. The bezel rests
-## on the glass around it.
-ACTIVE_X = (5.4, 46.2)
-ACTIVE_Y = (2.0, 32.6)
+## Display glass: in the middle of the board lengthwise, 4.0 mm from each
+## end, and the board's full width (measured).
+PACK_GLASS_X = (4.0, PACK_L - 4.0)
+PACK_GLASS_Y = (0.0, PACK_W)
+## The window: the active area (40.8 x 30.6 mm, the panel's size), in the
+## middle of the glass, with a margin. The bezel rests on the glass around
+## it. MEASURE: with the display lit, check the picture is in the middle.
+ACTIVE_X = ((PACK_L - 40.8) / 2, (PACK_L + 40.8) / 2)
+ACTIVE_Y = ((PACK_W - 30.6) / 2, (PACK_W + 30.6) / 2)
 WINDOW_MARGIN = 0.6
 ## Height of the female header sockets on the back of the board. MEASURE.
 PACK_SOCKET_H = 7.0
@@ -236,9 +236,9 @@ AMIGO_STANDOFF = AMIGO_PARTS_H + 0.3
 ## Where the front shell meets the back cover.
 Z_SPLIT = Z_AMIGO_TOP + AMIGO_STANDOFF
 DEPTH = Z_SPLIT + WALL
-## Inside: the walls hug the Display Pack, except at its A/B end, where the
-## case reaches further so that the display's active area is in the middle
-## of the front (it is 1.8 mm off the board's middle). Behind it the
+## Inside: the walls hug the Display Pack. If the display's active area
+## were towards the X/Y end, the case would reach further at the A/B end to
+## keep the active area in the middle of the front. Behind it the
 ## charger, against the left wall for its USB-C, with room past its far end
 ## for its plugs, and the battery in front of it; the charger clear of the
 ## screw blocks along the long walls.
@@ -842,8 +842,11 @@ def preview_sections(path):
         ax.add_patch(PathPatch(Path(verts, codes), **style))
 
     case = [front_shell(), shelf(), back_cover(), placed_button_caps()]
-    colours = ["#1f77b4", "#aec7e8", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+    colours = ["#1f77b4", "#aec7e8", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+               "#e377c2", "#bcbd22", "#17becf", "#7f7f7f", "#ffbb78"]
     inside = list(components().items())
+    if len(inside) > len(colours):
+        raise ValueError(f"{len(inside)} parts inside but only {len(colours)} colours")
     pico_mid_y = BOARD_Y + PICO_Y + PICO_W / 2
     # (plane cut, where, title, axis names): None for the front view.
     panels = [

@@ -9,7 +9,7 @@ the wiring.
 | Qty | Part | Notes |
 |---|---|---|
 | 1 | Raspberry Pi Pico W, with headers ("Pico WH") | Or a Pico W with male headers soldered on, pins down |
-| 1 | Pimoroni Pico Display Pack 2.0 | 320 × 240 IPS display, buttons A/B/X/Y, RGB LED; 55.2 × 34.6 mm |
+| 1 | Pimoroni Pico Display Pack 2.0 | 320 × 240 IPS display, buttons A/B/X/Y, RGB LED; 55.0 × 34.6 mm |
 | 1 | Pimoroni LiPo Amigo Pro | LiPo charger with a PWR button; USB-C in, JST-PH BAT and DEVICE sockets; 36 × 23 × 7 mm |
 | 1 | LiPo battery, 3.7 V 350 mAh, JST-PH 2.0 mm plug, up to 32.0 × 20.5 × 7.3 mm | Pimoroni's 150 mAh pack (27 × 20.5 × 4.3 mm) also fits, with the caveats below |
 | 1 | JST-PH 2.0 mm 2-pin lead, plug one end, bare wires the other, about 100 mm | From the Amigo Pro's DEVICE socket to the Pico |
