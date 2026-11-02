@@ -19,7 +19,7 @@ and shows:
   (dBm, green, amber or red). Names of up to 24 characters show whole;
   longer ones are shortened in the middle, keeping the end. Open
   (unsecured) networks are shown in amber; hidden ones in grey, named by
-  the end of their MAC address (`hidden a2:7f:06`).
+  their MAC address (`hidden 02:1f:3c:a2:7f:06`).
 - **Events**: each start of the meter, newest first, and why it started:
   power on, a Wi-Fi restart, a crash, a hung thread or an unexplained
   restart, with how long the run before it lasted. The log is kept in
@@ -33,8 +33,9 @@ and shows:
 panel. The sample data is in `tests/ui_render`.)
 
 Networks stay on screen after they were last heard: at full brightness for
-15 s, then fading to black by 30 s. A scan that misses a network, or hears
-nothing at all, doesn't blank the display; an empty or failed scan is
+60 s, then fading to 40% brightness, still readable, and gone at 2 minutes.
+A scan that misses a network, or hears nothing at all, doesn't blank the
+display; an empty or failed scan is
 retried after 2 s.
 
 **Buttons**: A next screen, B previous screen. On the Channels screen X

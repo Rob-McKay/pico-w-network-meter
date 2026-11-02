@@ -410,6 +410,8 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size)
 		copy_middle_cut(ap->ssid, buf, size);
 		return;
 	}
-	(void)snprintf(buf, size, "hidden %02x:%02x:%02x", (unsigned int)ap->bssid[3],
+	(void)snprintf(buf, size, "hidden %02x:%02x:%02x:%02x:%02x:%02x",
+		       (unsigned int)ap->bssid[0], (unsigned int)ap->bssid[1],
+		       (unsigned int)ap->bssid[2], (unsigned int)ap->bssid[3],
 		       (unsigned int)ap->bssid[4], (unsigned int)ap->bssid[5]);
 }

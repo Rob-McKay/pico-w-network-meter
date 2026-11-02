@@ -183,9 +183,9 @@ bool chan_ap_hidden(const struct chan_ap *ap);
 /**
  * @brief Name an access point for display.
  *
- * A hidden network is named by the last three bytes of its BSSID (its MAC
- * address), "hidden 12:34:56", which tell the access points apart; the
- * first three only name the maker; that takes 16 bytes.
+ * A hidden network is named by its BSSID (its MAC address),
+ * "hidden 02:1f:3c:12:34:56", which tells the access points apart and can
+ * be looked up to find the maker; that takes 25 bytes.
  *
  * An SSID too long for @p buf is shortened in the middle, keeping its
  * start and end, "JurassicFi..UID35630", as the end often tells similar

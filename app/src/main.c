@@ -9,8 +9,8 @@
  * console.
  *
  * Networks stay on screen after they were last heard: at full brightness
- * for CONFIG_METER_FADE_START_S seconds, then fading to black by
- * CONFIG_METER_FADE_END_S. The screen is redrawn every
+ * for CONFIG_METER_FADE_START_S seconds, then fading to
+ * CONFIG_METER_FADE_MIN_PERCENT, and gone at CONFIG_METER_FADE_END_S. The screen is redrawn every
  * CONFIG_METER_REDRAW_MS while anything changes.
  *
  * Each start is logged in flash with why it happened (event_log.c,
