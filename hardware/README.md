@@ -11,9 +11,11 @@ A battery-powered build of the meter in a 3D-printed case:
 
 ## The case
 
-70.2 × 39.6 × 29.3 mm: little bigger than the Display Pack, with the
-charger and a 350 mAh battery side by side in a layer behind the Pico. It's three
-printed parts, screwed together, plus four button caps.
+70.2 × 39.0 × 36.6 mm: little bigger than the Display Pack, with a 350 mAh
+battery and the charger stacked behind the Pico. From the front: the
+Display Pack, the Pico, a printed shelf, the battery, then the charger,
+top towards the back. It's three printed parts, screwed together, plus four button caps and a plunger
+for the charger's PWR button.
 
 ![Sections through the assembled case](case/stl/sections.png)
 
@@ -21,34 +23,42 @@ printed parts, screwed together, plus four button caps.
   - the bezel, with a window onto the display's active area, and holes for
     the button caps and the RGB LED
   - a frame that locates the Display Pack
-  - an opening in the left wall onto the charger's USB-C socket and power
-    switch, which sit side by side at its end
+  - the charger's USB-C opening in the left wall
   - four corner bosses for the screws, beside the Display Pack's ends, so
     it slides in past them
-- **Shelf** (`shelf.stl`): a plate between the Pico and the battery layer.
-  Its four posts have pins into the Pico's mounting holes, holding it into
-  the Display Pack's sockets. The charger and battery behind keep the shelf
-  pressed onto the Pico. Two slots at the Pico's USB end let the power
-  wires through.
-- **Back cover** (`back.stl`): pockets for the charger and the battery,
-  and a lip along three sides that lines it up with the shell. There's no
-  lip on the left, so the charger's end goes right against the wall. The thinner of the charger and the battery stands on a
-  platform, so that both sit just behind the shelf. With the 350 mAh cell
-  the charger is only 0.8 mm short, which the foam tape under it takes up.
-- **Button caps** (`buttons.stl`): each one has a stem through the bezel
-  and a tab behind it, which rests on the button and stops the cap
-  falling out.
+- **Shelf** (`shelf.stl`): a plate between the Pico and the battery. Its
+  four posts have pins into the Pico's mounting holes, holding it into the
+  Display Pack's sockets. The battery and charger behind keep the shelf
+  pressed onto the Pico. Two slots, past the charger's far end and beside
+  the Pico on either side, let the power lead through.
+- **Back cover** (`back.stl`):
+  - three posts with pins into the charger's mounting holes: the charger
+    hangs on them **top towards the back**, so its PWR button and its ON and
+    CHG LEDs face out
+  - a hole for the PWR button's plunger, and two small holes onto the LEDs
+  - a lip along three sides that lines it up with the shell. There's none
+    on the left, so the charger's USB-C end goes right against the wall
+- **Button caps** (`buttons.stl`): four caps for A, B, X and Y, each with a
+  stem through the bezel and a tab behind it, which rests on the button
+  and stops the cap falling out. The fifth piece is the plunger for the
+  charger's PWR button, through the back cover.
+
+The battery lies in front of the charger, against the left wall, between
+the left-hand bosses; foam tape holds it to the back of the shelf. Past the
+charger's far end there's room for the BAT and DEVICE plugs and their
+leads.
 
 The Pico's own USB socket has no opening, and the charger sits over its
 BOOTSEL button. To flash new firmware or watch the serial console, take
-out the four screws and lift off the back cover, charger, battery and
-shelf.
+out the four screws and lift off the back cover (with the charger on it), then
+the shelf with the battery stuck to it.
 
 ### Check the measurements first
 
 `case.py` takes the Display Pack's layout from Pimoroni's dimension
 drawing: the board, the buttons, the LED, the glass and the active area.
-The other parts' sizes are the published ones. A few things are on
+The charger's are scaled from a photograph, and the other parts' sizes are
+the published ones. A few things are on
 neither, and are marked **MEASURE** in the script. Check these with
 calipers, change the constants at the top of `case.py`, and regenerate
 before printing:
@@ -60,8 +70,11 @@ before printing:
 | `BUTTON_TOP_H` | Height of a button's top above the board | 1.5 mm |
 | `PICO_USB_LEFT` | Whether the Pico's USB socket is at the A/B end (left, looking at the display) or the X/Y end. This places the shelf's posts and wire slots | A/B end |
 | `PICO_X`, `PICO_Y` | Where the Pico sits on the Display Pack's back | 2.5, 7.0 mm |
-| `AMIGO_SWITCH_ACROSS` | The middle of the charger's switch lever, from the board's edge nearest the case's bottom (with the charger's top facing the display) | 18.5 mm |
-| `AMIGO_SWITCH_H` | The middle of the lever, above the charger's board | 1.5 mm |
+| `AMIGO_HOLES` | The charger's three mounting holes. Positions on the charger are measured looking at its top with the USB-C on the right: from its USB-C end, and from its bottom edge | (3.1, 2.4), (3.1, 20.8), (34.1, 20.6) mm |
+| `AMIGO_PWR`, `AMIGO_PWR_H` | Its PWR button, and the height of the button's top above the board | (8.6, 2.0) mm, 1.5 mm |
+| `AMIGO_LEDS` | Its CHG and ON LEDs | (14.6, 2.0), (12.3, 2.0) mm |
+| `AMIGO_USB_ACROSS` | The middle of its USB-C socket, from its bottom edge | 11.0 mm |
+| `AMIGO_PARTS_H` | Its tallest parts (the JST sockets) above its board | 6.0 mm |
 
 Every run checks that the parts inside (modelled as blocks) clear the case,
 and prints any clash.
@@ -110,18 +123,21 @@ needed:
    Buttons A and B go at the left-hand end, the end with the USB-C
    opening.
 5. **Fit the shelf**, posts first, so their pins go into the Pico's
-   mounting holes. Thread the power lead through the slot by the Pico's
-   pins 38 and 39.
-6. **Fit the charger and battery.** Stick the charger into its pocket on
-   the back cover with foam tape, USB-C to the open end, components up. Put
-   the battery in its pocket.
-   - Check the battery's polarity, then plug it into the charger's
-     **BAT** socket.
-   - Plug the Pico's lead into **DEVICE**.
-7. **Close the case.** Turn the shell over onto the cover, so the lip goes
+   mounting holes. Thread the power lead out through the slot on the side
+   where the Pico's pins 38 and 39 are.
+6. **Stick the battery to the back of the shelf** with foam tape, against
+   the left wall, its lead towards the right-hand end.
+7. **Fit the charger to the back cover.**
+   - Push the PWR plunger into its hole from the inside, tab inwards.
+   - Hang the charger on the three posts, **its top towards the cover**,
+     so that the pins go into its mounting holes, the plunger's tab rests
+     on its PWR button, and its USB-C socket is at the open end.
+   - Check the battery's polarity, then plug it into the charger's **BAT**
+     socket, and the Pico's lead into **DEVICE**.
+8. **Close the case.** Turn the shell over onto the cover, so the lip goes
    inside the walls, and fit the four M2 screws.
-8. **Switch on** with the charger's switch, beside the USB-C socket in the
-   left wall. A fingernail or a pen tip slides it.
+9. **Switch on** by pressing the PWR plunger in the back. The charger's ON
+   LED shows through its hole beside it, and CHG lights while charging.
 
 The charger's USB-C socket charges the battery, and powers the meter while
 a cable is plugged in.

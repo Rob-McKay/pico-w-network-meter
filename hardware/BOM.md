@@ -10,7 +10,7 @@ the wiring.
 |---|---|---|
 | 1 | Raspberry Pi Pico W, with headers ("Pico WH") | Or a Pico W with male headers soldered on, pins down |
 | 1 | Pimoroni Pico Display Pack 2.0 | 320 × 240 IPS display, buttons A/B/X/Y, RGB LED; 55.2 × 34.6 mm |
-| 1 | Pimoroni LiPo Amigo Pro | LiPo charger with power switch; USB-C in, JST-PH BAT and DEVICE sockets; 36 × 23 × 7 mm |
+| 1 | Pimoroni LiPo Amigo Pro | LiPo charger with a PWR button; USB-C in, JST-PH BAT and DEVICE sockets; 36 × 23 × 7 mm |
 | 1 | LiPo battery, 3.7 V 350 mAh, JST-PH 2.0 mm plug, up to 32.0 × 20.5 × 7.3 mm | Pimoroni's 150 mAh pack (27 × 20.5 × 4.3 mm) also fits, with the caveats below |
 | 1 | JST-PH 2.0 mm 2-pin lead, plug one end, bare wires the other, about 100 mm | From the Amigo Pro's DEVICE socket to the Pico |
 | 1 | Schottky diode, 1 A, e.g. 1N5817 (or SS14, MBR120) | In the red (+) wire, cathode (stripe) towards the Pico |
@@ -23,9 +23,9 @@ the wiring.
 | 1 | Front shell, `case/stl/front.stl` | PLA or PETG, 0.2 mm layers, 3 walls; print face down, no supports |
 | 1 | Shelf, `case/stl/shelf.stl` | Print flat, posts up |
 | 1 | Back cover, `case/stl/back.stl` | Print outside face down, no supports |
-| 4 | Button caps, `case/stl/buttons.stl` (one print holds all four) | Print tab down; 0.1–0.15 mm layers print the small stems better |
+| 5 | Button caps and the PWR plunger, `case/stl/buttons.stl` (one print holds all five) | Print tab down; 0.1–0.15 mm layers print the small stems better |
 | 4 | M2 × 8 mm self-tapping screws, pan head | Cover to shell |
-| 1 | Double-sided foam tape, about 20 × 30 mm | Holds the charger in its pocket |
+| 1 | Double-sided foam tape, about 20 × 30 mm | Holds the battery to the back of the shelf |
 
 About 30 g of filament in all.
 

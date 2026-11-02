@@ -24,14 +24,14 @@
   <g>
     <rect x="290" y="300" width="230" height="170" rx="8" fill="#e3ecf7" stroke="#2b5a8a" stroke-width="2"/>
     <text x="405" y="328" text-anchor="middle" font-weight="bold">Pimoroni LiPo Amigo Pro</text>
-    <text x="405" y="348" text-anchor="middle" font-size="12">charger, power switch</text>
+    <text x="405" y="348" text-anchor="middle" font-size="12">charger, PWR button</text>
     <rect x="290" y="372" width="70" height="28" fill="#fff" stroke="#2b5a8a"/>
     <text x="325" y="391" text-anchor="middle" font-size="12">BAT</text>
     <rect x="450" y="372" width="70" height="28" fill="#fff" stroke="#2b5a8a"/>
     <text x="485" y="391" text-anchor="middle" font-size="12">DEVICE</text>
     <rect x="370" y="440" width="70" height="30" fill="#ddd" stroke="#2b5a8a"/>
     <text x="405" y="460" text-anchor="middle" font-size="12">USB-C</text>
-    <text x="405" y="420" text-anchor="middle" font-size="12">switch: ON/OFF, beside USB-C</text>
+    <text x="405" y="420" text-anchor="middle" font-size="12">PWR button: on / off</text>
   </g>
 
   <!-- Battery to BAT: the battery's own lead -->
@@ -90,6 +90,6 @@
     <text x="40" y="100">1. The diode stops 5 V from the Pico's own USB socket reaching the battery through the charger.</text>
     <text x="40" y="118">2. Solder the two wires to the tops of pins 39 and 38, where they come through the Pico.</text>
     <text x="40" y="136">3. Check the battery lead's polarity matches the charger's BAT marking before plugging it in.</text>
-    <text x="40" y="154">4. The Amigo Pro's switch turns the meter on and off; the battery still charges when it is off.</text>
+    <text x="40" y="154">4. The Amigo Pro's PWR button turns the meter on and off; the battery still charges when it is off.</text>
   </g>
 </svg>
