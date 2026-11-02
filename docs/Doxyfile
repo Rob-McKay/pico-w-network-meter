@@ -7,8 +7,9 @@ GENERATE_LATEX         = NO
 GENERATE_XML           = YES
 XML_PROGRAMLISTING     = NO
 QUIET                  = YES
-INPUT                  = app/src tests/meter_units/src tests/ui_render/src scripts/check-docs.py \
-                         scripts/clang-tidy-cross.py
+INPUT                  = app/src tests/meter_units/src tests/ui_render/src \
+                         tests/event_log/src scripts/check-docs.py \
+                         scripts/clang-tidy-cross.py hardware/case/case.py
 FILE_PATTERNS          = *.c *.h *.py
 RECURSIVE              = YES
 EXTRACT_ALL            = YES
