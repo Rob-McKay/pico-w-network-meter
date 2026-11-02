@@ -31,7 +31,7 @@
     <text x="485" y="391" text-anchor="middle" font-size="12">DEVICE</text>
     <rect x="370" y="440" width="70" height="30" fill="#ddd" stroke="#2b5a8a"/>
     <text x="405" y="460" text-anchor="middle" font-size="12">USB-C</text>
-    <text x="405" y="420" text-anchor="middle" font-size="12">switch: ON/OFF</text>
+    <text x="405" y="420" text-anchor="middle" font-size="12">switch: ON/OFF, beside USB-C</text>
   </g>
 
   <!-- Battery to BAT: the battery's own lead -->

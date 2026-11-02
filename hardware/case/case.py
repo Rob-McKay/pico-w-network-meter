@@ -10,13 +10,14 @@ layer behind the Pico, side by side, so the case is little bigger than the
 Display Pack:
 
     front.stl     the front shell: bezel with the display window, button
-                  and LED holes, side walls, the charger's USB-C opening and
-                  screw bosses. Print face down.
+                  and LED holes, side walls, an opening onto the charger's
+                  USB-C socket and power switch, and screw bosses. Print
+                  face down.
     shelf.stl     a shelf between the Pico and the battery layer: posts on
                   it hold the Pico into the Display Pack's sockets, and the
                   charger and battery hold it in place. Print flat, posts up.
     back.stl      the back cover: pockets for the charger and battery and a
-                  window onto the charger's switch. Print outside face down.
+                  Print outside face down.
     buttons.stl   four button caps for A, B, X and Y: a tab inside the
                   bezel keeps each in. Print tab down.
 
@@ -123,10 +124,13 @@ AMIGO_PCB = 1.0
 AMIGO_USB_H = 1.6
 ## Opening for a USB-C plug's moulding.
 AMIGO_USB_OPENING = (13.0, 7.5)
-## Power switch and LEDs, from its USB end and bottom edge: the back
-## cover's window. MEASURE.
-AMIGO_SWITCH = (24.0, 11.5)
-AMIGO_SWITCH_WINDOW = (12.0, 8.0)
+## Power switch: on its top, beside the USB-C socket at the same end, its
+## lever reached through the left wall. The lever's centre from the board's
+## edge nearest the case's bottom, and above the board. MEASURE.
+AMIGO_SWITCH_ACROSS = 18.5
+AMIGO_SWITCH_H = 1.5
+## Opening for the lever, beside the USB-C's: wide enough to slide it.
+AMIGO_SWITCH_OPENING = (7.0, 4.0)
 
 ## Its height with its connectors and switch (published).
 AMIGO_H = 7.0
@@ -196,9 +200,8 @@ DEPTH = Z_SPLIT + WALL
 ## wall, for its USB-C, and between the left-hand bosses) and the battery,
 ## turned, side by side. The battery needs to clear the right-hand bosses
 ## only if it reaches them; otherwise just the back cover's lip.
-INSIDE_L = max(PACK_L + 2 * BOSS_CLEAR,
-               LIP_T + FIT + AMIGO_L + GAP + BATTERY_W + FIT + LIP_T + FIT)
-_BATTERY_END = LIP_T + FIT + AMIGO_L + GAP + BATTERY_W + FIT
+INSIDE_L = max(PACK_L + 2 * BOSS_CLEAR, FIT + AMIGO_L + GAP + BATTERY_W + FIT + LIP_T + FIT)
+_BATTERY_END = FIT + AMIGO_L + GAP + BATTERY_W + FIT
 _BATTERY_MARGIN = BOSS_CLEAR if _BATTERY_END > INSIDE_L - BOSS_CLEAR else LIP_T + FIT
 INSIDE_H = max(PACK_W + FIT, AMIGO_W + FIT + 2 * BOSS_CLEAR,
                BATTERY_L + FIT + 2 * _BATTERY_MARGIN)
@@ -206,10 +209,10 @@ LENGTH = INSIDE_L + 2 * WALL
 HEIGHT = INSIDE_H + 2 * WALL
 
 ## Where things are on the case, from its outside bottom-left corner. The
-## charger's USB end is just inside the back cover's lip.
+## charger's USB end is against the left wall.
 BOARD_X = WALL + (INSIDE_L - PACK_L) / 2
 BOARD_Y = WALL + (INSIDE_H - PACK_W) / 2
-AMIGO_X = WALL + FIT / 2 + LIP_T + FIT / 2
+AMIGO_X = WALL + FIT / 2
 AMIGO_Y = (HEIGHT - AMIGO_W) / 2
 BATTERY_X = AMIGO_X + AMIGO_L + GAP
 BATTERY_Y = (HEIGHT - BATTERY_L) / 2
@@ -301,7 +304,11 @@ def pico_point(along, across):
     return BOARD_X + PICO_X + x, BOARD_Y + PICO_Y + across
 
 
-## @brief Cut the charger's USB-C opening, in the left wall.
+## @brief Cut the charger's opening in the left wall: one for its USB-C
+#         plug and its power switch's lever, beside each other.
+#
+# One opening rather than two, so that no thin pillar of wall is left
+# between them.
 #
 # The Pico's own USB socket gets no opening: the case comes open to flash
 # the Pico (four screws), which is also the way to its BOOTSEL button.
@@ -311,8 +318,12 @@ def pico_point(along, across):
 #
 # @sideeffects None.
 def usb_openings():
-    amigo_z = Z_SPLIT - AMIGO_PLATFORM - AMIGO_PCB - AMIGO_USB_H
-    return end_wall_opening(True, AMIGO_Y + AMIGO_W / 2, amigo_z, AMIGO_USB_OPENING)
+    board_z = Z_SPLIT - AMIGO_PLATFORM - AMIGO_PCB
+    usb = end_wall_opening(True, AMIGO_Y + AMIGO_W / 2, board_z - AMIGO_USB_H,
+                           AMIGO_USB_OPENING)
+    switch = end_wall_opening(True, AMIGO_Y + AMIGO_SWITCH_ACROSS, board_z - AMIGO_SWITCH_H,
+                              AMIGO_SWITCH_OPENING)
+    return Manifold.batch_hull([usb, switch])
 
 
 ## @brief Model the front shell.
@@ -347,8 +358,12 @@ def front_shell():
     return shell - usb_openings()
 
 
-## @brief Model the back cover's lip: strips along each wall, inside it,
+## @brief Model the back cover's lip: strips along the walls, inside them,
 #         that line the cover up with the shell.
+#
+# None along the left wall: the charger's end goes right against it, so
+# that its switch and USB-C socket are close to the outside. The other
+# three line the cover up.
 #
 # @return The lip, clear of the corner bosses.
 #
@@ -360,7 +375,6 @@ def back_lip():
     end = WALL + BOSS_D + 1.0
     return (box(end, i0, z0, LENGTH - end, i1, z1)
             + box(end, HEIGHT - i1, z0, LENGTH - end, HEIGHT - i0, z1)
-            + box(i0, end, z0, i1, HEIGHT - end, z1)
             + box(LENGTH - i1, end, z0, LENGTH - i0, HEIGHT - end, z1))
 
 
@@ -371,7 +385,8 @@ def back_lip():
 # @param length Part's length (x).
 # @param width Part's width (y).
 # @param height Wall height.
-# @param open_left Leave the left end open (for a connector).
+# @param open_left Leave the left end open (for a connector): the part's end
+#        is against the case's left wall.
 # @return The walls.
 #
 # @sideeffects None.
@@ -380,8 +395,10 @@ def pocket(x, y, length, width, height, open_left=False):
     t = 1.0
     x0, y0 = x - FIT / 2, y - FIT / 2
     x1, y1 = x + length + FIT / 2, y + width + FIT / 2
-    walls = (box(x0 - t, y0 - t, z0, x1 + t, y0, Z_SPLIT)
-             + box(x0 - t, y1, z0, x1 + t, y1 + t, Z_SPLIT)
+    # An open end is against the case's wall: the side walls stop there.
+    left = x0 if open_left else x0 - t
+    walls = (box(left, y0 - t, z0, x1 + t, y0, Z_SPLIT)
+             + box(left, y1, z0, x1 + t, y1 + t, Z_SPLIT)
              + box(x1, y0, z0, x1 + t, y1, Z_SPLIT))
     if not open_left:
         walls += box(x0 - t, y0, z0, x0, y1, Z_SPLIT)
@@ -391,8 +408,7 @@ def pocket(x, y, length, width, height, open_left=False):
 ## @brief Model the back cover.
 #
 # @return The cover: plate, lip, pockets for the charger and battery (the
-#         thinner of the two on a platform), screw holes and the charger's
-#         switch window.
+#         thinner of the two on a platform) and screw holes.
 #
 # @sideeffects None.
 def back_cover():
@@ -407,11 +423,6 @@ def back_cover():
     for x, y in BOSSES:
         cover -= cylinder(x, y, Z_SPLIT - 1, DEPTH + 1, SCREW_CLEAR_D)
         cover -= cylinder(x, y, DEPTH - SCREW_HEAD_H, DEPTH + 1, SCREW_HEAD_D)
-
-    sx = AMIGO_X + AMIGO_SWITCH[0]
-    sy = AMIGO_Y + AMIGO_SWITCH[1]
-    w, h = AMIGO_SWITCH_WINDOW
-    cover -= box(sx - w / 2, sy - h / 2, Z_SPLIT - 3, sx + w / 2, sy + h / 2, DEPTH + 1)
 
     return cover - usb_openings()
 

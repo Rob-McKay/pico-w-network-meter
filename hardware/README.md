@@ -21,7 +21,8 @@ printed parts, screwed together, plus four button caps.
   - the bezel, with a window onto the display's active area, and holes for
     the button caps and the RGB LED
   - a frame that locates the Display Pack
-  - the charger's USB-C opening in the left wall
+  - an opening in the left wall onto the charger's USB-C socket and power
+    switch, which sit side by side at its end
   - four corner bosses for the screws, beside the Display Pack's ends, so
     it slides in past them
 - **Shelf** (`shelf.stl`): a plate between the Pico and the battery layer.
@@ -29,9 +30,9 @@ printed parts, screwed together, plus four button caps.
   the Display Pack's sockets. The charger and battery behind keep the shelf
   pressed onto the Pico. Two slots at the Pico's USB end let the power
   wires through.
-- **Back cover** (`back.stl`): pockets for the charger and the battery, a
-  window onto the charger's power switch, and a lip that lines it up with
-  the shell. The thinner of the charger and the battery stands on a
+- **Back cover** (`back.stl`): pockets for the charger and the battery,
+  and a lip along three sides that lines it up with the shell. There's no
+  lip on the left, so the charger's end goes right against the wall. The thinner of the charger and the battery stands on a
   platform, so that both sit just behind the shelf. With the 350 mAh cell
   the charger is only 0.8 mm short, which the foam tape under it takes up.
 - **Button caps** (`buttons.stl`): each one has a stem through the bezel
@@ -59,7 +60,8 @@ before printing:
 | `BUTTON_TOP_H` | Height of a button's top above the board | 1.5 mm |
 | `PICO_USB_LEFT` | Whether the Pico's USB socket is at the A/B end (left, looking at the display) or the X/Y end. This places the shelf's posts and wire slots | A/B end |
 | `PICO_X`, `PICO_Y` | Where the Pico sits on the Display Pack's back | 2.5, 7.0 mm |
-| `AMIGO_SWITCH` | The charger's switch and LEDs, from its USB-C end | 24.0, 11.5 mm |
+| `AMIGO_SWITCH_ACROSS` | The middle of the charger's switch lever, from the board's edge nearest the case's bottom (with the charger's top facing the display) | 18.5 mm |
+| `AMIGO_SWITCH_H` | The middle of the lever, above the charger's board | 1.5 mm |
 
 Every run checks that the parts inside (modelled as blocks) clear the case,
 and prints any clash.
@@ -118,7 +120,8 @@ needed:
    - Plug the Pico's lead into **DEVICE**.
 7. **Close the case.** Turn the shell over onto the cover, so the lip goes
    inside the walls, and fit the four M2 screws.
-8. **Switch on** with the charger's switch, through the window in the back.
+8. **Switch on** with the charger's switch, beside the USB-C socket in the
+   left wall. A fingernail or a pen tip slides it.
 
 The charger's USB-C socket charges the battery, and powers the meter while
 a cable is plugged in.
