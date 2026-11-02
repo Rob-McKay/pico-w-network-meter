@@ -11,21 +11,26 @@ A battery-powered build of the meter in a 3D-printed case:
 
 ## The case
 
-70.2 × 39.0 × 36.6 mm: little bigger than the Display Pack, with a 350 mAh
-battery and the charger stacked behind the Pico. From the front: the
-Display Pack, the Pico, a printed shelf, the battery, then the charger,
-top towards the back. It's three printed parts, screwed together, plus four button caps and a plunger
-for the charger's PWR button.
+63.2 × 39.0 × 36.6 mm. It's 4.4 mm taller than the Display Pack and 8 mm
+longer, the extra length at the A/B end. That puts the display's active
+area in the middle of the front: it's 1.8 mm off the middle of its own
+board.
+
+A 350 mAh battery and the charger are stacked behind the Pico. From the
+front: the Display Pack, the Pico, a printed shelf, the battery, then the
+charger, top towards the back. It's three printed parts, held together by
+four side screws, plus four button caps and a plunger for the charger's
+PWR button.
 
 ![Sections through the assembled case](case/stl/sections.png)
 
 - **Front shell** (`front.stl`):
   - the bezel, with a window onto the display's active area, and holes for
     the button caps and the RGB LED
-  - a frame that locates the Display Pack
+  - walls that hug the Display Pack, square inside, and a rib that locates
+    its A/B end
   - the charger's USB-C opening in the left wall
-  - four corner bosses for the screws, beside the Display Pack's ends, so
-    it slides in past them
+  - clearance holes for four M2 screws through the long walls
 - **Shelf** (`shelf.stl`): a plate between the Pico and the battery. Its
   four posts have pins into the Pico's mounting holes, holding it into the
   Display Pack's sockets. The battery and charger behind keep the shelf
@@ -38,19 +43,21 @@ for the charger's PWR button.
   - a hole for the PWR button's plunger, and two small holes onto the LEDs
   - a lip along three sides that lines it up with the shell. There's none
     on the left, so the charger's USB-C end goes right against the wall
+  - four blocks on its rim, beside the charger, that the side screws go
+    into
 - **Button caps** (`buttons.stl`): four caps for A, B, X and Y, each with a
   stem through the bezel and a tab behind it, which rests on the button
   and stops the cap falling out. The fifth piece is the plunger for the
   charger's PWR button, through the back cover.
 
-The battery lies in front of the charger, against the left wall, between
-the left-hand bosses; foam tape holds it to the back of the shelf. Past the
+The battery lies in front of the charger, against the left wall; foam tape
+holds it to the back of the shelf. Past the
 charger's far end there's room for the BAT and DEVICE plugs and their
 leads.
 
 The Pico's own USB socket has no opening, and the charger sits over its
 BOOTSEL button. To flash new firmware or watch the serial console, take
-out the four screws and lift off the back cover (with the charger on it), then
+out the four side screws and lift off the back cover (with the charger on it), then
 the shelf with the battery stuck to it.
 
 ### Check the measurements first
@@ -118,8 +125,8 @@ needed:
    is at the end `PICO_USB_LEFT` says before printing.
 3. **Drop the button caps into their holes** in the front shell, from the
    inside, tabs along the edge.
-4. **Lower the Display Pack into the shell**, glass first, past the
-   bosses, until it sits in the frame with its glass against the bezel.
+4. **Lower the Display Pack into the shell**, glass first, until its glass
+   sits against the bezel.
    Buttons A and B go at the left-hand end, the end with the USB-C
    opening.
 5. **Fit the shelf**, posts first, so their pins go into the Pico's
@@ -135,7 +142,8 @@ needed:
    - Check the battery's polarity, then plug it into the charger's **BAT**
      socket, and the Pico's lead into **DEVICE**.
 8. **Close the case.** Turn the shell over onto the cover, so the lip goes
-   inside the walls, and fit the four M2 screws.
+   inside the walls, and fit the four M2 × 6 mm screws through the long
+   walls into the cover's blocks.
 9. **Switch on** by pressing the PWR plunger in the back. The charger's ON
    LED shows through its hole beside it, and CHG lights while charging.
 

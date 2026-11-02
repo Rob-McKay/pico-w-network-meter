@@ -12,13 +12,15 @@ charger, hanging top towards the back so its PWR button and LEDs face out.
 
     front.stl     the front shell: bezel with the display window, button
                   and LED holes, side walls, the charger's USB-C opening and
-                  screw bosses. Print face down.
+                  holes for the screws. The display's active area is in the
+                  middle of the front. Print face down.
     shelf.stl     a shelf between the Pico and the battery: posts on it hold
                   the Pico into the Display Pack's sockets, and the battery
                   and charger behind hold it in place. Print flat, posts up.
     back.stl      the back cover: posts the charger hangs on, and holes for
-                  the PWR button's plunger and onto the charger's LEDs.
-                  Print outside face down.
+                  the PWR button's plunger and onto the charger's LEDs, and
+                  blocks the four side screws go into. Print outside face
+                  down.
     buttons.stl   four button caps for A, B, X and Y, and a plunger for the
                   charger's PWR button: a tab inside keeps each in. Print
                   tab down.
@@ -55,8 +57,8 @@ from manifold3d import CrossSection, Manifold
 WALL = 2.0
 ## The bezel in front of the display.
 FRONT = 1.6
-## Outside corner radius.
-CORNER_R = 4.0
+## Outside corner radius. Inside, the corners are square, for the boards'.
+CORNER_R = 3.0
 ## Clearance around parts that fit into frames, holes or openings.
 FIT = 0.4
 ## Circles' segments: smooth enough to print round.
@@ -161,12 +163,16 @@ BATTERY_T = 7.3
 
 # --- Fastenings -----------------------------------------------------------
 
-## Four M2 x 8 mm self-tapping screws, one in each corner.
-BOSS_D = 5.0
+## Four M2 x 6 mm self-tapping screws through the long walls, two in each,
+## into blocks on the back cover's rim beside the charger: the walls hug the
+## Display Pack, leaving no room for screw posts inside.
 SCREW_PILOT_D = 1.6
 SCREW_CLEAR_D = 2.4
-SCREW_HEAD_D = 4.2
-SCREW_HEAD_H = 1.4
+## The screws' positions along the case, from each end.
+SCREW_FROM_END = 10.0
+## The blocks: how far in from the wall, and how deep (z).
+SCREW_BLOCK_T = 4.0
+SCREW_BLOCK_H = 6.0
 ## A lip on the back cover that fits inside the walls, to line it up.
 LIP_H = 2.0
 LIP_T = 1.2
@@ -196,8 +202,8 @@ SHELF_POST_D = 3.2
 ## the gap past the charger, beside the Pico on either side (whichever its
 ## pins 38 and 39 are on), so the lead runs along the Pico's side to them.
 SHELF_SLOT = (6.0, 4.0)
-## Keep the boards clear of the screw bosses.
-BOSS_CLEAR = BOSS_D + 0.5
+## Keep the charger clear of the screw blocks.
+BLOCK_CLEAR = SCREW_BLOCK_T + 1.0
 
 ## Depths, from the front face.
 Z_GLASS = FRONT
@@ -218,30 +224,29 @@ AMIGO_STANDOFF = AMIGO_PARTS_H + 0.3
 ## Where the front shell meets the back cover.
 Z_SPLIT = Z_AMIGO_TOP + AMIGO_STANDOFF
 DEPTH = Z_SPLIT + WALL
-## Inside: the Display Pack, with room at its ends for the corner bosses, so
-## that it slides in past them. Behind it the charger, against the left wall
-## for its USB-C, with room past its far end for its plugs; the battery in
-## front of it. Both lie between the left-hand bosses.
-INSIDE_L = max(PACK_L + 2 * BOSS_CLEAR, FIT + AMIGO_L + AMIGO_PLUG_CLEAR + BOSS_CLEAR,
-               FIT + BATTERY_L + FIT + BOSS_CLEAR)
-INSIDE_H = max(PACK_W + FIT, AMIGO_W + FIT + 2 * BOSS_CLEAR, BATTERY_W + FIT + 2 * BOSS_CLEAR)
-LENGTH = INSIDE_L + 2 * WALL
+## Inside: the walls hug the Display Pack, except at its A/B end, where the
+## case reaches further so that the display's active area is in the middle
+## of the front (it is 1.8 mm off the board's middle). Behind it the
+## charger, against the left wall for its USB-C, with room past its far end
+## for its plugs, and the battery in front of it; the charger clear of the
+## screw blocks along the long walls.
+_ACTIVE_MID = (ACTIVE_X[0] + ACTIVE_X[1]) / 2
+BOARD_X = max(WALL + FIT / 2, PACK_L + FIT / 2 + WALL - 2 * _ACTIVE_MID)
+LENGTH = 2 * (BOARD_X + _ACTIVE_MID)
+INSIDE_L = LENGTH - 2 * WALL
+INSIDE_H = max(PACK_W + FIT, AMIGO_W + FIT + 2 * BLOCK_CLEAR, BATTERY_W + FIT)
 HEIGHT = INSIDE_H + 2 * WALL
+BOARD_Y = WALL + (INSIDE_H - PACK_W) / 2
 
 ## Where things are on the case, from its outside bottom-left corner. The
 ## charger's USB end, and the battery's end, are against the left wall.
-BOARD_X = WALL + (INSIDE_L - PACK_L) / 2
-BOARD_Y = WALL + (INSIDE_H - PACK_W) / 2
 AMIGO_X = WALL + FIT / 2
 AMIGO_Y = (HEIGHT - AMIGO_W) / 2
 BATTERY_X = WALL + FIT / 2
 BATTERY_Y = (HEIGHT - BATTERY_W) / 2
-BOSSES = [(WALL + BOSS_D / 2, WALL + BOSS_D / 2),
-          (LENGTH - WALL - BOSS_D / 2, WALL + BOSS_D / 2),
-          (WALL + BOSS_D / 2, HEIGHT - WALL - BOSS_D / 2),
-          (LENGTH - WALL - BOSS_D / 2, HEIGHT - WALL - BOSS_D / 2)]
-## Screws reach this far into the bosses.
-SCREW_DEPTH = 9.0
+## The screws: x along the case, and z, through the long walls.
+SCREWS_X = [SCREW_FROM_END, LENGTH - SCREW_FROM_END]
+SCREW_Z = Z_SPLIT - SCREW_BLOCK_H / 2
 
 
 ## @brief Make a box between two corners.
@@ -347,14 +352,30 @@ def usb_openings():
     return end_wall_opening(True, y, Z_AMIGO_TOP + AMIGO_USB_H, AMIGO_USB_OPENING)
 
 
+## @brief Make a screw hole through a long wall, along y.
+#
+# @param x The screw's position along the case.
+# @param y0 Where the hole starts.
+# @param y1 Where it ends.
+# @param d Its diameter.
+# @return The hole, at SCREW_Z.
+#
+# @sideeffects None.
+def screw_hole(x, y0, y1, d):
+    hole = Manifold.cylinder(y1 - y0, d / 2, d / 2, SEGMENTS).rotate([-90, 0, 0])
+    return hole.translate([x, y0, SCREW_Z])
+
+
 ## @brief Model the front shell.
 #
-# @return The shell: bezel, walls, a frame locating the Display Pack, and
-#         the screw bosses.
+# @return The shell: bezel, walls (square inside, hugging the Display Pack),
+#         a frame locating the Display Pack at its A/B end, and the screws'
+#         clearance holes through the long walls.
 #
 # @sideeffects None.
 def front_shell():
-    shell = rounded_slab(0, 0, Z_SPLIT) - rounded_slab(WALL, FRONT, Z_SPLIT + 1)
+    shell = rounded_slab(0, 0, Z_SPLIT) - box(WALL, WALL, FRONT, LENGTH - WALL, HEIGHT - WALL,
+                                              Z_SPLIT + 1)
 
     # A frame that holds the Display Pack's edges, from the bezel to the
     # back of its board.
@@ -365,9 +386,9 @@ def front_shell():
                    BOARD_X + PACK_L + FIT / 2, BOARD_Y + PACK_W + FIT / 2, Z_PACK_BACK + 1)
     shell += frame_out - frame_in
 
-    for x, y in BOSSES:
-        boss = cylinder(x, y, FRONT, Z_SPLIT, BOSS_D)
-        shell += boss - cylinder(x, y, Z_SPLIT - SCREW_DEPTH, Z_SPLIT + 1, SCREW_PILOT_D)
+    for x in SCREWS_X:
+        shell -= screw_hole(x, -1, WALL + 1, SCREW_CLEAR_D)
+        shell -= screw_hole(x, HEIGHT - WALL - 1, HEIGHT + 1, SCREW_CLEAR_D)
 
     m = WINDOW_MARGIN
     shell -= box(BOARD_X + ACTIVE_X[0] - m, BOARD_Y + ACTIVE_Y[0] - m, -1,
@@ -386,14 +407,14 @@ def front_shell():
 # that its USB-C socket is close to the outside. The other
 # three line the cover up.
 #
-# @return The lip, clear of the corner bosses.
+# @return The lip.
 #
 # @sideeffects None.
 def back_lip():
     z0, z1 = Z_SPLIT - LIP_H, Z_SPLIT
     i0 = WALL + FIT / 2
     i1 = i0 + LIP_T
-    end = WALL + BOSS_D + 1.0
+    end = WALL + 1.0
     return (box(end, i0, z0, LENGTH - end, i1, z1)
             + box(end, HEIGHT - i1, z0, LENGTH - end, HEIGHT - i0, z1)
             + box(LENGTH - i1, end, z0, LENGTH - i0, HEIGHT - end, z1))
@@ -401,9 +422,9 @@ def back_lip():
 
 ## @brief Model the back cover.
 #
-# @return The cover: plate, lip, posts the charger hangs on (pins in its
-#         mounting holes), screw holes, and holes for the charger's PWR
-#         button plunger and onto its LEDs.
+# @return The cover: plate, lip, blocks for the side screws, posts the
+#         charger hangs on (pins in its mounting holes), and holes for the
+#         charger's PWR button plunger and onto its LEDs.
 #
 # @sideeffects None.
 def back_cover():
@@ -413,9 +434,12 @@ def back_cover():
         cover += cylinder(x, y, Z_AMIGO_TOP, Z_SPLIT, 4.5)
         cover += cylinder(x, y, Z_AMIGO_TOP - AMIGO_PCB, Z_AMIGO_TOP, AMIGO_HOLE_D - 0.3)
 
-    for x, y in BOSSES:
-        cover -= cylinder(x, y, Z_SPLIT - 1, DEPTH + 1, SCREW_CLEAR_D)
-        cover -= cylinder(x, y, DEPTH - SCREW_HEAD_H, DEPTH + 1, SCREW_HEAD_D)
+    i0 = WALL + FIT / 2
+    for x in SCREWS_X:
+        w = SCREW_BLOCK_H
+        for y0, y1 in ((i0, i0 + SCREW_BLOCK_T), (HEIGHT - i0 - SCREW_BLOCK_T, HEIGHT - i0)):
+            cover += box(x - w / 2, y0, Z_SPLIT - SCREW_BLOCK_H, x + w / 2, y1, Z_SPLIT)
+            cover -= screw_hole(x, y0 - 1, y1 + 1, SCREW_PILOT_D)
     x, y = amigo_point(*AMIGO_PWR)
     cover -= cylinder(x, y, Z_SPLIT - 1, DEPTH + 1, BUTTON_STEM_D + FIT)
     for led in AMIGO_LEDS:
@@ -427,7 +451,7 @@ def back_cover():
 
 ## @brief Model the shelf between the Pico and the battery layer.
 #
-# A plate filling the inside, notched round the bosses, with posts whose
+# A plate filling the inside, with posts whose
 # pins go into the Pico's mounting holes. Two slots, in the gap past the
 # charger and just beside the Pico on either side, let the lead from the
 # charger's DEVICE socket through, to run along the Pico's side to its pins
@@ -438,9 +462,8 @@ def back_cover():
 #
 # @sideeffects None.
 def shelf():
-    plate = rounded_slab(WALL + FIT / 2, Z_SHELF, Z_LAYER, CORNER_R)
-    for x, y in BOSSES:
-        plate -= cylinder(x, y, Z_SHELF - 1, Z_LAYER + 1, BOSS_D + FIT * 2)
+    i0 = WALL + FIT / 2
+    plate = box(i0, i0, Z_SHELF, LENGTH - i0, HEIGHT - i0, Z_LAYER)
     for hx, hy in PICO_HOLES:
         x, y = pico_point(hx, hy)
         plate += cylinder(x, y, Z_PICO_TOP, Z_SHELF, SHELF_POST_D)
@@ -763,37 +786,79 @@ def preview_sections(path):
     colours = ["#1f77b4", "#aec7e8", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
     inside = list(components().items())
     pico_mid_y = BOARD_Y + PICO_Y + PICO_W / 2
-    cuts = [
-        ("y", pico_mid_y, "Through the Pico (from below)", ("x", "z")),
-        ("y", amigo_point(0.0, AMIGO_PWR[1])[1],
-         "Through the charger's PWR button (from below)", ("x", "z")),
-        ("x", BATTERY_X + BATTERY_L / 2, "Through the battery, charger and Pico (from the side)",
+    # (plane cut, where, title, axis names): None for the front view.
+    panels = [
+        (None, 0.0, "Front view", ("x", "y")),
+        ("z", Z_BATTERY + BATTERY_T / 2, "Through the battery, seen from the front",
+         ("x", "y")),
+        ("y", pico_mid_y, "Through the Pico, seen from below", ("x", "z")),
+        ("y", amigo_point(0.0, AMIGO_PWR[1])[1], "Through the charger's PWR button",
+         ("x", "z")),
+        ("x", BATTERY_X + BATTERY_L / 2, "Through the battery, charger and Pico, from the side",
          ("y", "z")),
-        ("z", Z_BATTERY + BATTERY_T / 2, "Through the battery, from the back", ("x", "y")),
+        ("z", Z_AMIGO_TOP + 2.0, "Through the charger, seen from the front", ("x", "y")),
     ]
-    fig, axes = plt.subplots(2, 2, figsize=(13, 10))
-    for ax, (axis, at, title, labels) in zip(axes.flat, cuts):
-        for part in case:
-            draw(ax, section(part, axis, at), facecolor="#bbbbbb", edgecolor="#555555",
-                 linewidth=0.4)
-        for (name, block), colour in zip(inside, colours):
-            draw(ax, section(block, axis, at), facecolor=colour, alpha=0.8, label=name,
-                 linewidth=0)
-        ax.autoscale_view()
-        ax.set_title(title)
-        ax.set_xlabel(f"{labels[0]} (mm)")
-        ax.set_ylabel(f"{labels[1]} (mm)")
-        ax.set_aspect("equal")
-        if axis != "z":
+    # One scale for every panel: each shows the same span, centred on the case.
+    span_h = LENGTH + 6
+    span_v = max(DEPTH, HEIGHT) + 6
+    mids = {"x": LENGTH / 2, "y": HEIGHT / 2, "z": DEPTH / 2}
+    fig, axes = plt.subplots(3, 2, figsize=(13, 14), layout="constrained")
+    for ax, (axis, at, title, labels) in zip(axes.flat, panels):
+        if axis is None:
+            draw_front(ax, draw, colours)
+        else:
+            for part in case:
+                draw(ax, section(part, axis, at), facecolor="#bbbbbb", edgecolor="#555555",
+                     linewidth=0.4)
+            for (name, block), colour in zip(inside, colours):
+                draw(ax, section(block, axis, at), facecolor=colour, alpha=0.8, label=name,
+                     linewidth=0)
+        h, v = labels
+        ax.set_xlim(mids[h] - span_h / 2, mids[h] + span_h / 2)
+        ax.set_ylim(mids[v] - span_v / 2, mids[v] + span_v / 2)
+        if v == "z":
             ax.invert_yaxis()  # the front (z = 0) at the top
+        ax.set_aspect("equal")
+        ax.set_title(title)
+        ax.set_xlabel(f"{h} (mm)")
+        ax.set_ylabel(f"{v} (mm)")
     handles = {}
     for ax in axes.flat:
         for h, label in zip(*ax.get_legend_handles_labels()):
             handles.setdefault(label, h)
-    fig.legend(handles.values(), handles.keys(), loc="lower center", ncol=4)
-    fig.suptitle(f"Case {LENGTH:.1f} x {HEIGHT:.1f} x {DEPTH:.1f} mm: sections")
+    fig.legend(handles.values(), handles.keys(), loc="outside lower center", ncol=4)
+    fig.suptitle(f"Case {LENGTH:.1f} x {HEIGHT:.1f} x {DEPTH:.1f} mm, all at one scale")
     fig.savefig(path, dpi=110, bbox_inches="tight")
     plt.close(fig)
+
+
+## @brief Draw the case from the front: the bezel, the display through its
+#         window, the button caps and the LED.
+#
+# @param ax The axes.
+# @param draw The shape-drawing function (preview_sections()'s).
+# @param colours Its colours: the display's glass and board take the first
+#        two.
+#
+# @sideeffects Adds shapes and labels to @p ax.
+def draw_front(ax, draw, colours):
+    glass = box(BOARD_X + PACK_GLASS_X[0], BOARD_Y + PACK_GLASS_Y[0], 0,
+                BOARD_X + PACK_GLASS_X[1], BOARD_Y + PACK_GLASS_Y[1], 1)
+    active = box(BOARD_X + ACTIVE_X[0], BOARD_Y + ACTIVE_Y[0], 0, BOARD_X + ACTIVE_X[1],
+                 BOARD_Y + ACTIVE_Y[1], 1)
+    draw(ax, section(glass, "z", 0.5), facecolor=colours[1], linewidth=0)
+    draw(ax, section(active, "z", 0.5), facecolor="#16324f", linewidth=0,
+         label="display (active area)")
+    led = cylinder(BOARD_X + LED[0], BOARD_Y + LED[1], 0, 1, LED_HOLE_D + 1)
+    draw(ax, section(led, "z", 0.5), facecolor="#d020d0", linewidth=0, label="RGB LED")
+    draw(ax, section(front_shell(), "z", FRONT / 2), facecolor="#bbbbbb", edgecolor="#555555",
+         linewidth=0.4)
+    draw(ax, section(placed_button_caps(), "z", -BUTTON_PROUD / 2), facecolor="#777777",
+         linewidth=0)
+    for name, (bx, by) in BUTTONS.items():
+        dx = -3.5 if bx < PACK_L / 2 else 3.5
+        ax.text(BOARD_X + bx + dx, BOARD_Y + by, name, ha="center", va="center", fontsize=9)
+    ax.plot([LENGTH / 2], [HEIGHT / 2], "+", color="#ffffff", markersize=10)
 
 
 ## @brief Generate the parts and, with --preview, their pictures.
