@@ -130,16 +130,30 @@ source [in Seeed's wiki repository][seeed-gs-src]) and Zephyr's
 | (internal) | 13, 14 | USB Serial/JTAG D−/D+ | |
 | (internal) | 16–22 | flash and PSRAM | |
 
-**Strapping pins.** Espressif's ESP32-C5-DevKitC-1 guide lists MTMS
-(GPIO2), MTDI (GPIO3), GPIO7, GPIO25, GPIO26, GPIO27 and GPIO28 as the
-C5's strapping pins ([DevKitC-1 user guide][devkitc], which points to the
-datasheet's *Boot Configurations* for their levels; I could not read the
-datasheet's table itself). esptool's notes add that GPIO28 selects download
-mode and has a 45 kΩ internal pull ([esptool boot modes][esptool-boot]).
-Of the XIAO's front pads only **D2 (GPIO25)** and **D3 (GPIO7)** are
-strapping pins. The rule this port follows: put **outputs to high-impedance
-inputs** on them (the TFT's DC and CS), and never a button or anything with
-a pull-up or pull-down that could hold the level at reset.
+**Strapping pins.** From the ESP32-C5 datasheet ([datasheet][esp-ds],
+pre-release v0.5, chapter 3 *Boot Configurations*, Tables 3-1 to 3-8). The
+chip latches these at reset and holds them until power-down. Each must be
+stable for 3 ms after CHIP_PU rises (Table 3-2). After that they are
+ordinary GPIOs.
+
+| Strapping pin | Internal pull at reset | Selects | Matters for the meter? |
+|---|---|---|---|
+| GPIO28 (BOOT button) | pull-up | boot mode: 1 = SPI boot (normal), 0 = download | Only the board's BOOT button should touch it |
+| GPIO27 (user LED) | pull-up | boot mode with GPIO28 (Joint Download Boot 0/1); UART0 ROM printing, only if `EFUSE_UART_PRINT_CONTROL` is burnt | No: board-internal |
+| GPIO26 (battery divider enable) | none (floating) | download mode variant (Joint Download Boot 1), only with GPIO28 = 0 | No: board-internal |
+| GPIO25 (**D2**) | none | SDIO slave sampling/driving edge, with MTDI | **No**: SDIO isn't used. Safe for the TFT's DC |
+| MTDI (GPIO3, back pad) | none | SDIO edge, with GPIO25 | No |
+| GPIO7 (**D3**) | **none, and must not float** | JTAG source (USB Serial/JTAG or the JTAG pads), but only if `EFUSE_JTAG_SEL_ENABLE` is burnt | With the default eFuses (all 0), GPIO7 is ignored and JTAG stays on USB Serial/JTAG (Table 3-7). Safe for the TFT's CS. A 10 kΩ pull-up to 3V3 on CS also keeps the panel deselected during boot and removes any doubt |
+| MTMS (GPIO2, back pad) | none | crystal frequency (40/48 MHz), only in download boot | No |
+
+So the only strapping pin that can stop the meter booting is GPIO28, which
+is the board's BOOT button and not wired to anything here. Of the XIAO's
+front pads only **D2 (GPIO25)** and **D3 (GPIO7)** are strapping pins, and
+with factory eFuses neither affects a normal SPI boot. The port still puts
+only **outputs to high-impedance inputs** on them (the TFT's DC and CS),
+not buttons. The datasheet's list matches the DevKitC-1 guide's
+([DevKitC-1 user guide][devkitc]) and esptool's note on GPIO28
+([esptool boot modes][esptool-boot]).
 
 **Free pins for the port.** The meter needs SCK, MOSI, CS, DC, backlight
 (and optionally RESET) for the TFT, plus four buttons: 9–10 pins of the 11
@@ -150,12 +164,15 @@ two of its pins come from the back pads MTCK (GPIO4) and MTDO (GPIO5),
 which are not strapping pins. The allocation is in section 7 and
 appendix A.
 
-**SPI speed.** SPI2's IO_MUX pins on the C5 are GPIO6 (SCK), GPIO7 (MOSI)
-and GPIO10 (CS0) (hal_espressif `components/soc/esp32c5/register/soc/io_mux_reg.h`:
-`FUNC_GPIO6_FSPICLK`, `FUNC_GPIO7_FSPID`, `FUNC_GPIO10_FSPICS0`). GPIO6 is
-wired to the battery-voltage divider and has no pad, so the panel's SPI must
-go through the **GPIO matrix**. Zephyr's `espressif,esp32-spi` binding says
-IO_MUX is what allows "frequencies higher than 20 MHz". Plan on **20 MHz**
+**SPI speed.** SPI2 runs at up to **80 MHz** as master (datasheet
+§4.2.1.2). Its IO_MUX pins are GPIO6 (FSPICLK), GPIO7 (FSPID), GPIO2
+(FSPIQ), GPIO4 (FSPIHD), GPIO5 (FSPIWP) and GPIO10 (FSPICS0) (datasheet
+§4.2.1.2 and Appendix A Table 7-1; the same in hal_espressif's
+`io_mux_reg.h`). The clock's IO_MUX pin, GPIO6, is wired to the
+battery-voltage divider and has no pad, so the panel's SPI clock must go
+through the **GPIO matrix**. The datasheet gives no GPIO-matrix speed limit;
+Zephyr's `espressif,esp32-spi` binding says IO_MUX is what allows
+"frequencies higher than 20 MHz". Plan on **20 MHz**
 (a full 320×240 RGB565 frame is 1.23 Mbit, about 62 ms); try 26–40 MHz on
 hardware. The Pico drives its panel at 62.5 MHz. The meter redraws only
 what changes, a band at a time, so 20 MHz should not be noticeable.
@@ -374,9 +391,13 @@ SDO/MISO) vary by maker. Before wiring, check on yours:
   the XIAO's 3V3 if it is a 3.3 V-only part, or from 5V/VBUS if it has a
   regulator. Logic is 3.3 V either way.
 - **LED (backlight)**: either straight to the LEDs through a resistor
-  (tens of mA: too much for a GPIO) or through a transistor on the module.
-  Measure it. The wiring in section 7 assumes a small transistor or MOSFET
-  switch, which costs nothing and keeps any LED current off the GPIO. The
+  (tens of mA) or through a transistor on the module. Measure it. A C5 pin
+  sources 40 mA typical at full drive with the output still above 2.64 V,
+  and sinks 28 mA (datasheet Table 5-4, `PAD_DRIVER` = 3). That's a
+  typical figure, not a limit, and it's well above what to load a pin with
+  continuously. The wiring in section 7 therefore assumes a small
+  transistor or MOSFET switch, which costs nothing and keeps the LED
+  current off the GPIO. The
   backlight could instead be dimmed with LEDC PWM, which the Pico can't do
   on the Display Pack.
 - **RESET**: wire it to a GPIO (as the trial overlay does) or to 3V3
@@ -399,7 +420,7 @@ appendix A.
 - **Wiring**: each button from its GPIO to GND (press to make), as the
   Display Pack's are.
 - **Pull-ups**: `GPIO_PULL_UP | GPIO_ACTIVE_LOW`. The C5's internal
-  pull-ups (about 45 kΩ) are enough for short leads inside a case. For
+  pull-ups (45 kΩ typical, datasheet Table 5-4) are enough for short leads inside a case. For
   leads over 10–20 cm, add 10 kΩ external pull-ups.
 - **Debounce**: `gpio-keys` debounces in software
   (`debounce-interval-ms`, default 30 ms). The trial overlay sets it
@@ -590,9 +611,9 @@ band of the Channels screen last viewed, or the worse of the two. A small
 | `zephyr/patches/zephyr/rpi-pico-boot2-clang-target.patch` | Not needed; harmless (only the RP2040's boot2 CMake). |
 | `CONFIG_WHD_WIFI_COUNTRY` in `app/prj.conf` | Move to `app/boards/rpi_pico_rp2040_w.conf` (the WHD symbol is undefined on the C5, and Zephyr fails the build on an undefined symbol). On the C5: `CONFIG_METER_WIFI_COUNTRY` and `NET_REQUEST_WIFI_REG_DOMAIN` at start-up (section 2). |
 | Restart after `CONFIG_METER_RECOVER_AFTER` failed scans (`scan_health.c`, `scan_task.c`) | Keep: it's generic and costs nothing. Whether the ESP32 driver ever needs it is unknown. Reword the README's AIROC buffer-leak explanation as Pico-specific. |
-| `reset_note.c`: `__noinit` in SRAM | Builds (`.dram0.noinit`). **Risk**: on ESP32 chips the ROM loader and simple-boot code run in SRAM before the app, and may overwrite it across a reset. Espressif keeps such data in RTC/LP memory. The board's devicetree already has `retainedmem0` (`zephyr,retained-ram`, 512 bytes of LP SRAM): use Zephyr's **retention** API (`zephyr,retention` partition) for the note on the C5, behind the existing `reset_note.h` interface. Verify on hardware either way. |
+| `reset_note.c`: `__noinit` in SRAM | Builds (`.dram0.noinit`). The datasheet (§4.1.3.2) says the C5's CPU, Core and System resets "preserve the data stored in internal memory"; only a Chip Reset (power-up, CHIP_PU) clears it. A software restart (`sys_reboot()`), a panic restart and a watchdog reset keep the note, as on the RP2040, and a power cut loses it, which is what `reset_note.c` relies on. **Remaining risk**: the ROM loader and simple-boot code run in SRAM before the app and could overwrite the part the note lands in. Espressif's own code keeps such data in RTC/LP memory. If testing shows the note lost, the board's devicetree already has `retainedmem0` (`zephyr,retained-ram`, 512 bytes of the 16 KB LP SRAM): use Zephyr's **retention** API for the note on the C5, behind the existing `reset_note.h` interface. |
 | "The RP2040 can't tell reset button, debugger and hardware watchdog apart" | The ESP32 can: `hwinfo_get_reset_cause()` (`hwinfo_esp32.c`, `esp_reset_reason()`) reports power-on, reset pin, software, watchdog (interrupt, task or RTC WDT), panic and brown-out. `boot_record` could record it, and the Events screen show "reset button", "hardware watchdog", "brown-out". New behaviour, optional; add `CONFIG_HWINFO`. |
-| `watchdog.c`: `wdt0`, RP2040 notes (8.3 s limit, not stopped at start-up), `CONFIG_TASK_WDT_*` comments in `prj.conf` | `wdt0` exists (Timer Group 0 MWDT, `CONFIG_WDT_ESP32`) and the build links. Move the RP2040 comments to the board's `.conf`; check the ESP32 MWDT's limits and that `wdt_disable()` behaves as `watchdog.c` expects. |
+| `watchdog.c`: `wdt0`, RP2040 notes (8.3 s limit, not stopped at start-up), `CONFIG_TASK_WDT_*` comments in `prj.conf` | `wdt0` exists (Timer Group 0 MWDT, `CONFIG_WDT_ESP32`) and the build links. The C5 has three digital watchdogs: an MWDT in each of the two timer groups and an RTC watchdog (RWDT), each with four stages and a 32-bit counter. It also has an analog "super watchdog", and flash-boot protection that resets the chip if booting from flash stalls (datasheet §4.1.3.9). Move the RP2040 comments to the board's `.conf`; check that `wdt_disable()` behaves as `watchdog.c` expects. |
 | `event_log.c`: FCB on `storage_partition`, created by the Pico overlay (last 64 KB) | The C5 board's 8 MB table already has `storage_partition` at 0x7b0000, 192 KB, with 4 KB erase sectors: no overlay change. `west flash` writes only the bootloader and app regions, so the log survives updates, as with UF2; `esptool erase_flash` wipes it. Check `MAX_SECTORS` (the log uses at most that many of the 48 sectors). |
 | `usb_console.c`, `app/usb-console.conf`, `app/usb-console.overlay` (CDC-ACM with DTR-based flow control; Raspberry Pi VID/PID) | Not used: the console is the hardware USB Serial/JTAG (`zephyr,console = &usb_serial`, board default). `usb_console.c` is compiled only with `CONFIG_USBD_CDC_ACM_CLASS`, so it drops out. Check on hardware that the console doesn't block with no host attached (the problem `usb_console.c` solves on the Pico), and how the X+Y log dump behaves (it waits up to 1 s for the log backend). |
 | `README.md`, `docs/USAGE.md`, `docs/quick-reference.html`/`.pdf`, `hardware/` | Per-target sections (hardware, pins, flashing, battery), the 5 GHz screen and band filter, the LED meaning. |
@@ -744,7 +765,7 @@ and a `message(STATUS ...)`.
 | GND | TFT GND, all button commons, LED switch | |
 | D8 (8) | TFT SCK | board's SPI2 SCK |
 | D10 (10) | TFT SDI (MOSI) | board's SPI2 MOSI |
-| D3 (7) | TFT CS | strapping pin; CS is a high-impedance input on the TFT |
+| D3 (7) | TFT CS, plus 10 kΩ to 3V3 | strapping pin with no internal pull: the pull-up fixes its level at reset and keeps the panel deselected while the chip boots |
 | D2 (25) | TFT DC / RS | strapping pin; also an input on the TFT |
 | D6 (11) | TFT RESET | UART0 TX by default: disabled |
 | D9 (9) | TFT LED, through an N-MOSFET (e.g. 2N7000/BSS138) or NPN + 1 kΩ, unless the module switches it | SPI2 MISO by default: not needed |
@@ -772,6 +793,7 @@ free D9.
 | 1 | RGB LED, 5 mm, common anode (optional) | Or a 3.3 V-friendly SMD RGB on a carrier |
 | 3 | Resistors for the LED: 330 Ω (red), 680 Ω (green, blue) | Dimmed further in software (2%) |
 | 1 | N-MOSFET 2N7000 / BSS138 (or NPN + 1 kΩ base resistor) | Backlight switch, if the module has none |
+| 1 | 10 kΩ | Pull-up on TFT CS (GPIO7, a strapping pin) |
 | 1 | 10 kΩ, 100 nF (optional) | TFT reset RC, if not on a GPIO |
 | 1 | LiPo cell, 3.7 V, with protection, e.g. 350–500 mAh | Soldered to the XIAO's BAT+/BAT− pads (no JST socket on the XIAO) |
 | 1 | Slide switch (optional) | In the battery lead, for a hard off |
@@ -793,11 +815,20 @@ takes it at ≤ 1 C.
 ADC (`adc0`, Zephyr's ADC API), × 2. It could be a header item on the
 screens. Not in the current meter; optional.
 
-**Current**: not measured, and no datasheet figure checked. A guess: the
-C5 receiving while it scans, some tens of mA up to about 100 mA, plus the
-TFT backlight (20–60 mA depending on module) gives an estimate of
-**about 100–150 mA**, similar to or a little above the Pico W build's
-80–100 mA. A 500 mAh cell would last about 3–5 hours. Measure on hardware.
+**Current**: not measured on the board. The datasheet's figures (Tables
+5-7 and 5-8, preliminary, at 3.3 V) for receiving, with the CPU idle,
+are **99–107 mA on 2.4 GHz** and **127–135 mA on 5 GHz**. A scan is
+almost all listening, especially a passive one. Transmit peaks are 246–339
+mA on 2.4 GHz and 377–381 mA on 5 GHz; an active scan transmits a
+probe request on each active channel, and the passive default doesn't.
+Add the CPU (modem-sleep figures, Table 5-11, put a busy 240 MHz CPU at
+26–43 mA, partly already in the RX figures), the TFT backlight (20–60 mA
+depending on module) and the XIAO's regulator. That gives roughly
+**150–200 mA** while scanning, against 80–100 mA for the Pico W build.
+With 10 s between scans the radio still listens for ≈ 5 s of every 15,
+so the average is lower: estimate 100–150 mA. A 500 mAh cell would last
+about 3–5 hours. The supply must also handle ~400 mA transmit peaks.
+Measure on hardware.
 
 **5 V for the TFT**: the XIAO's 5V pad is VBUS. On battery it carries
 nothing (or the battery through a diode, depending on the board: check the
@@ -844,7 +875,7 @@ the same script (`--layout xiao`) rather than a fork.
 | 3 | Hidden networks with `show_hidden = true` on passive channels | Fewer hidden networks than expected | Compare with a phone's analyser app |
 | 4 | Scan duration and the 15 s timeout / watchdog | Truncated scans, watchdog restarts | Log scan durations; tune `dwell_time_passive` |
 | 5 | GCC in a clang-only project; clang-tidy on RISC-V | Rule change; work in `clang-tidy-cross.py` | Decide the rule first; fix the script in step 1 |
-| 6 | `__noinit` reset note survives ESP32 resets? | Events screen misreports restarts | Test SW reset, watchdog, panic, power cut; switch to `retainedmem0` + retention API |
+| 6 | `__noinit` reset note survives ESP32 resets? Datasheet: all resets but Chip Reset keep internal memory; the ROM loader could still overwrite it | Events screen misreports restarts | Test SW reset, watchdog, panic, power cut; if lost, `retainedmem0` + retention API |
 | 7 | 2.2" module variants (VCC, LED wiring, BGR, mirroring) | Dark, mirrored or colour-swapped panel | Measure; `rotation`, `h-mirror`, `red-blue-swap`, `display-inversion` |
 | 8 | SPI over the GPIO matrix at 20+ MHz | Garbled picture at higher clocks | Start at 20 MHz; try 26/40 |
 | 9 | USB Serial/JTAG console with no host: blocking or dropping? | Start-up hangs on a charger (the Pico problem) | Boot from a USB charger and a battery; watch the display |
@@ -966,14 +997,21 @@ hardware**. The XIAO, the TFT, the buttons and the radio were never run.
 
 - The default band mode is `WIFI_BAND_MODE_AUTO`, so a scan covers 5 GHz
   (Espressif workshop).
-- The ESP32-C5 strapping-pin list (Espressif's DevKitC-1 guide, not the
-  datasheet itself), and that holding D2/D3 at a TFT input is safe at
-  reset.
 - The `channel_bitmap` band-skip semantics in appendix B (header comments).
-- SPI above 20 MHz over the GPIO matrix (binding text).
-- Scan timings (library defaults × channel counts), current draw,
-  charging current, TFT module electrical details.
-- `__noinit` data across ESP32 resets (risk 6).
+- SPI above 20 MHz over the GPIO matrix (binding text; the datasheet gives
+  only the 80 MHz SPI2 maximum).
+- Scan timings (library defaults × channel counts), the meter's actual
+  current draw, charging current, TFT module electrical details.
+- That the ROM loader leaves the `__noinit` note alone across resets (risk
+  6; the datasheet confirms that the resets themselves keep SRAM).
+
+**From the ESP32-C5 datasheet** ([pre-release v0.5][esp-ds], 2025-05-19,
+marked preliminary; checked after the first version of this report): the
+strapping pins and what each selects, the default eFuse behaviour of GPIO7,
+SPI2's 80 MHz maximum and IO_MUX pins, the GPIO drive currents and 45 kΩ
+pulls, the Wi-Fi receive and transmit currents, that resets other than a
+Chip Reset keep internal memory, and the watchdogs. The figures may change
+in the final datasheet.
 
 **`make test` on this branch** (in the project's image built without its
 Wi-Fi blobs, which native_sim doesn't use): the documentation check, the
@@ -1004,6 +1042,7 @@ noted):
 
 Espressif:
 
+- [ESP32-C5 Series Datasheet][esp-ds], pre-release v0.5 (2025-05-19): §2.3.4 GPIO restrictions, chapter 3 Boot Configurations (Tables 3-1 to 3-8), §4.1.2.1 internal memory, §4.1.3.2 reset, §4.1.3.9 watchdogs, §4.2.1.2 SPI controller, §4.2.1.7 LED PWM, Table 5-4 DC characteristics, Tables 5-7, 5-8, 5-11 current consumption, Appendix A Table 7-1 pin overview
 - hal_espressif (`b16851b`, the pin's revision): `components/esp_wifi/include/esp_wifi.h` (`esp_wifi_scan_start()` defaults, `esp_wifi_set_band_mode()`), `esp_wifi_types_generic.h` (`wifi_scan_config_t`, `wifi_scan_channel_bitmap_t`, `wifi_ap_record_t`), `components/soc/esp32c5/register/soc/io_mux_reg.h` (SPI2 IO_MUX pins), `zephyr/module.yml` (blobs)
 - [ESP-IDF Wi-Fi driver guide, ESP32-C5][esp-wifi-guide] (band modes, country policy, DFS, scan dwell times); source in [esp-idf `docs/en/api-guides/wifi-driver/`][esp-idf-docs-src] (`0e6b480`)
 - [ESP-IDF GPIO reference, ESP32-C5][esp-gpio] (GPIO13/14 USB-JTAG, GPIO16–22 flash/PSRAM)
@@ -1026,6 +1065,7 @@ Seeed:
 [z-ili9341]: https://github.com/zephyrproject-rtos/zephyr/blob/v4.5.0/dts/bindings/display/ilitek%2Cili9341.yaml
 [z-ili9xxx-common]: https://github.com/zephyrproject-rtos/zephyr/blob/v4.5.0/dts/bindings/display/ilitek%2Cili9xxx-common.yaml
 [sdk]: https://github.com/zephyrproject-rtos/sdk-ng/releases/tag/v1.0.1
+[esp-ds]: https://www.espressif.com/documentation/esp32-c5_datasheet_en.pdf
 [esp-wifi-guide]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32c5/api-guides/wifi-driver/overview.html
 [esp-idf-docs-src]: https://github.com/espressif/esp-idf/tree/master/docs/en/api-guides/wifi-driver
 [esp-gpio]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32c5/api-reference/peripherals/gpio.html
