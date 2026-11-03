@@ -79,8 +79,11 @@ core, which runs the meter) and `xiao_esp32c5/esp32c5/lpcore` (the
 low-power core, not needed). Its devicetree
 (`xiao_esp32c5_hpcore.dts`):
 
-- 8 MB flash and 8 MB PSRAM (Zephyr's board docs say an ESP32-C5-WROOM-1
-  module; Seeed's wiki says only "8 MB PSRAM & 8 MB Flash");
+- 8 MB flash and 8 MB PSRAM. Seeed's schematic ([V1.1][seeed-sch]) shows
+  a bare ESP32-C5 QFN48 (U6) with a 48 MHz crystal and an external 8 MB
+  PY25Q64HA flash (U5). There's no separate PSRAM part, so any PSRAM is
+  inside the chip package; the meter doesn't use it. Zephyr's board docs
+  say "ESP32-C5-WROOM-1 module", which the schematic doesn't bear out;
 - console and shell on `usb_serial`, the SoC's built-in **USB Serial/JTAG**
   controller on the USB-C socket (no USB stack in Zephyr, no CDC-ACM);
 - user LED on GPIO27, active low, as `led0` (`gpio-leds`);
@@ -119,15 +122,17 @@ source [in Seeed's wiki repository][seeed-gs-src]) and Zephyr's
 | D8 | 8 | SPI2 SCK | |
 | D9 | 9 | SPI2 MISO | |
 | D10 | 10 | SPI2 MOSI | SPI2 IO_MUX CS0 (FSPICS0) |
-| MTMS (back pad) | 2 | JTAG | **strapping pin** |
-| MTDI (back pad) | 3 | JTAG | **strapping pin** |
-| MTCK (back pad) | 4 | JTAG | usable as GPIO (USB-JTAG is on GPIO13/14) |
-| MTDO (back pad) | 5 | JTAG | usable as GPIO |
+| MTMS (back test pad TP7) | 2 | JTAG | **strapping pin** |
+| MTDI (back test pad TP6) | 3 | JTAG | **strapping pin** |
+| MTCK (back test pad TP5) | 4 | JTAG | usable as GPIO (USB-JTAG is on GPIO13/14) |
+| MTDO (back test pad TP4) | 5 | JTAG | usable as GPIO |
+| EN (back test pad TP8) | — | CHIP_PU: the RESET button, 10 kΩ pull-up and 1 µF | the chip's reset line, like the Pico's RUN pin |
 | (internal) | 6 | battery voltage (ADC_BAT) | SPI2 IO_MUX SCK (FSPICLK): not on a pad |
 | (internal) | 26 | enables the battery divider (ADC_CTRL) | strapping pin |
 | (internal) | 27 | user LED, yellow, active low | strapping pin |
 | (internal) | 28 | BOOT button | strapping pin (download mode) |
 | (internal) | 13, 14 | USB Serial/JTAG D−/D+ | |
+| (back test pads) | — | TP1 3V3, TP2 BOOT (GPIO28), TP3 GND | 45-mil round test points |
 | (internal) | 16–22 | flash and PSRAM | |
 
 **Strapping pins.** From the ESP32-C5 datasheet ([datasheet][esp-ds],
@@ -400,9 +405,14 @@ SDO/MISO) vary by maker. Before wiring, check on yours:
   current off the GPIO. The
   backlight could instead be dimmed with LEDC PWM, which the Pico can't do
   on the Display Pack.
-- **RESET**: wire it to a GPIO (as the trial overlay does) or to 3V3
-  through 10 kΩ with 100 nF to GND. The driver sends a software reset
-  either way.
+- **RESET**: three options; the driver sends a software reset in every
+  case.
+  - **A GPIO**, as the trial overlay does (D6).
+  - **The XIAO's EN test pad** (TP8, the chip's reset line, with its own
+    10 kΩ pull-up and 1 µF). The panel then resets with the chip, as the
+    Display Pack does from the Pico's RUN pin, and D6 is freed. EN is a
+    45-mil test point on the back, so the wire needs strain relief.
+  - **3V3 through 10 kΩ with 100 nF to GND.**
 
 ---
 
@@ -436,8 +446,8 @@ appendix A.
 The Display Pack's RGB LED is driven by `pwm-leds` and dimmed to 2%
 (`status_led.c`). The XIAO ESP32-C5 has:
 
-- **a single-colour user LED** (yellow, GPIO27, active low; Zephyr's
-  `led0`). It is too limited for the meter's six states: blue scanning,
+- **a single-colour user LED** (yellow, from 3V3 through 1.5 kΩ into
+  GPIO27, so active low and about 1 mA; Zephyr's `led0`). It is too limited for the meter's six states: blue scanning,
   green, amber, red, magenta, off.
 - **a charge LED** (red), driven by the charger, not software.
 - **no RGB LED.**
@@ -766,7 +776,7 @@ and a `message(STATUS ...)`.
 | D10 (10) | TFT SDI (MOSI) | board's SPI2 MOSI |
 | D3 (7) | TFT CS, plus 10 kΩ to 3V3 | strapping pin with no internal pull: the pull-up fixes its level at reset and keeps the panel deselected while the chip boots |
 | D2 (25) | TFT DC / RS | strapping pin; also an input on the TFT |
-| D6 (11) | TFT RESET | UART0 TX by default: disabled |
+| D6 (11) | TFT RESET (or the EN test pad, TP8, see section 3) | UART0 TX by default: disabled. The board has a 499 Ω series resistor (R15) on this pin, harmless for a reset line |
 | D9 (9) | TFT LED, through an N-MOSFET (e.g. 2N7000/BSS138) or NPN + 1 kΩ, unless the module switches it | SPI2 MISO by default: not needed |
 | D0 (1) | Button A, other side to GND | |
 | D1 (0) | Button B, other side to GND | |
@@ -786,7 +796,7 @@ free D9.
 
 | Qty | Part | Notes |
 |---|---|---|
-| 1 | Seeed Studio XIAO ESP32-C5 | 21 × 17.8 mm; "External RF antenna included", on a U.FL socket ([Seeed][seeed-gs]). Seeed's pin map lists no other antenna, so treat the U.FL antenna as required |
+| 1 | Seeed Studio XIAO ESP32-C5 | 21 × 17.8 mm; comes with an FPC antenna for its U.FL socket ([Seeed][seeed-gs]). The schematic has no other antenna: the chip's 2.4 GHz and 5 GHz RF pins go through a diplexer (U7, LFD182G45) to the one U.FL socket, so **the antenna is required** |
 | 1 | 2.2" SPI TFT module, ILI9341, 240×320, 3.3 V supply | Check the LED (backlight) wiring (section 3) |
 | 4 | Tactile push switches, 6×6 mm (or 12×12 with caps) | Press to make |
 | 1 | RGB LED, 5 mm, common anode (optional) | Or a 3.3 V-friendly SMD RGB on a carrier |
@@ -794,21 +804,34 @@ free D9.
 | 1 | N-MOSFET 2N7000 / BSS138 (or NPN + 1 kΩ base resistor) | Backlight switch, if the module has none |
 | 1 | 10 kΩ | Pull-up on TFT CS (GPIO7, a strapping pin) |
 | 1 | 10 kΩ, 100 nF (optional) | TFT reset RC, if not on a GPIO |
-| 1 | LiPo cell, 3.7 V, with protection, e.g. 350–500 mAh | Soldered to the XIAO's BAT+/BAT− pads (no JST socket on the XIAO) |
+| 1 | LiPo cell, 3.7 V, with protection, 350–500 mAh (the charger gives 200 mA, so ≥ 200 mAh keeps it at ≤ 1 C) | Soldered to the XIAO's BAT+/BAT− pads (no JST socket on the XIAO) |
 | 1 | Slide switch (optional) | In the battery lead, for a hard off |
 | — | Hook-up wire, perfboard for the buttons, headers | |
 
 ### Power and battery
 
-The XIAO ESP32-C5 has **battery charging on board**: an SGM40567 charger
-from USB-C to BAT+/BAT− pads on the back, a red charge LED, and a battery
-voltage monitor (a TPS22916 switch and a 2 × 100 kΩ divider on GPIO6,
-enabled by GPIO26) ([Seeed getting started][seeed-gs], "Battery Usage").
-That replaces the **LiPo Amigo Pro and the Schottky diode** of the current
-build: the XIAO runs from USB when plugged in and from the cell otherwise.
-Seeed's page doesn't state the charge current. Check the schematic
-([PDF linked from the wiki][seeed-gs]) or measure, and pick a cell that
-takes it at ≤ 1 C.
+The XIAO ESP32-C5 has **battery charging and power-path switching on
+board** (Seeed's schematic, [V1.1, 25 Dec 2025][seeed-sch], sheet 03
+*Power*):
+
+- **Charger**: SGM40567-4.2 from USB 5 V to the BAT+/BAT− pads on the
+  back. Its charge current is set by R2 (120 kΩ) to **200 mA**. The red
+  charge LED blinks while charging; the schematic's note says it then
+  lights for 51.2 s when charged and goes off.
+- **Power path**: a TPS2116 power mux feeds the system from USB (VBUS)
+  while it's above 4.33 V, and switches to the battery when USB goes.
+- **3V3**: an SGM6029C buck converter, **1 A**, from that supply. The
+  3V3 pad (`3V3_OUT`) is behind a TPS22916 load switch (U10) on that rail.
+- **5V pad**: USB's VBUS (after a TPS22916 reverse-current switch, U4),
+  so **nothing on battery**.
+- **Battery voltage**: a TPS22916 switch (U3) connects the battery to a
+  100 kΩ + 100 kΩ divider into GPIO6. GPIO26 high turns it on; R22
+  (100 kΩ) holds it off at reset, so it draws nothing until asked.
+
+That replaces the **LiPo Amigo Pro and the Schottky diode** of the
+current build: the XIAO runs from USB when plugged in and from the cell
+otherwise, and charges the cell from USB. At 200 mA, a 350–500 mAh cell
+charges at 0.4–0.6 C in about 2–3 hours.
 
 **Battery level**, new and cheap: enable GPIO26, read GPIO6 through the
 ADC (`adc0`, Zephyr's ADC API), × 2. It could be a header item on the
@@ -831,10 +854,10 @@ Measure on hardware.
 
 **3V3 rail**: everything external (the TFT and its backlight, the RGB LED,
 the pull-ups) runs from the XIAO's 3V3 pad, so it all keeps working on
-battery. That rail also feeds the C5, so it carries the whole budget above:
-about 150–200 mA while scanning, with ~400 mA transmit peaks. Seeed's page
-doesn't give the 3V3 regulator's rating; check it in the schematic before
-adding anything else to the rail.
+battery. The buck converter behind it is rated 1 A and also feeds the C5,
+so it carries the whole budget above: about 150–200 mA while scanning,
+with ~400 mA transmit peaks. That leaves plenty of margin. The pad's load
+switch (TPS22916, 2 A) is not the limit.
 
 **Antenna**: the 5 GHz band is lossier through cases and hands. Mount the
 FPC antenna flat against the inside of the case's back or top, away from
@@ -858,6 +881,11 @@ hangs at the back. For the new parts:
   perfboard at chosen positions) instead of the pack's buttons; the XIAO's
   mount with its USB-C opening (on the XIAO now, not a charger); a pocket
   for the cell; and the antenna. No charger, no PWR plunger.
+- **The XIAO's layout**, from Seeed's KiCad PCB: the USB-C socket is at
+  one end. The U.FL connector and the RESET and BOOT buttons are at the
+  other, so the case needs openings or plungers there for flashing. The
+  BAT+/BAT− pads and the test pads (TP1–TP8) are on the back. The KiCad
+  file gives their exact positions for the case script.
 
 Estimate: 1–2 days to adapt with calipers in hand, as a second layout in
 the same script (`--layout xiao`) rather than a fork.
@@ -1001,7 +1029,7 @@ hardware**. The XIAO, the TFT, the buttons and the radio were never run.
 - SPI above 20 MHz over the GPIO matrix (binding text; the datasheet gives
   only the 80 MHz SPI2 maximum).
 - Scan timings (library defaults × channel counts), the meter's actual
-  current draw, charging current, TFT module electrical details.
+  current draw, TFT module electrical details.
 - That the ROM loader leaves the `__noinit` note alone across resets (risk
   6; the datasheet confirms that the resets themselves keep SRAM).
 
@@ -1057,6 +1085,8 @@ Seeed:
 - [XIAO ESP32-C5 getting started][seeed-gs] (pin map, LEDs, battery, charger, schematic link); [its source][seeed-gs-src]
 - Seeed wiki source pages *XIAO ESP32C5 With Zephyr* and *XIAO ESP32C5 WiFi Usage* (flashing with BOOT held; dual-band scan example)
 - [CNX Software: XIAO ESP32-C5 announcement][cnx] (battery pads)
+- Seeed Studio XIAO ESP32-C5 schematic and KiCad project, **V1.1 (2025-12-25)**, CC BY-SA 4.0 ([schematic PDF][seeed-sch], [KiCad project][seeed-kicad], both linked from the getting-started page): sheet 02 block diagram, sheet 03 power (charger, power mux, buck, load switches, battery divider, header), sheet 04 main (chip, flash, crystal, LEDs, buttons, RF diplexer, U.FL); the PCB file for footprint positions
+- [XIAO ESP32-C5 pinout sheet][seeed-pinout] (`XIAO_ESP32C5_Pinout.xlsx`). Its last column swaps D8 and D9; its own XIAO-function column and the schematic agree with Zephyr (D8 = GPIO8 SCK, D9 = GPIO9 MISO)
 
 [z-board]: https://github.com/zephyrproject-rtos/zephyr/tree/v4.5.0/boards/seeed/xiao_esp32c5
 [z-board-doc]: https://docs.zephyrproject.org/latest/boards/seeed/xiao_esp32c5/doc/index.html
@@ -1076,6 +1106,9 @@ Seeed:
 [esp-wifi-lib]: https://github.com/espressif/esp32-wifi-lib
 [seeed-gs]: https://wiki.seeedstudio.com/xiao_esp32c5_getting_started/
 [seeed-gs-src]: https://github.com/Seeed-Studio/wiki-documents/blob/docusaurus-version/sites/en/docs/Sensor/SeeedStudio_XIAO/SeeedStudio_XIAO_ESP32C5/XIAO_ESP32C5_Getting_Started.md
+[seeed-sch]: https://files.seeedstudio.com/wiki/XIAO_ESP32C5/res/Seeed_Studio_XIAO_ESP32C5.pdf
+[seeed-kicad]: https://files.seeedstudio.com/wiki/XIAO_ESP32C5/res/Seeed_Studio_XIAO_ESP32C5.zip
+[seeed-pinout]: https://files.seeedstudio.com/wiki/XIAO_ESP32C5/res/XIAO_ESP32C5_Pinout.xlsx
 [cnx]: https://www.cnx-software.com/2026/01/16/xiao-esp32-c5-a-tiny-usb-c-iot-board-with-dual-band-wifi-6-bluetooth-5-0-le-zigbee-and-thread-connectivity/
 
 ---
