@@ -177,10 +177,15 @@ appendix A.
 battery-voltage divider and has no pad, so the panel's SPI clock must go
 through the **GPIO matrix**. The datasheet gives no GPIO-matrix speed limit;
 Zephyr's `espressif,esp32-spi` binding says IO_MUX is what allows
-"frequencies higher than 20 MHz". Plan on **20 MHz**
-(a full 320×240 RGB565 frame is 1.23 Mbit, about 62 ms); try 26–40 MHz on
-hardware. The Pico drives its panel at 62.5 MHz. The meter redraws only
-what changes, a band at a time, so 20 MHz should not be noticeable.
+"frequencies higher than 20 MHz". The panel sets the limit first, though.
+The ILI9341's rated write clock is 10 MHz. On this same module, wired with
+jumper wires, the radio project ran 9.6 MHz, and its first try at
+31.25 MHz left the screen white (section 3). So start at **10 MHz**: a
+full 320×240 RGB565 frame is 1.23 Mbit, about 123 ms, and one text line
+(320 × 16 × 2 bytes) about 8 ms. With short wires, try 20 MHz, the GPIO
+matrix's limit. The Pico drives its panel at 62.5 MHz, but the meter
+redraws only what changes, a band at a time, so the difference should
+show only on a full-screen change.
 
 **USB.** The USB-C socket goes to the C5's USB Serial/JTAG controller:
 `west flash` (esptool) programs it, the console appears as
@@ -350,23 +355,23 @@ the current setup:
 | | Pico (`st7789v`) | XIAO (`ili9341`) |
 |---|---|---|
 | Driver | `display_st7789v.c` | `display_ili9xxx.c` (ILI9340/9341/9342C/9488) |
-| Bus | `spi0`, 62.5 MHz | `spi2`, 20 MHz (GPIO matrix, section 1) |
+| Bus | `spi0`, 62.5 MHz | `spi2`, 10 MHz to start (the panel's rating; 9.6 MHz ran on this module in the radio project), at most 20 MHz on the GPIO matrix |
 | Size in devicetree | `width = <320>; height = <240>;` | `width = <240>; height = <320>;` (portrait, native) |
-| Landscape | `mdac = <0x60>` (raw MADCTL) | `rotation = <90>;` (driver sets MV/MX); `h-mirror`/`v-mirror` to correct, or 270 |
+| Landscape | `mdac = <0x60>` (raw MADCTL) | `rotation = <90>;` plus `v-mirror;` (driver sets MV/MX, then MY): what this module needed on hardware. `rotation = <270>` if upside down |
 | Byte order | `PANEL_PIXEL_FORMAT_RGB_565X` | `PANEL_PIXEL_FORMAT_RGB_565X` (same) |
 | Panel tuning | gamma, VCOM, porch from Pimoroni's driver | driver defaults; `pgamctrl`/`ngamctrl`/`vmctrl1` etc. exist if needed |
 | Reset | none (wired to RUN); software reset | `reset-gpios` on the bus node (optional); the driver also sends SWRESET |
-| Colour order | | BGR by default; `red-blue-swap` if red and blue are swapped |
+| Colour order | | BGR, the driver's default; the radio project didn't need `red-blue-swap` on this module |
 | Inversion | `inversion-off` if inverted | `display-inversion` if inverted |
-| Backlight | `gpio-leds` on GPIO20 | `gpio-leds` (or LEDC PWM) on the module's LED pin |
+| Backlight | `gpio-leds` on GPIO20 | `gpio-leds` (or LEDC PWM, for dimming) on the module's LED pin |
 
 **Rotation and size.** `ili9xxx_get_capabilities()` swaps width and height
 for 90° and 270°, so with `width = <240>; height = <320>; rotation = <90>;`
 the application sees **x_resolution 320, y_resolution 240**, as the UI is
 laid out for. `gfx.c` checks only `x_resolution <= MAX_WIDTH` (320) and
 reads the size at run time, so it needs no change. **Verified** in the
-trial build's devicetree (appendix A); the picture's orientation and
-mirroring can only be checked on the panel.
+trial build's devicetree (appendix A). The orientation settings are the
+ones this module needed on real hardware in the radio project (below).
 
 **Byte order.** `gfx.c` has
 `BUILD_ASSERT(DT_PROP(DISPLAY_NODE, pixel_format) == PANEL_PIXEL_FORMAT_RGB_565X)`
@@ -388,23 +393,53 @@ SPI panel; `zephyr,mipi-dbi-spi` is the right model here.
 
 ### The module
 
-"2.2 inch SPI TFT ILI9341 240x320" modules (often a red PCB with an SD
-card socket; pins VCC, GND, CS, RESET, DC/RS, SDI/MOSI, SCK, LED,
-SDO/MISO) vary by maker. Before wiring, check on yours:
+The TFT is the module this meter used before the Display Pack, and the
+one [pi-zephyr-inet-radio][radio] drove on a real Raspberry Pi 3A+ before it moved to the
+Pirate Audio HAT. Through the same Zephyr `ilitek,ili9341` driver over
+`zephyr,mipi-dbi-spi`, that project's history records what this module
+needs. Its README and overlay are at commit `fbbe5d8^`, and its bring-up
+commits are `cfcaf5f`, `3be9ec8`, `c3624af`, `2f951c4`, `32183df` and
+`ae5a7d2`, all on 19 Oct 2026. Its Pi 3A+ logs show the UI running,
+`Display UI 21x10 chars (15x24 font) on ili9341@0`: 320×240 landscape.
 
-- **VCC**: the chosen module runs from 3.3 V, so it takes its supply from
-  the XIAO's 3V3 pad, the same rail as its 3.3 V logic. That works on USB
-  and on battery alike, and no level shifting or 5 V supply is needed.
-- **LED (backlight)**: either straight to the LEDs through a resistor
-  (tens of mA) or through a transistor on the module. Measure it. A C5 pin
-  sources 40 mA typical at full drive with the output still above 2.64 V,
-  and sinks 28 mA (datasheet Table 5-4, `PAD_DRIVER` = 3). That's a
-  typical figure, not a limit, and it's well above what to load a pin with
-  continuously. The wiring in section 7 therefore assumes a small
-  transistor or MOSFET switch, which costs nothing and keeps the LED
-  current off the GPIO. The
-  backlight could instead be dimmed with LEDC PWM, which the Pico can't do
-  on the Display Pack.
+- **Pins**: VCC, GND, CS, RESET, DC/RS, SDI/MOSI, SCK, LED, SDO/MISO
+  (optional: the panel is only written). Touch pins, if present, stay
+  unconnected.
+- **VCC**: 3.3 V, from the XIAO's 3V3 pad, the same rail as its logic.
+  That works on USB and on battery alike; no level shifting or 5 V
+  supply. The radio's notes: on modules with a **J1** jumper, J1 open
+  means VCC feeds an on-board regulator, and closed suits 3.3 V on VCC.
+- **SPI clock: 10 MHz.** The first try at 31.25 MHz left the screen
+  **white**: the panel lights white on power alone and had taken no valid
+  command. 9.6 MHz, within the ILI9341's 10 MHz rating, worked over
+  jumper wires (`c3624af`).
+- **Pixel format `PANEL_PIXEL_FORMAT_RGB_565X`**: a format of 0 made the
+  driver refuse to start ("Unsupported pixel format in DT"), which also
+  leaves the screen white (`2f951c4`). The meter's overlay already uses
+  RGB_565X.
+- **Size and rotation**: `width = <240>; height = <320>; rotation = <90>;`.
+  Giving the landscape size instead made the UI 240 pixels wide on a
+  320-pixel screen (`ae5a7d2`).
+- **Mirroring**: in landscape this module's picture was **mirrored
+  left-right**; `v-mirror` (MADCTL MY) fixed it (`32183df`). Upside down
+  would be `rotation = <270>`.
+- **Colours**: right with the driver's defaults (BGR, no inversion).
+- **LED (backlight)**: the radio first tied it to 3V3, then put it on a
+  GPIO for dimming (`3be9ec8`). Its README notes that most of these
+  modules switch the LED with a transistor of their own, so a GPIO only
+  drives that transistor; if a module draws more from its LED pin, put a
+  transistor in. Whether the GPIO-driven backlight was run on hardware
+  isn't recorded (dimming is still on its to-do list). On the XIAO:
+  - measure the LED pin's current;
+  - if it is a few mA (an on-board transistor), drive it from the GPIO
+    directly, with LEDC PWM for dimming, which the Pico can't do on the
+    Display Pack;
+  - if it is tens of mA, add the switch in section 7. A C5 pin sources
+    40 mA typical at full drive (datasheet Table 5-4), a typical figure,
+    not a limit to load a pin to.
+- **White screen checklist** (the radio's README): check the boot log for
+  `ili9xxx` or display errors, then the CS, DC, RESET, MOSI and SCK wires.
+  Then the clock.
 - **RESET**: three options; the driver sends a software reset in every
   case.
   - **A GPIO**, as the trial overlay does (D6).
@@ -777,7 +812,7 @@ and a `message(STATUS ...)`.
 | D3 (7) | TFT CS, plus 10 kΩ to 3V3 | strapping pin with no internal pull: the pull-up fixes its level at reset and keeps the panel deselected while the chip boots |
 | D2 (25) | TFT DC / RS | strapping pin; also an input on the TFT |
 | D6 (11) | TFT RESET (or the EN test pad, TP8, see section 3) | UART0 TX by default: disabled. The board has a 499 Ω series resistor (R15) on this pin, harmless for a reset line |
-| D9 (9) | TFT LED, through an N-MOSFET (e.g. 2N7000/BSS138) or NPN + 1 kΩ, unless the module switches it | SPI2 MISO by default: not needed |
+| D9 (9) | TFT LED: directly if the module switches it (a few mA), else through an N-MOSFET (e.g. 2N7000/BSS138) or NPN + 1 kΩ | SPI2 MISO by default: not needed |
 | D0 (1) | Button A, other side to GND | |
 | D1 (0) | Button B, other side to GND | |
 | D4 (23) | Button X, other side to GND | I2C0 SDA by default: disabled |
@@ -797,11 +832,11 @@ free D9.
 | Qty | Part | Notes |
 |---|---|---|
 | 1 | Seeed Studio XIAO ESP32-C5 | 21 × 17.8 mm; comes with an FPC antenna for its U.FL socket ([Seeed][seeed-gs]). The schematic has no other antenna: the chip's 2.4 GHz and 5 GHz RF pins go through a diplexer (U7, LFD182G45) to the one U.FL socket, so **the antenna is required** |
-| 1 | 2.2" SPI TFT module, ILI9341, 240×320, 3.3 V supply | Check the LED (backlight) wiring (section 3) |
+| 1 | 2.2" SPI TFT module, ILI9341, 240×320, 3.3 V supply | The module from pi-zephyr-inet-radio (section 3). Measure its LED pin's current |
 | 4 | Tactile push switches, 6×6 mm (or 12×12 with caps) | Press to make |
 | 1 | RGB LED, 5 mm, common anode (optional) | Or a 3.3 V-friendly SMD RGB on a carrier |
 | 3 | Resistors for the LED: 330 Ω (red), 680 Ω (green, blue) | Dimmed further in software (2%) |
-| 1 | N-MOSFET 2N7000 / BSS138 (or NPN + 1 kΩ base resistor) | Backlight switch, if the module has none |
+| 1 | N-MOSFET 2N7000 / BSS138 (or NPN + 1 kΩ base resistor), optional | Backlight switch, only if the module's LED pin draws tens of mA (most switch it themselves) |
 | 1 | 10 kΩ | Pull-up on TFT CS (GPIO7, a strapping pin) |
 | 1 | 10 kΩ, 100 nF (optional) | TFT reset RC, if not on a GPIO |
 | 1 | LiPo cell, 3.7 V, with protection, 350–500 mAh (the charger gives 200 mA, so ≥ 200 mAh keeps it at ≤ 1 C) | Soldered to the XIAO's BAT+/BAT− pads (no JST socket on the XIAO) |
@@ -904,8 +939,8 @@ the same script (`--layout xiao`) rather than a fork.
 | 4 | Scan duration and the 15 s timeout / watchdog | Truncated scans, watchdog restarts | Log scan durations; tune `dwell_time_passive` |
 | 5 | GCC in a clang-only project; clang-tidy on RISC-V | Rule change; work in `clang-tidy-cross.py` | Decide the rule first; fix the script in step 1 |
 | 6 | `__noinit` reset note survives ESP32 resets? Datasheet: all resets but Chip Reset keep internal memory; the ROM loader could still overwrite it | Events screen misreports restarts | Test SW reset, watchdog, panic, power cut; if lost, `retainedmem0` + retention API |
-| 7 | 2.2" module variants (LED wiring, BGR, mirroring) | Dark, mirrored or colour-swapped panel | Measure; `rotation`, `h-mirror`, `red-blue-swap`, `display-inversion` |
-| 8 | SPI over the GPIO matrix at 20+ MHz | Garbled picture at higher clocks | Start at 20 MHz; try 26/40 |
+| 7 | The module's settings | Low now: size, rotation, `v-mirror`, pixel format and colours are known from the radio project's hardware runs. The LED pin's current isn't | Measure the LED pin; check the picture once |
+| 8 | SPI clock | White screen above the panel's rating (seen at 31.25 MHz) | Start at 10 MHz (9.6 MHz worked); try 20 MHz with short wires |
 | 9 | USB Serial/JTAG console with no host: blocking or dropping? | Start-up hangs on a charger (the Pico problem) | Boot from a USB charger and a battery; watch the display |
 | 10 | Wi-Fi blob licence and size | Binary libraries in the firmware | As now with Infineon's: document in README's licence section ([esp32-wifi-lib][esp-wifi-lib]) |
 | 11 | 5 GHz bandwidth not in Zephyr's scan result | Overlap figures approximate | Start with the 80 MHz assumption; Zephyr API patch later |
@@ -1003,6 +1038,17 @@ hardware**. The XIAO, the TFT, the buttons and the radio were never run.
 - **With clang-tidy on**, the same build fails in clang-tidy (section 6).
 - **The draft driver patch** (appendix B) applied to the pinned Zephyr
   compiles into the meter's C5 build.
+- **The overlay with this module's known settings** (10 MHz, `v-mirror`,
+  the commit history of pi-zephyr-inet-radio): rebuilt for the C5, still
+  no warnings, same size; the devicetree has `mipi-max-frequency`
+  10000000 and `v-mirror`.
+
+**From the module's earlier use** (pi-zephyr-inet-radio on a Raspberry
+Pi 3A+, through the same Zephyr driver; read from that repository's
+history, not re-run here): the 10 MHz clock limit and the white screen
+above it, RGB_565X, the portrait size with rotation 90, `v-mirror`, and
+colours right with the driver's defaults. Not recorded there: whether the
+backlight was driven from a GPIO on hardware, and the LED pin's current.
 - **`make test`** (documentation check, style check, native_sim tests) on
   this branch: see the end of this section.
 
@@ -1029,7 +1075,7 @@ hardware**. The XIAO, the TFT, the buttons and the radio were never run.
 - SPI above 20 MHz over the GPIO matrix (binding text; the datasheet gives
   only the 80 MHz SPI2 maximum).
 - Scan timings (library defaults × channel counts), the meter's actual
-  current draw, TFT module electrical details.
+  current draw, the TFT's LED pin current.
 - That the ROM loader leaves the `__noinit` note alone across resets (risk
   6; the datasheet confirms that the resets themselves keep SRAM).
 
@@ -1085,6 +1131,10 @@ Seeed:
 - [XIAO ESP32-C5 getting started][seeed-gs] (pin map, LEDs, battery, charger, schematic link); [its source][seeed-gs-src]
 - Seeed wiki source pages *XIAO ESP32C5 With Zephyr* and *XIAO ESP32C5 WiFi Usage* (flashing with BOOT held; dual-band scan example)
 - [CNX Software: XIAO ESP32-C5 announcement][cnx] (battery pads)
+
+The TFT module:
+
+- [pi-zephyr-inet-radio][radio] (private repository), where this module ran on a Raspberry Pi 3A+ with Zephyr's ILI9341 driver: `README.md` and `app/boards/rpi_3a_plus.overlay` at `fbbe5d8^`; commits `cfcaf5f`, `3be9ec8`, `c3624af`, `2f951c4`, `32183df`, `ae5a7d2` (19 Oct 2026); `tests/wifi_hw/logs/2026-10-24-radio-over-wifi-pi3a.log` (the UI running on `ili9341@0`)
 - Seeed Studio XIAO ESP32-C5 schematic and KiCad project, **V1.1 (2025-12-25)**, CC BY-SA 4.0 ([schematic PDF][seeed-sch], [KiCad project][seeed-kicad], both linked from the getting-started page; copies in [`hardware/xiao-esp32c5/vendor/`](../hardware/xiao-esp32c5/vendor/README.md)): sheet 02 block diagram, sheet 03 power (charger, power mux, buck, load switches, battery divider, header), sheet 04 main (chip, flash, crystal, LEDs, buttons, RF diplexer, U.FL); the PCB file for footprint positions
 - [XIAO ESP32-C5 pinout sheet][seeed-pinout] (`XIAO_ESP32C5_Pinout.xlsx`). Its last column swaps D8 and D9; its own XIAO-function column and the schematic agree with Zephyr (D8 = GPIO8 SCK, D9 = GPIO9 MISO)
 
@@ -1109,6 +1159,7 @@ Seeed:
 [seeed-sch]: https://files.seeedstudio.com/wiki/XIAO_ESP32C5/res/Seeed_Studio_XIAO_ESP32C5.pdf
 [seeed-kicad]: https://files.seeedstudio.com/wiki/XIAO_ESP32C5/res/Seeed_Studio_XIAO_ESP32C5.zip
 [seeed-pinout]: https://files.seeedstudio.com/wiki/XIAO_ESP32C5/res/XIAO_ESP32C5_Pinout.xlsx
+[radio]: https://github.com/Rob-McKay/pi-zephyr-inet-radio
 [cnx]: https://www.cnx-software.com/2026/01/16/xiao-esp32-c5-a-tiny-usb-c-iot-board-with-dual-band-wifi-6-bluetooth-5-0-le-zigbee-and-thread-connectivity/
 
 ---
@@ -1128,7 +1179,8 @@ port would rename them to something neutral in both overlays.
  * SPDX-License-Identifier: Apache-2.0
  *
  * TRIAL for the ESP32-C5 port study: Seeed XIAO ESP32-C5 with a 2.2" ILI9341
- * 240x320 SPI TFT, four push buttons to ground and a common-anode RGB LED.
+ * 240x320 SPI TFT (3.3 V; the module pi-zephyr-inet-radio used), four push
+ * buttons to ground and a common-anode RGB LED.
  *
  *   Function          XIAO pad   GPIO
  *   TFT SCK           D8         8     SPI2 SCLK (GPIO matrix)
@@ -1166,11 +1218,25 @@ port would rename them to something neutral in both overlays.
 		tft: ili9341@0 {
 			compatible = "ilitek,ili9341";
 			reg = <0>;
-			mipi-max-frequency = <20000000>;
+			/* 10 MHz: the ILI9341's rated write clock. On the same
+			 * module over jumper wires, pi-zephyr-inet-radio ran
+			 * 9.6 MHz; 31.25 MHz left the screen white. Raise it
+			 * (20 MHz on the GPIO matrix) only with short wires.
+			 */
+			mipi-max-frequency = <DT_FREQ_M(10)>;
 			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+			/* The panel's own (portrait) size: the driver swaps
+			 * them for rotation 90, giving the UI 320x240.
+			 */
 			width = <240>;
 			height = <320>;
 			rotation = <90>;
+			/* This module is mirrored left-right in landscape
+			 * (seen on hardware in pi-zephyr-inet-radio); v-mirror
+			 * (MADCTL MY) flips the axis that rotation 90 puts
+			 * across the screen.
+			 */
+			v-mirror;
 			pixel-format = <PANEL_PIXEL_FORMAT_RGB_565X>;
 		};
 	};
