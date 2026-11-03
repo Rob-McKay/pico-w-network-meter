@@ -80,6 +80,7 @@ before printing:
 | `PICO_USB_LEFT` | Whether the Pico's USB socket is at the A/B end (left, looking at the display) or the X/Y end. This places the shelf's posts and wire slots | A/B end |
 | `PICO_X`, `PICO_Y` | Where the Pico sits on the Display Pack's back | 2.5, 7.0 mm |
 | `AMIGO_HOLES` | The charger's three mounting holes. Positions on the charger are measured looking at its top with the USB-C on the right: from its USB-C end, and from its bottom edge | (3.1, 2.4), (3.1, 20.8), (34.1, 20.6) mm |
+| `AMIGO_HOLE_D` | Its mounting holes' size. The cover's pins are 0.3 mm thinner | 2.1 mm (from a test print) |
 | `AMIGO_PWR`, `AMIGO_PWR_H` | Its PWR button, and the height of the button's top above the board | (8.6, 2.0) mm, 1.5 mm |
 | `AMIGO_LEDS` | Its CHG and ON LEDs | (14.6, 2.0), (12.3, 2.0) mm |
 | `AMIGO_USB_ACROSS` | The middle of its USB-C socket, from its bottom edge | 11.0 mm |
