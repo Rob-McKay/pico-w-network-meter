@@ -267,4 +267,8 @@ carries `SPDX-License-Identifier: Apache-2.0`.
 Third-party parts keep their own licences: Zephyr and its modules (Apache
 2.0), and the Infineon CYW43439 Wi-Fi firmware and CLM blob that the Docker
 image fetches with `west blobs` (Infineon's licence, in hal_infineon's
-`zephyr/blobs/license.txt`), which are built into the firmware image.
+`zephyr/blobs/license.txt`), which are built into the firmware image. Seeed's XIAO ESP32-C5
+schematic, KiCad project and pinout sheet in
+`hardware/xiao-esp32c5/vendor/` are © Seeed Studio, under CC BY-SA 4.0
+(the pinout sheet states no licence of its own); see that folder's
+README.
