@@ -831,7 +831,8 @@ free D9.
 
 | Qty | Part | Notes |
 |---|---|---|
-| 1 | Seeed Studio XIAO ESP32-C5 | 21 × 17.8 mm; comes with an FPC antenna for its U.FL socket ([Seeed][seeed-gs]). The schematic has no other antenna: the chip's 2.4 GHz and 5 GHz RF pins go through a diplexer (U7, LFD182G45) to the one U.FL socket, so **the antenna is required** |
+| 1 | Seeed Studio XIAO ESP32-C5 | 21 × 17.8 mm. Seeed lists an FPC antenna as included ([Seeed][seeed-gs]), but it isn't always in the box: check the packaging, or buy the antenna below |
+| 1 | **Antenna**: dual-band 2.4 GHz + 5 GHz (2.4–2.5 and 5.15–5.85 GHz), 50 Ω, **U.FL / IPEX-1 / MHF1** plug (not MHF4), lead about 50–150 mm | **Required**: the schematic has no other antenna; the chip's 2.4 GHz and 5 GHz RF pins go through a diplexer (U7, LFD182G45) to the one U.FL socket. Either a stick-on FPC antenna (fits inside the case; mount it flat, away from the TFT's frame and the battery) or Seeed's 2.4G/5G RP-SMA antenna set with a U.FL-to-RP-SMA bulkhead lead (outside the case, higher gain; antenna and bulkhead must both be RP-SMA or both SMA). A 2.4 GHz-only antenna would cripple the 5 GHz results |
 | 1 | 2.2" SPI TFT module, ILI9341, 240×320, 3.3 V supply | The module from pi-zephyr-inet-radio (section 3). Measure its LED pin's current |
 | 4 | Tactile push switches, 6×6 mm (or 12×12 with caps) | Press to make |
 | 1 | RGB LED, 5 mm, common anode (optional) | Or a 3.3 V-friendly SMD RGB on a carrier |
