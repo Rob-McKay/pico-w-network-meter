@@ -145,7 +145,9 @@ AMIGO_HOLE_D = 2.1
 AMIGO_USB_ACROSS = 11.0
 AMIGO_USB_H = 1.6
 ## Opening for a USB-C plug's moulding.
-AMIGO_USB_OPENING = (13.0, 7.5)
+AMIGO_USB_OPENING = (9.0, 3.5)
+## Its corners' radius.
+AMIGO_USB_OPENING_R = 1.5
 ## The PWR button (press to make), and the height of its top above the board:
 ## 2 mm more than first guessed, from a test print, which shortens the
 ## plunger by 2 mm.
@@ -312,19 +314,26 @@ def rounded_slab(inset, z0, z1, radius=CORNER_R):
     return Manifold.extrude(outline, z1 - z0).translate([0, 0, z0])
 
 
-## @brief Make an opening through an end wall, centred on a point.
+## @brief Make an opening with rounded corners through an end wall,
+#         centred on a point.
 #
 # @param left The left wall if true, the right one if false.
 # @param y Centre y.
 # @param z Centre z.
 # @param size Width (y) and height (z).
+# @param radius The corners' radius, at most half the smaller side.
 # @return The cutting solid: through the wall and a little inside it.
 #
 # @sideeffects None.
-def end_wall_opening(left, y, z, size):
+def end_wall_opening(left, y, z, size, radius):
     w, h = size
-    x0, x1 = (-1, WALL + 1) if left else (LENGTH - WALL - 1, LENGTH + 1)
-    return box(x0, y - w / 2, z - h / 2, x1, y + w / 2, z + h / 2)
+    r = min(radius, w / 2 - 0.01, h / 2 - 0.01)
+    x0 = -1 if left else LENGTH - WALL - 1
+    # Drawn in (u, v) = (-z, y), extruded along x by the rotation below.
+    outline = CrossSection.square([h - 2 * r, w - 2 * r])
+    outline = outline.translate([-z - h / 2 + r, y - w / 2 + r])
+    outline = outline.offset(r, circular_segments=SEGMENTS)
+    return Manifold.extrude(outline, WALL + 2).rotate([0, 90, 0]).translate([x0, 0, 0])
 
 
 ## @brief Find a point on the Pico, given from its USB end.
@@ -367,7 +376,8 @@ def amigo_point(along, across):
 # @sideeffects None.
 def usb_openings():
     _, y = amigo_point(0.0, AMIGO_USB_ACROSS)
-    return end_wall_opening(True, y, Z_AMIGO_TOP + AMIGO_USB_H, AMIGO_USB_OPENING)
+    return end_wall_opening(True, y, Z_AMIGO_TOP + AMIGO_USB_H, AMIGO_USB_OPENING,
+                            AMIGO_USB_OPENING_R)
 
 
 ## @brief Make a screw hole through a long wall, along y.
