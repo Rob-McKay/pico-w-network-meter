@@ -387,9 +387,9 @@ SPI panel; `zephyr,mipi-dbi-spi` is the right model here.
 card socket; pins VCC, GND, CS, RESET, DC/RS, SDI/MOSI, SCK, LED,
 SDO/MISO) vary by maker. Before wiring, check on yours:
 
-- **VCC**: most take 3.3–5 V through an on-board regulator. Power it from
-  the XIAO's 3V3 if it is a 3.3 V-only part, or from 5V/VBUS if it has a
-  regulator. Logic is 3.3 V either way.
+- **VCC**: the chosen module runs from 3.3 V, so it takes its supply from
+  the XIAO's 3V3 pad, the same rail as its 3.3 V logic. That works on USB
+  and on battery alike, and no level shifting or 5 V supply is needed.
 - **LED (backlight)**: either straight to the LEDs through a resistor
   (tens of mA) or through a transistor on the module. Measure it. A C5 pin
   sources 40 mA typical at full drive with the output still above 2.64 V,
@@ -760,8 +760,7 @@ and a `message(STATUS ...)`.
 
 | XIAO pad (GPIO) | To | Why this pin |
 |---|---|---|
-| 3V3 | TFT VCC (if 3.3 V-only), RGB LED common anode | |
-| 5V (VBUS) | TFT VCC (if it has a regulator; only when on USB, so see power) | |
+| 3V3 | TFT VCC, RGB LED common anode, CS pull-up | |
 | GND | TFT GND, all button commons, LED switch | |
 | D8 (8) | TFT SCK | board's SPI2 SCK |
 | D10 (10) | TFT SDI (MOSI) | board's SPI2 MOSI |
@@ -788,7 +787,7 @@ free D9.
 | Qty | Part | Notes |
 |---|---|---|
 | 1 | Seeed Studio XIAO ESP32-C5 | 21 × 17.8 mm; "External RF antenna included", on a U.FL socket ([Seeed][seeed-gs]). Seeed's pin map lists no other antenna, so treat the U.FL antenna as required |
-| 1 | 2.2" SPI TFT module, ILI9341, 240×320 | Check VCC range and LED wiring (section 3) |
+| 1 | 2.2" SPI TFT module, ILI9341, 240×320, 3.3 V supply | Check the LED (backlight) wiring (section 3) |
 | 4 | Tactile push switches, 6×6 mm (or 12×12 with caps) | Press to make |
 | 1 | RGB LED, 5 mm, common anode (optional) | Or a 3.3 V-friendly SMD RGB on a carrier |
 | 3 | Resistors for the LED: 330 Ω (red), 680 Ω (green, blue) | Dimmed further in software (2%) |
@@ -830,11 +829,12 @@ so the average is lower: estimate 100–150 mA. A 500 mAh cell would last
 about 3–5 hours. The supply must also handle ~400 mA transmit peaks.
 Measure on hardware.
 
-**5 V for the TFT**: the XIAO's 5V pad is VBUS. On battery it carries
-nothing (or the battery through a diode, depending on the board: check the
-schematic), so a module that needs its regulator's input above 3.3 V would
-go dark on battery. Prefer a module that runs from 3.3 V (most have a
-jumper, often J1, to bypass the regulator for 3.3 V).
+**3V3 rail**: everything external (the TFT and its backlight, the RGB LED,
+the pull-ups) runs from the XIAO's 3V3 pad, so it all keeps working on
+battery. That rail also feeds the C5, so it carries the whole budget above:
+about 150–200 mA while scanning, with ~400 mA transmit peaks. Seeed's page
+doesn't give the 3V3 regulator's rating; check it in the schematic before
+adding anything else to the rail.
 
 **Antenna**: the 5 GHz band is lossier through cases and hands. Mount the
 FPC antenna flat against the inside of the case's back or top, away from
@@ -876,7 +876,7 @@ the same script (`--layout xiao`) rather than a fork.
 | 4 | Scan duration and the 15 s timeout / watchdog | Truncated scans, watchdog restarts | Log scan durations; tune `dwell_time_passive` |
 | 5 | GCC in a clang-only project; clang-tidy on RISC-V | Rule change; work in `clang-tidy-cross.py` | Decide the rule first; fix the script in step 1 |
 | 6 | `__noinit` reset note survives ESP32 resets? Datasheet: all resets but Chip Reset keep internal memory; the ROM loader could still overwrite it | Events screen misreports restarts | Test SW reset, watchdog, panic, power cut; if lost, `retainedmem0` + retention API |
-| 7 | 2.2" module variants (VCC, LED wiring, BGR, mirroring) | Dark, mirrored or colour-swapped panel | Measure; `rotation`, `h-mirror`, `red-blue-swap`, `display-inversion` |
+| 7 | 2.2" module variants (LED wiring, BGR, mirroring) | Dark, mirrored or colour-swapped panel | Measure; `rotation`, `h-mirror`, `red-blue-swap`, `display-inversion` |
 | 8 | SPI over the GPIO matrix at 20+ MHz | Garbled picture at higher clocks | Start at 20 MHz; try 26/40 |
 | 9 | USB Serial/JTAG console with no host: blocking or dropping? | Start-up hangs on a charger (the Pico problem) | Boot from a USB charger and a battery; watch the display |
 | 10 | Wi-Fi blob licence and size | Binary libraries in the firmware | As now with Infineon's: document in README's licence section ([esp32-wifi-lib][esp-wifi-lib]) |
