@@ -1070,7 +1070,7 @@ noted):
 
 Espressif:
 
-- [ESP32-C5 Series Datasheet][esp-ds], pre-release v0.5 (2025-05-19): §2.3.4 GPIO restrictions, chapter 3 Boot Configurations (Tables 3-1 to 3-8), §4.1.2.1 internal memory, §4.1.3.2 reset, §4.1.3.9 watchdogs, §4.2.1.2 SPI controller, §4.2.1.7 LED PWM, Table 5-4 DC characteristics, Tables 5-7, 5-8, 5-11 current consumption, Appendix A Table 7-1 pin overview
+- [ESP32-C5 Series Datasheet][esp-ds], pre-release v0.5 (2025-05-19; not copied into this repository, see [`hardware/xiao-esp32c5/vendor/`](../hardware/xiao-esp32c5/vendor/README.md) for why and the copy's checksum): §2.3.4 GPIO restrictions, chapter 3 Boot Configurations (Tables 3-1 to 3-8), §4.1.2.1 internal memory, §4.1.3.2 reset, §4.1.3.9 watchdogs, §4.2.1.2 SPI controller, §4.2.1.7 LED PWM, Table 5-4 DC characteristics, Tables 5-7, 5-8, 5-11 current consumption, Appendix A Table 7-1 pin overview
 - hal_espressif (`b16851b`, the pin's revision): `components/esp_wifi/include/esp_wifi.h` (`esp_wifi_scan_start()` defaults, `esp_wifi_set_band_mode()`), `esp_wifi_types_generic.h` (`wifi_scan_config_t`, `wifi_scan_channel_bitmap_t`, `wifi_ap_record_t`), `components/soc/esp32c5/register/soc/io_mux_reg.h` (SPI2 IO_MUX pins), `zephyr/module.yml` (blobs)
 - [ESP-IDF Wi-Fi driver guide, ESP32-C5][esp-wifi-guide] (band modes, country policy, DFS, scan dwell times); source in [esp-idf `docs/en/api-guides/wifi-driver/`][esp-idf-docs-src] (`0e6b480`)
 - [ESP-IDF GPIO reference, ESP32-C5][esp-gpio] (GPIO13/14 USB-JTAG, GPIO16–22 flash/PSRAM)
@@ -1085,7 +1085,7 @@ Seeed:
 - [XIAO ESP32-C5 getting started][seeed-gs] (pin map, LEDs, battery, charger, schematic link); [its source][seeed-gs-src]
 - Seeed wiki source pages *XIAO ESP32C5 With Zephyr* and *XIAO ESP32C5 WiFi Usage* (flashing with BOOT held; dual-band scan example)
 - [CNX Software: XIAO ESP32-C5 announcement][cnx] (battery pads)
-- Seeed Studio XIAO ESP32-C5 schematic and KiCad project, **V1.1 (2025-12-25)**, CC BY-SA 4.0 ([schematic PDF][seeed-sch], [KiCad project][seeed-kicad], both linked from the getting-started page): sheet 02 block diagram, sheet 03 power (charger, power mux, buck, load switches, battery divider, header), sheet 04 main (chip, flash, crystal, LEDs, buttons, RF diplexer, U.FL); the PCB file for footprint positions
+- Seeed Studio XIAO ESP32-C5 schematic and KiCad project, **V1.1 (2025-12-25)**, CC BY-SA 4.0 ([schematic PDF][seeed-sch], [KiCad project][seeed-kicad], both linked from the getting-started page; copies in [`hardware/xiao-esp32c5/vendor/`](../hardware/xiao-esp32c5/vendor/README.md)): sheet 02 block diagram, sheet 03 power (charger, power mux, buck, load switches, battery divider, header), sheet 04 main (chip, flash, crystal, LEDs, buttons, RF diplexer, U.FL); the PCB file for footprint positions
 - [XIAO ESP32-C5 pinout sheet][seeed-pinout] (`XIAO_ESP32C5_Pinout.xlsx`). Its last column swaps D8 and D9; its own XIAO-function column and the schematic agree with Zephyr (D8 = GPIO8 SCK, D9 = GPIO9 MISO)
 
 [z-board]: https://github.com/zephyrproject-rtos/zephyr/tree/v4.5.0/boards/seeed/xiao_esp32c5
