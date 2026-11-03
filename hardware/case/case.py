@@ -135,17 +135,22 @@ AMIGO_PCB = 1.0
 ## Its tallest parts (the JST sockets) above its top.
 AMIGO_PARTS_H = 6.0
 ## Mounting holes: two at the USB-C end, one at the far corner (the DEVICE
-## socket takes the fourth corner).
-AMIGO_HOLES = [(3.1, 2.4), (3.1, 20.8), (34.1, 20.6)]
-AMIGO_HOLE_D = 2.6
+## socket takes the fourth corner). The far one is 0.5 mm nearer the USB-C
+## end than the photo gave, from a test print.
+AMIGO_HOLES = [(3.1, 2.4), (3.1, 20.8), (33.6, 20.6)]
+## The holes' size; the pins into them are 0.3 mm thinner. 2.6 mm (from the
+## photo) gave pins about 0.5 mm too wide on a print.
+AMIGO_HOLE_D = 2.1
 ## USB-C socket: its centre across the board, and above it.
 AMIGO_USB_ACROSS = 11.0
 AMIGO_USB_H = 1.6
 ## Opening for a USB-C plug's moulding.
 AMIGO_USB_OPENING = (13.0, 7.5)
-## The PWR button (press to make), and the height of its top above the board.
+## The PWR button (press to make), and the height of its top above the board:
+## 2 mm more than first guessed, from a test print, which shortens the
+## plunger by 2 mm.
 AMIGO_PWR = (8.6, 2.0)
-AMIGO_PWR_H = 1.5
+AMIGO_PWR_H = 3.5
 ## The CHG and ON LEDs beside it, seen through holes in the back cover.
 AMIGO_LEDS = [(14.6, 2.0), (12.3, 2.0)]
 ## Room past its far end for the BAT and DEVICE plugs and their leads.
@@ -338,8 +343,9 @@ def pico_point(along, across):
 #         across from its bottom edge (looking at its top, USB-C on the
 #         right).
 #
-# It hangs top towards the back cover, USB-C at the left wall: seen from
-# the back, it looks as it does from its top, so "across" runs up the case.
+# It hangs top towards the back cover, USB-C at the left wall. Checked
+# against a printed cover: its bottom edge (the PWR button and LEDs) is at
+# the top of the case, so "across" runs down the case.
 #
 # @param along Distance from its USB-C end.
 # @param across Distance from its bottom edge.
@@ -347,7 +353,7 @@ def pico_point(along, across):
 #
 # @sideeffects None.
 def amigo_point(along, across):
-    return AMIGO_X + along, AMIGO_Y + across
+    return AMIGO_X + along, AMIGO_Y + AMIGO_W - across
 
 
 ## @brief Cut the charger's USB-C opening, in the left wall.
@@ -637,7 +643,7 @@ def bolts_and_nuts():
 #
 # @sideeffects None.
 def charger():
-    x0, y0 = amigo_point(0.0, 0.0)
+    x0, y0 = AMIGO_X, AMIGO_Y
     z_board = Z_AMIGO_TOP - AMIGO_PCB
     board = box(x0, y0, z_board, x0 + AMIGO_L, y0 + AMIGO_W, Z_AMIGO_TOP)
     parts = box(x0, y0, Z_AMIGO_TOP, x0 + AMIGO_L, y0 + AMIGO_W, Z_AMIGO_TOP + AMIGO_PARTS_H)
