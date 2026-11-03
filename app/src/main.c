@@ -3,10 +3,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Pico W network meter: scans the 2.4 GHz Wi-Fi band every
+ * Network meter: scans the 2.4 GHz Wi-Fi band every
  * CONFIG_METER_SCAN_INTERVAL_S seconds (scan_task.c) and shows per-channel
- * statistics on a Pimoroni Pico Display Pack 2.0, and on the serial
- * console.
+ * statistics on the display (zephyr,display: on the Pico W, a Pimoroni Pico
+ * Display Pack 2.0), and on the serial console.
  *
  * Networks stay on screen after they were last heard: at full brightness
  * for CONFIG_METER_FADE_START_S seconds, then fading to

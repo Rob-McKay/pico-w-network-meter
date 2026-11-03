@@ -54,7 +54,7 @@ void reset_note_alive(int64_t uptime_ms);
  * @param arg See struct boot_record.
  *
  * @sideeffects Rewrites the note in RAM, logs why and flushes the log, stops the hardware
- *              watchdog (watchdog_stop()), and restarts the Pico (sys_reboot()); does not
+ *              watchdog (watchdog_stop()), and restarts the meter (sys_reboot()); does not
  *              return. errno unchanged.
  */
 FUNC_NORETURN void reset_note_restart(enum boot_cause cause, int32_t detail, uint32_t arg);

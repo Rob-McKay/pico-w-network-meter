@@ -28,7 +28,8 @@ LOG_MODULE_REGISTER(gfx, CONFIG_METER_LOG_LEVEL);
 #define DISPLAY_NODE DT_CHOSEN(zephyr_display)
 
 /* text_raster.c draws RGB565 high byte first, as the panel takes it over
- * SPI; the ST7789V driver cannot change format at run time.
+ * SPI; the display driver may not be able to change format at run time (the
+ * ST7789V's cannot).
  */
 BUILD_ASSERT(DT_PROP(DISPLAY_NODE, pixel_format) == PANEL_PIXEL_FORMAT_RGB_565X,
 	     "zephyr,display: set pixel-format = <PANEL_PIXEL_FORMAT_RGB_565X>");
