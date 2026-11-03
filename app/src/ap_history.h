@@ -29,8 +29,9 @@ struct ap_history {
 
 /** How long access points stay shown. */
 struct ap_fade {
-	int64_t start_ms; /**< age at which an access point starts to fade */
-	int64_t end_ms;   /**< age at which it has faded out and is forgotten */
+	int64_t start_ms;  /**< age at which an access point starts to fade */
+	int64_t end_ms;    /**< age at which it has faded out and is forgotten */
+	uint8_t min_level; /**< freshness it fades to, still visible, before it goes */
 };
 
 /**
@@ -73,9 +74,10 @@ void ap_history_expire(struct ap_history *h, int64_t now_ms, const struct ap_fad
  *
  * @param age_ms Time since it was last heard.
  * @param fade Fade timing.
- * @return CHAN_FRESH up to fade->start_ms, falling in a straight line to 0
- *         at fade->end_ms (straight from CHAN_FRESH to 0 if end_ms is not
- *         after start_ms).
+ * @return CHAN_FRESH up to fade->start_ms, falling in a straight line
+ *         towards fade->min_level at fade->end_ms, then 0 (gone) from
+ *         end_ms on; straight from CHAN_FRESH to 0 if end_ms is not after
+ *         start_ms.
  *
  * @sideeffects None; errno unchanged.
  */

@@ -459,7 +459,9 @@ ZTEST(meter_chan, test_ap_name)
 	ap.bssid[4] = 0xcd;
 	zassert_true(chan_ap_hidden(&ap));
 	chan_ap_name(&ap, name, sizeof(name));
-	zassert_str_equal(name, "hidden 12:cd:ab");
+	zassert_str_equal(name, "hidden 02:00:00:12:cd:ab", "the whole MAC address");
+	chan_ap_name(&ap, name, 25);
+	zassert_str_equal(name, "hidden 02:00:00:12:cd:ab", "fits the networks screen's 24");
 
 	chan_ap_name(&ap, name, 7);
 	zassert_str_equal(name, "hidden", "cut to fit, terminated");
@@ -558,7 +560,8 @@ ZTEST(meter_history, test_empty_scan_keeps_data)
 }
 
 /**
- * @brief Networks fade from 15 s and are gone at 30 s; hearing one again restores it.
+ * @brief Networks fade from 15 s and are gone at 30 s (the test's own times); hearing one
+ *        again restores it.
  *
  * @sideeffects Overwrites the test's own static history and scans. errno may be set by
  *              snprintf() (only on an output error).
@@ -635,6 +638,26 @@ ZTEST(meter_history, test_counts)
 	ap_history_snapshot(&h, 0, &fade, &snap);
 	zassert_equal(snap.ignored, 3);
 	zassert_equal(snap.dropped, 1);
+}
+
+/**
+ * @brief With a minimum, a network fades only to it, stays visible until the
+ *        end of the fade, then goes.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_history, test_freshness_floor)
+{
+	static const struct ap_fade floor = {.start_ms = 60000, .end_ms = 120000, .min_level = 102};
+
+	zassert_equal(ap_history_freshness(60000, &floor), CHAN_FRESH);
+	zassert_equal(ap_history_freshness(90000, &floor), 102 + ((255 - 102) / 2), "half way");
+	zassert_equal(ap_history_freshness(119999, &floor), 102, "still visible at the end");
+	zassert_equal(ap_history_freshness(120000, &floor), 0, "then gone");
+
+	static const struct ap_fade too_high = {.start_ms = 0, .end_ms = 10, .min_level = 255};
+
+	zassert_equal(ap_history_freshness(5, &too_high), CHAN_FRESH, "never above CHAN_FRESH");
 }
 
 ZTEST_SUITE(meter_history, NULL, NULL, NULL, NULL, NULL);

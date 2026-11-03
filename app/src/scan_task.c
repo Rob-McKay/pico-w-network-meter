@@ -33,6 +33,7 @@ BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 static const struct ap_fade fade = {
 	.start_ms = (int64_t)CONFIG_METER_FADE_START_S * MSEC_PER_SEC,
 	.end_ms = (int64_t)CONFIG_METER_FADE_END_S * MSEC_PER_SEC,
+	.min_level = (uint8_t)((CONFIG_METER_FADE_MIN_PERCENT * CHAN_FRESH) / 100),
 };
 
 /* Zephyr's definition macros can end in an empty statement: ISO C -Wpedantic

@@ -61,8 +61,10 @@ The strongest networks, one per row:
 
 - **Name.** Shown in amber if the network is open (no password), white
   if it is secured. A hidden network, which doesn't broadcast its name, is
-  shown in grey as "hidden" and the last three bytes of its MAC address
-  (BSSID), such as `hidden a2:7f:06`, which tell its access points apart.
+  shown in grey as "hidden" and its MAC address (BSSID), such as
+  `hidden 02:1f:3c:a2:7f:06`, which tells its access points apart. The
+  first three bytes identify the maker: look them up in the IEEE's
+  register of MAC prefixes (OUI).
   Names up to 24 characters, such as `JurassicFibre_UID35630`, are shown
   whole; longer ones are shortened in the middle with `..`, keeping the
   start and the end, which often tells similar names apart.
@@ -122,10 +124,11 @@ harm.
 A network stays on screen after it was last heard, so one scan that misses
 it doesn't make it vanish:
 
-- For **15 seconds** after it was last heard it is shown at full
-  brightness.
-- It then **fades**, and has faded to **black at 30 seconds**, when it is
-  removed.
+- For **60 seconds** after it was last heard it is shown at full
+  brightness. Weak and hidden networks are often missed by a scan or two,
+  so this keeps them on screen.
+- It then **fades**, down to 40% brightness so it stays readable, and at
+  **2 minutes** it is removed.
 - If it is heard again, it is back at full brightness straight away.
 
 So dim bars and rows are old data. If the whole screen fades, the meter has
@@ -174,6 +177,7 @@ Change these when building the firmware: `make pico` with
 | `WIFI_COUNTRY` | `UNITED_KINGDOM` | Which channels may be scanned (the US stops at 11) |
 | `CONFIG_METER_SCAN_INTERVAL_S` | 10 | Seconds between scans |
 | `CONFIG_METER_RECOVER_AFTER` | 5 | Failed scans in a row before the meter restarts itself (0: never) |
-| `CONFIG_METER_FADE_START_S` | 15 | Seconds at full brightness |
-| `CONFIG_METER_FADE_END_S` | 30 | Seconds until faded out |
+| `CONFIG_METER_FADE_START_S` | 60 | Seconds at full brightness |
+| `CONFIG_METER_FADE_END_S` | 120 | Seconds until a network is removed |
+| `CONFIG_METER_FADE_MIN_PERCENT` | 40 | Brightness a network fades to before it is removed (0: fade to black) |
 | `CONFIG_METER_LED_BRIGHTNESS` | 2 | LED brightness, percent (1 is the dimmest) |

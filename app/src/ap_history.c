@@ -6,6 +6,8 @@
 
 #include <string.h>
 
+#include <zephyr/sys/util.h>
+
 #include "ap_history.h"
 
 /*
@@ -109,7 +111,8 @@ void ap_history_expire(struct ap_history *h, int64_t now_ms, const struct ap_fad
  * Public interface: documented in ap_history.h.
  *
  * The products fit easily in int64_t. The end <= start case is caught by the second test, so
- * the division never divides by zero.
+ * the division never divides by zero. The result is min_level plus a share of the rest, so it
+ * never falls below min_level before end_ms, and never exceeds CHAN_FRESH.
  */
 uint8_t ap_history_freshness(int64_t age_ms, const struct ap_fade *fade)
 {
@@ -120,7 +123,11 @@ uint8_t ap_history_freshness(int64_t age_ms, const struct ap_fade *fade)
 		return 0; /* also when end_ms <= start_ms: no fade, so no division by 0 */
 	}
 
-	return (uint8_t)(((fade->end_ms - age_ms) * CHAN_FRESH) / (fade->end_ms - fade->start_ms));
+	int64_t min = MIN(fade->min_level, CHAN_FRESH);
+	int64_t share =
+		((fade->end_ms - age_ms) * (CHAN_FRESH - min)) / (fade->end_ms - fade->start_ms);
+
+	return (uint8_t)(min + share);
 }
 
 /*
