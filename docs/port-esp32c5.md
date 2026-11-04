@@ -719,13 +719,17 @@ ENV ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-${ZEPHYR_SDK_VERSION}
 RUN west packages pip --install \
     && pip install --no-cache-dir -r modules/hal/espressif/zephyr/requirements.txt
 
-# The ESP32-C5's Wi-Fi, PHY and coexistence libraries.
-RUN west blobs fetch hal_espressif --auto-accept --allow-regex '.*/lib/esp32c5/lib(core|net80211|pp|phy|coexist|mesh|espnow)\.a$'
+# Espressif's binary libraries: all of hal_espressif's (see below).
+RUN west blobs fetch hal_espressif --auto-accept
 ```
 
 (The arm64 SDK asset is `linux-aarch64`, so `$(uname -m)` covers both
-image architectures. Check whether the Wi-Fi driver links `libmesh` and
-`libespnow` without mesh enabled before trimming the list further.)
+image architectures.) **Corrected in step 5 of the plan**: this study first
+fetched only the C5's Wi-Fi libraries, but its builds used
+`CONFIG_BUILD_ONLY_NO_BLOBS`. A real build fails without the others:
+`drivers/wifi/CMakeLists.txt` calls `zephyr_blobs_verify(MODULE
+hal_espressif REQUIRED)`, which checks all 73 of the module's blobs, for
+every ESP chip (41 MB).
 
 Cost: the riscv64 toolchain is a 152 MB download and 1.1 GB unpacked (all
 its multilibs), hal_espressif 173 MB, mbedtls + tf-psa-crypto 37 MB. The

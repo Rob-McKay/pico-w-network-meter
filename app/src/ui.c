@@ -643,7 +643,7 @@ static void networks_footer(const struct chan_stats *s, size_t first, char *buf,
 		(void)snprintf(buf, size, "%u heard, %u other", (unsigned int)s->ap_count, other);
 		return;
 	}
-	(void)snprintf(buf, size, "%u-%u of %u, %u other", (unsigned int)(first + 1U),
+	(void)snprintf(buf, size, "%u-%u of %u, %u other", (unsigned int)first + 1U,
 		       (unsigned int)MIN(first + rows, s->ap_count), (unsigned int)s->ap_count,
 		       other);
 }
@@ -838,7 +838,7 @@ static void show_events_screen(unsigned int scan_no, size_t first)
 	if (events_count <= rows) {
 		(void)snprintf(text, sizeof(text), "%u starts logged", (unsigned int)events_count);
 	} else {
-		(void)snprintf(text, sizeof(text), "%u-%u of %u starts", (unsigned int)(first + 1U),
+		(void)snprintf(text, sizeof(text), "%u-%u of %u starts", (unsigned int)first + 1U,
 			       (unsigned int)MIN(first + rows, events_count),
 			       (unsigned int)events_count);
 	}

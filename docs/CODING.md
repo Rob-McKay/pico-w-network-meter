@@ -34,7 +34,18 @@ Every target with our code calls `meter_strict_warnings()` from
 
 Zephyr's headers are included as system headers, so only this
 repository's code is checked. `scripts/clang-tidy-cross.py` gives
-clang-tidy the C library headers of the ATfE cross compile.
+clang-tidy the C library headers of the cross compile.
+
+The compiler is clang (`cmake/toolchain.cmake`): Arm Toolchain for
+Embedded for the Pico W, the host's clang for the native_sim tests. The
+one exception is the XIAO ESP32-C5, built with the Zephyr SDK's GCC,
+because Espressif's SoC support doesn't build with clang (its CMake adds
+GCC-only flags and its assembly uses GCC syntax; see
+[port-esp32c5.md](port-esp32c5.md), section 6). The same rules apply there:
+GCC's warnings with `-Werror`, and clang-tidy, which the wrapper gives the
+target, C library headers and the `-Wno-gnu` that Zephyr gives clang
+builds. Shared code that only GCC accepts is a bug: it must build with
+both compilers.
 
 When a finding is a deliberate choice, suppress that one line with a
 reason, never the whole check. The `#pragma GCC diagnostic` blocks around

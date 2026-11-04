@@ -1,0 +1,31 @@
+diff --git a/drivers/wifi/esp32/src/esp_wifi_drv.c b/drivers/wifi/esp32/src/esp_wifi_drv.c
+index ee7e80b94..708816506 100644
+--- a/drivers/wifi/esp32/src/esp_wifi_drv.c
++++ b/drivers/wifi/esp32/src/esp_wifi_drv.c
+@@ -1823,9 +1823,26 @@ static int esp32_wifi_scan(const struct device *dev __unused,
+ 
+ 	wifi_scan_config_t scan_config = { 0 };
+ 
++	/* Report hidden networks too, as other Zephyr Wi-Fi drivers do. */
++	scan_config.show_hidden = true;
++
+ 	if (params) {
+ 		/* The enum values are same, so, no conversion needed */
+ 		scan_config.scan_type = params->scan_type;
++		/* 0 keeps the library's default (120 ms active, 360 ms passive). */
++		scan_config.scan_time.active.max = params->dwell_time_active;
++		scan_config.scan_time.passive = params->dwell_time_passive;
++#if defined(CONFIG_SOC_ESP32_WIFI_SUPPORT_5G)
++		/* Bit 0 of a band's bitmap skips the band; 0 scans all its channels. */
++		if (params->bands != 0U) {
++			if ((params->bands & BIT(WIFI_FREQ_BAND_2_4_GHZ)) == 0U) {
++				scan_config.channel_bitmap.ghz_2_channels = BIT(0);
++			}
++			if ((params->bands & BIT(WIFI_FREQ_BAND_5_GHZ)) == 0U) {
++				scan_config.channel_bitmap.ghz_5_channels = BIT(0);
++			}
++		}
++#endif
+ 	}
+ 
+ #if defined(CONFIG_ESP32_WIFI_AP_STA_MODE)

@@ -99,6 +99,21 @@ restarted itself, how long it had been running before:
 | **scan hung / main hung after …** | red | A part of the meter stopped responding, and the watchdog restarted it |
 | **restart after …** | red | Restarted with no reason recorded: the reset button, a debugger, or the hardware watchdog |
 
+On the XIAO ESP32-C5, which records the chip's own reset cause, a restart
+with no reason recorded says what the chip saw instead, where it tells
+more than "restart":
+
+| Event | Colour | Meaning |
+|---|---|---|
+| **brown-out** | white | The supply dropped too low (a flat battery or a weak USB supply), then came back: shown in place of "power on" |
+| **HW watchdog after …** | red | The chip's hardware watchdog restarted it: the whole system stopped, not just one part of the meter |
+| **CPU fault after …** | red | The processor faulted in a way the meter couldn't record as a crash |
+| **reset button after …** | red | The chip's reset pin. The XIAO's own reset button resets the whole chip, which it reports as a power-on instead |
+
+On the console's full listing (below), such a start ends with `hw` and the
+cause's number: 1 power-on, 2 reset pin, 3 software, 4 watchdog,
+5 brown-out, 6 CPU fault, 7 wake-up, 8 other.
+
 The log is kept in flash, so it survives power cuts and firmware updates.
 The screen shows the newest 64 (9 to a page: **Y** next page, **X**
 previous). The serial console prints the newest 10 when the meter starts.
