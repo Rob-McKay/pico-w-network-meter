@@ -40,10 +40,9 @@ if [[ ! $country =~ ^[A-Z_]+$ ]]; then
 fi
 
 build_dir="$here/build/$target"
-# The console goes to the Pico's USB port (app/usb-console.*) rather than
-# UART0.
+# The board's own settings, the USB console among them, come from
+# app/boards/<board>.conf and .overlay, which Zephyr adds by board name.
 west build -p auto -b "$board" -d "$build_dir" "$here/app" -- \
-  -DEXTRA_CONF_FILE=usb-console.conf -DEXTRA_DTC_OVERLAY_FILE=usb-console.overlay \
   "-DCONFIG_WHD_WIFI_COUNTRY=\"WHD_COUNTRY_${country}\"" "$@"
 
 mkdir -p "$here/out/$target"

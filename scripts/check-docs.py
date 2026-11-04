@@ -289,8 +289,9 @@ def header_declarations(path):
 def check_sources(root):
     dirs = [os.path.join(root, "app", "src")] + \
         [os.path.join(root, "tests", t, "src") for t in os.listdir(os.path.join(root, "tests"))]
-    files = sorted(os.path.join(d, n) for d in dirs if os.path.isdir(d)
-                   for n in os.listdir(d) if n.endswith((".c", ".h")))
+    files = sorted(os.path.join(top, n) for d in dirs if os.path.isdir(d)
+                   for top, _, names in os.walk(d)
+                   for n in names if n.endswith((".c", ".h")))
     decls = {}
     for f in files:
         if f.endswith(".h"):

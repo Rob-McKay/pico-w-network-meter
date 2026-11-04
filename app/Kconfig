@@ -97,6 +97,9 @@ config METER_SCAN_PRIORITY
 	int "Scan thread priority"
 	default 5
 
+# Options that only one target has (src/target/<target>/Kconfig).
+rsource "src/target/*/Kconfig"
+
 module = METER
 module-str = Network meter
 source "subsys/logging/Kconfig.template.log_config"
