@@ -611,7 +611,7 @@
 <text x="220" y="926" font-size="12.5">9 SDO / MISO (21): not connected</text>
 <text x="530" y="926" font-size="12.5"></text>
 <text x="24" y="962" font-size="11.5" fill="#333">Assumed: the XIAO's pins in rows c and g (any two rows 6 apart work: use a free hole in the same column and half);</text>
-<text x="24" y="980" font-size="11.5" fill="#333">the TFT's header in row a, pin 1 in column 29, and the usual 2.2" module pin order. Check your module's labels.</text>
+<text x="24" y="980" font-size="11.5" fill="#333">the TFT's header in row a, with pin 1 (VCC) in column 29 and pin 9 (SDO) in column 21.</text>
 <text x="24" y="998" font-size="11.5" fill="#333">The TFT runs on 3V3 only: leave the XIAO's 5V pad unconnected. Fit an antenna on the U.FL socket before scanning.</text>
 <text x="24" y="1016" font-size="11.5" fill="#333">LED straight from D9 works if the module switches its backlight (a few mA); otherwise use a transistor (BOM).</text>
 </svg>
