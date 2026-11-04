@@ -30,5 +30,6 @@ target_sources(app PRIVATE
   src/status_led.c
 )
 
-# Flow control for the console on the USB port (scripts/build.sh).
-target_sources_ifdef(CONFIG_USBD_CDC_ACM_CLASS app PRIVATE src/usb_console.c)
+# Target-only code: src/target/<target>/, each file under its own option.
+# The Pico's: flow control for the console on its USB port.
+target_sources_ifdef(CONFIG_METER_USB_CONSOLE_FLOW app PRIVATE src/target/pico/usb_console.c)

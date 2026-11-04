@@ -13,7 +13,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 zephyr=${ZEPHYR_BASE:-/workdir/zephyr}
-mapfile -t files < <(cd "$here" && ls app/src/*.[ch] tests/*/src/*.[ch])
+mapfile -t files < <(cd "$here" && find app/src tests/*/src -name '*.[ch]' | sort)
 status=0
 
 cd "$here"
