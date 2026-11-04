@@ -49,8 +49,8 @@ is in columns 1–7, its USB-C at the column 1 end, with its 5V…D7 pins in
 row g and its D0…D6 pins in row c. The TFT's header is in row f, pin 1
 (VCC) in column 29 and pin 9 (SDO) in column 21, and the module lies over
 rows a–f and off the bottom edge. Its pins join rows f–j of their columns,
-so its wires go into rows g–j. The 10 kΩ pull-up sits between the CS and
-VCC columns (27 and 29, row j). The buttons, dashed, go in later: each
+so its wires go into row j, above the module. The 10 kΩ pull-up sits
+between the CS and VCC columns (27 and 29, row i). The buttons, dashed, go in later: each
 from its pad's column (row a) to the bottom − rail, with the − rails joined
 to the XIAO's GND. The module's pins are 1 VCC, 2 GND, 3 CS, 4 RESET, 5 DC,
 6 SDI, 7 SCK, 8 LED, 9 SDO (checked on the module).

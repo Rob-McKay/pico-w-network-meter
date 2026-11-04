@@ -520,44 +520,44 @@
 <text x="274" y="319" font-size="9.5" fill="#fff" text-anchor="middle">D7</text>
 <circle cx="274" cy="441" r="5" fill="#d8b23a" stroke="#6b5410"/>
 <text x="274" y="427" font-size="9.5" fill="#fff" text-anchor="middle">D6</text>
-<path d="M178,273 C178,203 802,179 802,249" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M178,273 C178,203 802,179 802,249" fill="none" stroke="#e02020" stroke-width="4" stroke-linecap="round"/>
+<path d="M178,273 C178,203 802,155 802,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M178,273 C178,203 802,155 802,225" fill="none" stroke="#e02020" stroke-width="4" stroke-linecap="round"/>
 <circle cx="178" cy="273" r="3.5" fill="#e02020" stroke="#222"/>
-<circle cx="802" cy="249" r="3.5" fill="#e02020" stroke="#222"/>
-<path d="M154,273 C154,178 778,178 778,273" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M154,273 C154,178 778,178 778,273" fill="none" stroke="#202020" stroke-width="4" stroke-linecap="round"/>
+<circle cx="802" cy="225" r="3.5" fill="#e02020" stroke="#222"/>
+<path d="M154,273 C154,178 778,130 778,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M154,273 C154,178 778,130 778,225" fill="none" stroke="#202020" stroke-width="4" stroke-linecap="round"/>
 <circle cx="154" cy="273" r="3.5" fill="#202020" stroke="#222"/>
-<circle cx="778" cy="273" r="3.5" fill="#202020" stroke="#222"/>
-<path d="M202,273 C202,213 682,213 682,273" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M202,273 C202,213 682,213 682,273" fill="none" stroke="#1f6fe0" stroke-width="4" stroke-linecap="round"/>
+<circle cx="778" cy="225" r="3.5" fill="#202020" stroke="#222"/>
+<path d="M202,273 C202,213 682,165 682,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M202,273 C202,213 682,165 682,225" fill="none" stroke="#1f6fe0" stroke-width="4" stroke-linecap="round"/>
 <circle cx="202" cy="273" r="3.5" fill="#1f6fe0" stroke="#222"/>
-<circle cx="682" cy="273" r="3.5" fill="#1f6fe0" stroke="#222"/>
-<path d="M226,273 C226,233 634,233 634,273" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M226,273 C226,233 634,233 634,273" fill="none" stroke="#9a9a9a" stroke-width="4" stroke-linecap="round"/>
+<circle cx="682" cy="225" r="3.5" fill="#1f6fe0" stroke="#222"/>
+<path d="M226,273 C226,233 634,185 634,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M226,273 C226,233 634,185 634,225" fill="none" stroke="#9a9a9a" stroke-width="4" stroke-linecap="round"/>
 <circle cx="226" cy="273" r="3.5" fill="#9a9a9a" stroke="#222"/>
-<circle cx="634" cy="273" r="3.5" fill="#9a9a9a" stroke="#222"/>
-<path d="M250,273 C250,223 658,199 658,249" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M250,273 C250,223 658,199 658,249" fill="none" stroke="#f0c000" stroke-width="4" stroke-linecap="round"/>
+<circle cx="634" cy="225" r="3.5" fill="#9a9a9a" stroke="#222"/>
+<path d="M250,273 C250,223 658,175 658,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M250,273 C250,223 658,175 658,225" fill="none" stroke="#f0c000" stroke-width="4" stroke-linecap="round"/>
 <circle cx="250" cy="273" r="3.5" fill="#f0c000" stroke="#222"/>
-<circle cx="658" cy="249" r="3.5" fill="#f0c000" stroke="#222"/>
-<path d="M178,465 C178,205 706,-11 706,249" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M178,465 C178,205 706,-11 706,249" fill="none" stroke="#ff8c00" stroke-width="4" stroke-linecap="round"/>
+<circle cx="658" cy="225" r="3.5" fill="#f0c000" stroke="#222"/>
+<path d="M178,465 C178,205 706,-35 706,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M178,465 C178,205 706,-35 706,225" fill="none" stroke="#ff8c00" stroke-width="4" stroke-linecap="round"/>
 <circle cx="178" cy="465" r="3.5" fill="#ff8c00" stroke="#222"/>
-<circle cx="706" cy="249" r="3.5" fill="#ff8c00" stroke="#222"/>
-<path d="M202,465 C202,175 754,-41 754,249" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M202,465 C202,175 754,-41 754,249" fill="none" stroke="#18a050" stroke-width="4" stroke-linecap="round"/>
+<circle cx="706" cy="225" r="3.5" fill="#ff8c00" stroke="#222"/>
+<path d="M202,465 C202,175 754,-65 754,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M202,465 C202,175 754,-65 754,225" fill="none" stroke="#18a050" stroke-width="4" stroke-linecap="round"/>
 <circle cx="202" cy="465" r="3.5" fill="#18a050" stroke="#222"/>
-<circle cx="754" cy="249" r="3.5" fill="#18a050" stroke="#222"/>
-<path d="M274,465 C274,235 730,43 730,273" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
-<path d="M274,465 C274,235 730,43 730,273" fill="none" stroke="#8e44ad" stroke-width="4" stroke-linecap="round"/>
+<circle cx="754" cy="225" r="3.5" fill="#18a050" stroke="#222"/>
+<path d="M274,465 C274,235 730,-5 730,225" fill="none" stroke="#333" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
+<path d="M274,465 C274,235 730,-5 730,225" fill="none" stroke="#8e44ad" stroke-width="4" stroke-linecap="round"/>
 <circle cx="274" cy="465" r="3.5" fill="#8e44ad" stroke="#222"/>
-<circle cx="730" cy="273" r="3.5" fill="#8e44ad" stroke="#222"/>
-<line x1="754" y1="225" x2="802" y2="225" stroke="#777" stroke-width="2"/>
-<rect x="766" y="219" width="24" height="12" rx="4" fill="#d9c49a" stroke="#6b5a35"/>
-<rect x="770" y="219" width="2.5" height="12" fill="#8b4513"/>
-<rect x="775" y="219" width="2.5" height="12" fill="#000"/>
-<rect x="780" y="219" width="2.5" height="12" fill="#f60"/>
-<text x="778.0" y="213" font-size="10" text-anchor="middle">10 kΩ</text>
+<circle cx="730" cy="225" r="3.5" fill="#8e44ad" stroke="#222"/>
+<line x1="754" y1="249" x2="802" y2="249" stroke="#777" stroke-width="2"/>
+<rect x="766" y="243" width="24" height="12" rx="4" fill="#d9c49a" stroke="#6b5a35"/>
+<rect x="770" y="243" width="2.5" height="12" fill="#8b4513"/>
+<rect x="775" y="243" width="2.5" height="12" fill="#000"/>
+<rect x="780" y="243" width="2.5" height="12" fill="#f60"/>
+<text x="778.0" y="269" font-size="10" text-anchor="middle">10 kΩ</text>
 <line x1="130" y1="489" x2="130" y2="535" stroke="#666" stroke-width="2" stroke-dasharray="4,3"/>
 <rect x="123" y="505.0" width="14" height="14" fill="#fff" stroke="#666" stroke-dasharray="3,2"/>
 <text x="130" y="516.0" font-size="9" text-anchor="middle" fill="#444">A</text>
@@ -584,34 +584,34 @@
 <text x="220" y="811" font-size="12.5" font-weight="bold">To TFT pin (col)</text>
 <text x="530" y="811" font-size="12.5" font-weight="bold">Wire</text>
 <text x="24" y="831" font-size="12.5">3V3 (3, h)</text>
-<text x="220" y="831" font-size="12.5">1 VCC (29, i)</text>
+<text x="220" y="831" font-size="12.5">1 VCC (29, j)</text>
 <text x="530" y="831" font-size="12.5">red</text>
 <text x="24" y="851" font-size="12.5">GND (2, h)</text>
-<text x="220" y="851" font-size="12.5">2 GND (28, h)</text>
+<text x="220" y="851" font-size="12.5">2 GND (28, j)</text>
 <text x="530" y="851" font-size="12.5">black</text>
 <text x="24" y="871" font-size="12.5">D3 / GPIO7 (4, b)</text>
-<text x="220" y="871" font-size="12.5">3 CS (27, i), + 10 kΩ to VCC (27j–29j)</text>
+<text x="220" y="871" font-size="12.5">3 CS (27, j), + 10 kΩ to VCC (27i–29i)</text>
 <text x="530" y="871" font-size="12.5">green</text>
 <text x="24" y="891" font-size="12.5">D6 / GPIO11 (7, b)</text>
-<text x="220" y="891" font-size="12.5">4 RESET (26, h)</text>
+<text x="220" y="891" font-size="12.5">4 RESET (26, j)</text>
 <text x="530" y="891" font-size="12.5">purple</text>
 <text x="24" y="911" font-size="12.5">D2 / GPIO25 (3, b)</text>
-<text x="220" y="911" font-size="12.5">5 DC (25, i)</text>
+<text x="220" y="911" font-size="12.5">5 DC (25, j)</text>
 <text x="530" y="911" font-size="12.5">orange</text>
 <text x="24" y="931" font-size="12.5">D10 / GPIO10 (4, h)</text>
-<text x="220" y="931" font-size="12.5">6 SDI / MOSI (24, h)</text>
+<text x="220" y="931" font-size="12.5">6 SDI / MOSI (24, j)</text>
 <text x="530" y="931" font-size="12.5">blue</text>
 <text x="24" y="951" font-size="12.5">D8 / GPIO8 (6, h)</text>
-<text x="220" y="951" font-size="12.5">7 SCK (23, i)</text>
+<text x="220" y="951" font-size="12.5">7 SCK (23, j)</text>
 <text x="530" y="951" font-size="12.5">yellow</text>
 <text x="24" y="971" font-size="12.5">D9 / GPIO9 (5, h)</text>
-<text x="220" y="971" font-size="12.5">8 LED, backlight (22, h)</text>
+<text x="220" y="971" font-size="12.5">8 LED, backlight (22, j)</text>
 <text x="530" y="971" font-size="12.5">grey</text>
 <text x="24" y="991" font-size="12.5">—</text>
 <text x="220" y="991" font-size="12.5">9 SDO / MISO (21): not connected</text>
 <text x="530" y="991" font-size="12.5"></text>
 <text x="24" y="1027" font-size="11.5" fill="#333">The XIAO's pins are in rows g (5V side) and c (D0 side); the TFT's header is in row f, pin 1 (VCC) in column 29.</text>
-<text x="24" y="1045" font-size="11.5" fill="#333">Its pins join rows f-j of their columns: wire into rows g-j. Any free hole in the same column and half will do.</text>
+<text x="24" y="1045" font-size="11.5" fill="#333">Its pins join rows f-j of their columns: the wires go into row j, the pull-up into row i, above the module.</text>
 <text x="24" y="1063" font-size="11.5" fill="#333">The TFT runs on 3V3 only: leave the XIAO's 5V pad unconnected. Fit an antenna on the U.FL socket before scanning.</text>
 <text x="24" y="1081" font-size="11.5" fill="#333">LED straight from D9 works if the module switches its backlight (a few mA); otherwise use a transistor (BOM).</text>
 </svg>
