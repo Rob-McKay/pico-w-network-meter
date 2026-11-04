@@ -31,6 +31,7 @@
 #include "rgb565.h"
 #include "scan_health.h"
 #include "text_raster.h"
+#include "wifi_irq_state.h"
 
 /* ---- Channel statistics -------------------------------------------------- */
 
@@ -1257,3 +1258,55 @@ ZTEST(meter_keys, test_x_and_y)
 }
 
 ZTEST_SUITE(meter_keys, NULL, NULL, NULL, NULL, NULL);
+
+/* ---- Wi-Fi interrupt line ------------------------------------------------ */
+
+/**
+ * @brief A line never asserted is idle, one asserted throughout is held,
+ *        and anything between is busy.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_wifi_irq, test_classify)
+{
+	const bool idle[] = {false, false, false};
+	const bool held[] = {true, true, true};
+	const bool busy_end[] = {true, true, false};
+	const bool busy_start[] = {false, true, true};
+	const bool one[] = {true};
+
+	zassert_equal(wifi_irq_classify(idle, ARRAY_SIZE(idle)), WIFI_IRQ_IDLE);
+	zassert_equal(wifi_irq_classify(held, ARRAY_SIZE(held)), WIFI_IRQ_HELD);
+	zassert_equal(wifi_irq_classify(busy_end, ARRAY_SIZE(busy_end)), WIFI_IRQ_BUSY);
+	zassert_equal(wifi_irq_classify(busy_start, ARRAY_SIZE(busy_start)), WIFI_IRQ_BUSY);
+	zassert_equal(wifi_irq_classify(one, ARRAY_SIZE(one)), WIFI_IRQ_HELD);
+}
+
+/**
+ * @brief No samples, or none to read, count as idle rather than reading
+ *        through NULL.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_wifi_irq, test_classify_empty)
+{
+	const bool held[] = {true};
+
+	zassert_equal(wifi_irq_classify(held, 0), WIFI_IRQ_IDLE);
+	zassert_equal(wifi_irq_classify(NULL, 3), WIFI_IRQ_IDLE);
+}
+
+/**
+ * @brief Every state has a name, and a value that isn't one says so.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_wifi_irq, test_names)
+{
+	zassert_str_equal(wifi_irq_state_name(WIFI_IRQ_IDLE), "idle");
+	zassert_str_equal(wifi_irq_state_name(WIFI_IRQ_BUSY), "busy");
+	zassert_str_equal(wifi_irq_state_name(WIFI_IRQ_HELD), "held asserted");
+	zassert_str_equal(wifi_irq_state_name(WIFI_IRQ_STATE_COUNT), "unknown");
+}
+
+ZTEST_SUITE(meter_wifi_irq, NULL, NULL, NULL, NULL, NULL);

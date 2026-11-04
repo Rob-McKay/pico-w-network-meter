@@ -56,6 +56,12 @@ per-channel figures as log lines. Open it with, for example,
 `screen /dev/cu.usbmodem1101 115200` (any baud rate works; quit with Ctrl-A
 then K). `make pico BUILD_ARGS=-DCONFIG_METER_LOG_LEVEL_DBG=y` also logs
 every network each scan hears.
+`make pico BUILD_ARGS=-DCONFIG_METER_DEBUG_WIFI_IRQ=y` logs, whenever a scan
+fails, the Wi-Fi chip's interrupt line (GPIO 24) and the Wi-Fi library's
+state (its credits, queue, bus and thread), then wakes the library's thread
+to read from the chip and logs it again
+(`app/src/target/pico/wifi_debug.c`; for finding why scans stop working
+after a few hours).
 
 Scans are **passive** by default: the radio listens on each channel long
 enough to hear every network's beacons, instead of sending probe requests

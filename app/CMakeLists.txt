@@ -30,6 +30,10 @@ target_sources(app PRIVATE
 target_sources_ifdef(CONFIG_METER_WIFI_REG_DOMAIN app PRIVATE src/wifi_country.c)
 target_sources_ifdef(CONFIG_METER_RESET_CAUSE_HWINFO app PRIVATE src/reset_cause.c)
 
-# Target-only code: src/target/<target>/, each file under its own option.
+# Target-only code: src/target/<target>/, each file under its own option. It may use
+# the app's own headers, in src/.
+target_include_directories(app PRIVATE src)
 # The Pico's: flow control for the console on its USB port.
 target_sources_ifdef(CONFIG_METER_USB_CONSOLE_FLOW app PRIVATE src/target/pico/usb_console.c)
+# The Pico's: debugging the Wi-Fi driver after failed scans.
+target_sources_ifdef(CONFIG_METER_DEBUG_WIFI_IRQ app PRIVATE src/target/pico/wifi_debug.c)

@@ -20,6 +20,7 @@
 #include "scan_task.h"
 #include "scanner.h"
 #include "watchdog.h"
+#include "wifi_debug.h"
 #include "boot_record.h"
 #include "chan_stats.h"
 
@@ -112,7 +113,10 @@ static void set_busy(void)
  * @retval <0 Negative errno: the scan failed, or couldn't start.
  *
  * @sideeffects Overwrites @c scanning with the scan's results and drives the radio
- *              (scanner_run()); logs a timeout or failure. errno unchanged.
+ *              (scanner_run()); logs a timeout or failure. With CONFIG_METER_DEBUG_WIFI_IRQ,
+ *              after either, those of wifi_debug_scan_failed(): blocks for about 110 ms,
+ *              reads GPIO 24 and the WHD library's state, wakes the WHD thread, logs.
+ *              errno unchanged.
  */
 static int run_scan(void)
 {
@@ -120,9 +124,14 @@ static int run_scan(void)
 
 	if (ret == -ETIMEDOUT) {
 		LOG_WRN("Scan timed out: keeping what it heard");
-		ret = 0;
 	} else if (ret != 0) {
 		LOG_WRN("Scan failed: %d", ret);
+	}
+	if (ret != 0 && IS_ENABLED(CONFIG_METER_DEBUG_WIFI_IRQ)) {
+		wifi_debug_scan_failed();
+	}
+	if (ret == -ETIMEDOUT) {
+		ret = 0;
 	}
 
 	return ret;

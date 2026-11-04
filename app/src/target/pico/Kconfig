@@ -3,6 +3,17 @@
 #
 # Options for the Raspberry Pi Pico W target only.
 
+config METER_DEBUG_WIFI_IRQ
+	bool "After a failed scan, log the Wi-Fi library's state"
+	depends on WIFI_AIROC
+	help
+	  For finding why scans stop working after a few hours: when a
+	  scan fails or times out, logs the Wi-Fi chip's interrupt line
+	  (GPIO 24) and the WHD library's credits, queue, bus and thread,
+	  then wakes the WHD thread to read from the chip and logs them
+	  again (src/target/pico/wifi_debug.c). Reads WHD internals; for
+	  debug builds only.
+
 config METER_USB_CONSOLE_FLOW
 	bool "Console flow control that follows DTR"
 	default y

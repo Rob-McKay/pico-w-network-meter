@@ -19,6 +19,7 @@ set(METER_CORE_SOURCES
   ${METER_CORE_DIR}/keys.c
   ${METER_CORE_DIR}/text_raster.c
   ${METER_CORE_DIR}/country_code.c
+  ${METER_CORE_DIR}/wifi_irq_state.c
 )
 
 # @brief Build the core into a target, and let its sources include the
