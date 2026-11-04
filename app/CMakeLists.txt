@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.20.0)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/toolchain.cmake)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(pico_w_network_meter)
+project(network_meter)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/strict.cmake)
 meter_strict_warnings(app)

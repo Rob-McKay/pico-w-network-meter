@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Restarts the meter if a thread stops responding: Zephyr's task
- * watchdog, one channel a thread, with the RP2040's hardware watchdog
+ * watchdog, one channel a thread, with the hardware watchdog (wdt0)
  * behind it in case the kernel itself stops. A thread that misses its
  * deadline restarts the meter through reset_note_restart(), noting which
  * thread it was.
@@ -54,9 +54,9 @@ void watchdog_feed(int channel);
 /**
  * @brief Stop the hardware watchdog, before a restart.
  *
- * The RP2040's watchdog driver doesn't stop the watchdog at start-up, so a
- * restart that left it running could have it fire during the next
- * start-up, before anything feeds it. Safe from any thread or interrupt.
+ * A watchdog driver may not stop the watchdog at start-up (the RP2040's
+ * doesn't), so a restart that left it running could have it fire during the
+ * next start-up, before anything feeds it. Safe from any thread or interrupt.
  *
  * @sideeffects Disables the hardware watchdog if it was started. errno unchanged.
  */

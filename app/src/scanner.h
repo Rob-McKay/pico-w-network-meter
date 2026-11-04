@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Wi-Fi scans on the Pico W's CYW43439, through Zephyr's Wi-Fi management
- * API: each scan's results go into a struct chan_stats.
+ * Wi-Fi scans through Zephyr's Wi-Fi management API (on the Pico W, the
+ * CYW43439 with the AIROC driver): each scan's results go into a struct chan_stats.
  */
 
 #ifndef METER_SCANNER_H_
@@ -39,8 +39,9 @@ int scanner_init(void);
  * @retval -ETIMEDOUT Timed out: @p out has what arrived in time.
  * @retval -EIO The driver reported a failed scan.
  * @retval -ENODEV scanner_init() has not succeeded.
- * @retval other Negative errno from the scan request (the AIROC driver returns -EAGAIN when
- *         it can't start a scan, -EINPROGRESS when it thinks one is still running).
+ * @retval other Negative errno from the scan request (for example, the AIROC driver returns
+ *         -EAGAIN when it can't start a scan, -EINPROGRESS when it thinks one is still
+ *         running).
  *
  * @sideeffects Sets and clears the scan target (the scan's results go to @p out), drives the
  *              radio, logs; blocks the calling thread for up to @p timeout. errno unchanged.

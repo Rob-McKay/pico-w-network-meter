@@ -157,15 +157,16 @@ static unsigned int publish(int ret)
  * @brief Restart the meter, to recover a Wi-Fi driver that has stopped
  *        working.
  *
- * The AIROC driver can run out of packet buffers for good (a leak in it or
- * its WHD library), after which every scan fails to start. Only a restart
+ * A Wi-Fi driver can stop working for good: the Pico W's AIROC driver runs
+ * out of packet buffers (a leak in it or its WHD library), after which every
+ * scan fails to start. Only a restart
  * gets them back; it takes a few seconds. The next start logs it
  * (reset_note_restart()).
  *
  * @param ret The last scan's error.
  *
  * @sideeffects Logs the reason; those of reset_note_restart(): notes the error and the
- *              failures in a row, flushes the log, restarts the Pico; does not return. errno
+ *              failures in a row, flushes the log, restarts the meter; does not return. errno
  *              unchanged.
  */
 static FUNC_NORETURN void recover(int ret)
@@ -182,7 +183,7 @@ static FUNC_NORETURN void recover(int ret)
  * @sideeffects Those of set_busy(), run_scan(), publish() and report(): rewrites @c scanning,
  *              updates @c history and @c progress under @c lock, drives the radio, logs. Counts
  *              failures in a row in @c health; after CONFIG_METER_RECOVER_AFTER of them,
- *              restarts the Pico (recover(ret)). errno unchanged.
+ *              restarts the meter (recover(ret)). errno unchanged.
  */
 static bool scan_once(void)
 {

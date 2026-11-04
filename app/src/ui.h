@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * The meter's screens on the Display Pack (320x240, landscape):
+ * The meter's screens on a 320x240 landscape display:
  *
  *   Channels                          Networks
  *   +------------------------------+  +------------------------------+

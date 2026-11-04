@@ -42,8 +42,8 @@ config METER_RECOVER_AFTER
 	default 5
 	range 0 1000
 	help
-	  The Wi-Fi driver can run out of packet buffers for good, after
-	  which no scan can start. After this many failed scans in a row
+	  A Wi-Fi driver can stop working for good: the Pico W's AIROC
+	  driver runs out of packet buffers, after which no scan can start. After this many failed scans in a row
 	  (about 10 seconds at CONFIG_METER_RETRY_S = 2), the meter
 	  restarts to recover. 0 never restarts.
 
@@ -84,7 +84,8 @@ config METER_LED_BRIGHTNESS
 	default 2
 	range 1 100
 	help
-	  The Display Pack's RGB LED is dimmed with PWM. Zephyr's LED API
+	  The status RGB LED is dimmed with PWM (the Display Pack's is very
+	  bright at full power). Zephyr's LED API
 	  sets brightness in whole percent, so 1 is the dimmest it can be
 	  short of off.
 

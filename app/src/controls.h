@@ -3,8 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * The Display Pack's four buttons (A, B, X, Y), through Zephyr's input
- * subsystem (gpio-keys in the board overlay).
+ * The meter's four buttons (A, B, X, Y), through Zephyr's input
+ * subsystem (gpio-keys in the board overlay; on the Pico W, the Display
+ * Pack's buttons).
  */
 
 #ifndef METER_CONTROLS_H_

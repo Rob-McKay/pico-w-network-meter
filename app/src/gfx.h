@@ -3,10 +3,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Drawing on the Display Pack's ST7789V panel (zephyr,display, RGB565 high
- * byte first) without a frame buffer: rectangles and lines of text are
- * sent as they are drawn, through one small band buffer. The buffer is
- * shared, so drawing is not thread-safe: draw from one thread (main).
+ * Drawing on the display (zephyr,display, RGB565 high byte first; on the
+ * Pico W, the Display Pack's ST7789V panel) without a frame buffer:
+ * rectangles and lines of text are sent as they are drawn, through one
+ * small band buffer. The buffer is shared, so drawing is not thread-safe:
+ * draw from one thread (main).
  */
 
 #ifndef METER_GFX_H_

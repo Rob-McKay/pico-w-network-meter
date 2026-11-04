@@ -3,8 +3,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * The Display Pack's RGB LED, dimmed by PWM (pwm-leds in the board
- * overlay), and its backlight (gpio-leds), through Zephyr's LED API.
+ * The status RGB LED, dimmed by PWM (pwm-leds in the board overlay, node
+ * label meter_rgb_led), and the display's backlight (gpio-leds,
+ * meter_backlight), through Zephyr's LED API. On the Pico W, both are the
+ * Display Pack's.
  */
 
 #ifndef METER_STATUS_LED_H_

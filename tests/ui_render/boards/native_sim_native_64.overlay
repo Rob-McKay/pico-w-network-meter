@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * A 320x240 RGB565 panel like the Display Pack's, kept in memory by
+ * A 320x240 RGB565 panel like the meter's, kept in memory by
  * src/fake_display.c, in place of native_sim's SDL window.
  */
 

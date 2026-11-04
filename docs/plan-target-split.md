@@ -165,6 +165,35 @@ before and after, then diff `build/pico/zephyr/zephyr.dts` and
 `build/pico/zephyr/.config`. Only the renames in that step may differ. The
 `tests/ui_render` screenshots must also be byte-identical.
 
+**Progress**
+
+| Step | State |
+|---|---|
+| 1. Neutral names | Done: `refactor-neutral-names`. Pico `zephyr.bin` and `.config` byte-identical, `zephyr.dts` identical apart from the renamed labels and comments, screenshots byte-identical |
+| 2–6 | Not started |
+
+**Comparing Pico builds without the CYW43439 blobs.** Where `west blobs
+fetch hal_infineon` can't run, as in the cloud sessions this plan was
+written in, `CONFIG_BUILD_ONLY_NO_BLOBS` isn't enough: hal_infineon's
+CMake reads the blobs' sizes regardless. Write placeholder files at the
+two blob paths inside a throwaway container and build with a fixed
+`-DBUILD_VERSION`, before and after. The images are not runnable, but
+`zephyr.bin` must then be byte-identical for a step that changes no
+behaviour:
+
+```sh
+b=/workdir/modules/hal/infineon/zephyr/blobs/img/whd/resources
+mkdir -p $b/firmware/COMPONENT_43439 $b/clm/COMPONENT_43439/COMPONENT_MURATA-1YN
+printf placeholder > $b/firmware/COMPONENT_43439/43439A0.bin
+printf placeholder > $b/clm/COMPONENT_43439/COMPONENT_MURATA-1YN/43439A0.clm_blob
+scripts/build.sh pico -DBUILD_VERSION=ab-compare
+```
+
+Compare `build/pico/zephyr/zephyr.bin` and `.config` with `cmp`, and
+`zephyr.dts` with its `/* in ... */` comments stripped (they carry overlay
+line numbers). `zephyr.elf` differs whenever a comment moves a line: its
+debug information records line numbers.
+
 ### 1. Neutral names (Pico only; no behaviour change)
 
 - Rename the node labels (table above) in the Pico overlay and

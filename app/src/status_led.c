@@ -15,14 +15,14 @@
 #include "status_led.h"
 
 /* The RGB LED (pwm-leds, dimmable) and the backlight (gpio-leds). */
-#define RGB_NODE  DT_NODELABEL(pack_rgb_led)
-#define LEDS_NODE DT_NODELABEL(pack_leds)
+#define RGB_NODE  DT_NODELABEL(meter_rgb_led)
+#define LEDS_NODE DT_NODELABEL(meter_leds)
 
 /* Index of each LED in its node: its child order. */
-#define LED_RED       DT_NODE_CHILD_IDX(DT_NODELABEL(pack_led_red))
-#define LED_GREEN     DT_NODE_CHILD_IDX(DT_NODELABEL(pack_led_green))
-#define LED_BLUE      DT_NODE_CHILD_IDX(DT_NODELABEL(pack_led_blue))
-#define LED_BACKLIGHT DT_NODE_CHILD_IDX(DT_NODELABEL(pack_backlight))
+#define LED_RED       DT_NODE_CHILD_IDX(DT_NODELABEL(meter_led_red))
+#define LED_GREEN     DT_NODE_CHILD_IDX(DT_NODELABEL(meter_led_green))
+#define LED_BLUE      DT_NODE_CHILD_IDX(DT_NODELABEL(meter_led_blue))
+#define LED_BACKLIGHT DT_NODE_CHILD_IDX(DT_NODELABEL(meter_backlight))
 
 static const struct device *const rgb = DEVICE_DT_GET(RGB_NODE);
 static const struct device *const leds = DEVICE_DT_GET(LEDS_NODE);
