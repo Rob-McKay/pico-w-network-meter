@@ -10,15 +10,11 @@ project(test_meter_units)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/strict.cmake)
 meter_strict_warnings(app)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/meter_core.cmake)
+meter_core(app)
+
 set(APP_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../app/src)
 target_include_directories(app PRIVATE ${APP_SRC})
 target_sources(app PRIVATE
   src/main.c
-  ${APP_SRC}/chan_stats.c
-  ${APP_SRC}/ap_history.c
-  ${APP_SRC}/scan_health.c
-  ${APP_SRC}/paging.c
-  ${APP_SRC}/boot_record.c
-  ${APP_SRC}/keys.c
-  ${APP_SRC}/text_raster.c
 )

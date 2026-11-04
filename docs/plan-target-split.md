@@ -171,7 +171,8 @@ before and after, then diff `build/pico/zephyr/zephyr.dts` and
 |---|---|
 | 1. Neutral names | Done: `refactor-neutral-names`. Pico `zephyr.bin` and `.config` byte-identical, `zephyr.dts` identical apart from the renamed labels and comments, screenshots byte-identical |
 | 2. Pico-only configuration into the board files | Done: `refactor-pico-board-files`. Pico `zephyr.bin` byte-identical; `.config` gains only `CONFIG_METER_USB_CONSOLE_FLOW=y`; `zephyr.dts` identical apart from comments. `check-style.sh` and `check-docs.py` now walk subdirectories, so `src/target/` stays checked |
-| 3–6 | Not started |
+| 3. Separate the hardware-independent core | Done: `refactor-core-dir`. The link order changes, so `zephyr.bin` differs; instead every image symbol has the same name, type and size, and all 18 app object files have identical code, relocations and data (debug information aside). `.config` identical |
+| 4–6 | Not started |
 
 **Comparing Pico builds without the CYW43439 blobs.** Where `west blobs
 fetch hal_infineon` can't run, as in the cloud sessions this plan was

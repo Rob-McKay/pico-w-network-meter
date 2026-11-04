@@ -186,7 +186,7 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
 
 ## How the figures are worked out
 
-`app/src/chan_stats.c`, unit tested in `tests/meter_units`:
+`app/src/core/chan_stats.c`, unit tested in `tests/meter_units`:
 
 - Each scan's results are kept once per BSSID (access point), at the
   strongest signal reported. Networks the driver reports without a
@@ -214,17 +214,18 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
 | `app/src/main.c` | Redraw loop, buttons, LED |
 | `app/src/scan_task.c` | Scan thread: scans on a schedule into the history; console report |
 | `app/src/scanner.c` | Wi-Fi scans through Zephyr's `net_mgmt` Wi-Fi API |
-| `app/src/chan_stats.c` | Channel statistics (no Zephyr dependencies) |
-| `app/src/ap_history.c` | Networks heard over recent scans, with their age and fade (no Zephyr dependencies) |
-| `app/src/scan_health.c` | Counts failed scans in a row, to restart when the Wi-Fi driver gives up (no Zephyr dependencies) |
-| `app/src/paging.c` | Paging through the network and event lists a screenful at a time (no Zephyr dependencies) |
-| `app/src/boot_record.c` | Records of starts and the restart note: format, checksum, descriptions (no Zephyr dependencies) |
+| `app/src/core/chan_stats.c` | Channel statistics (no Zephyr dependencies) |
+| `app/src/core/ap_history.c` | Networks heard over recent scans, with their age and fade (no Zephyr dependencies) |
+| `app/src/core/scan_health.c` | Counts failed scans in a row, to restart when the Wi-Fi driver gives up (no Zephyr dependencies) |
+| `app/src/core/paging.c` | Paging through the network and event lists a screenful at a time (no Zephyr dependencies) |
+| `app/src/core/boot_record.c` | Records of starts and the restart note: format, checksum, descriptions (no Zephyr dependencies) |
 | `app/src/event_log.c` | The log of starts in flash (FCB in `storage_partition`) |
 | `app/src/reset_note.c` | The restart note in RAM; every restart, and the fatal error handler |
 | `app/src/watchdog.c` | Task watchdog per thread, with the hardware watchdog behind it |
-| `app/src/ui.c`, `gfx.c`, `text_raster.c` | The screens; drawing straight to the panel through a one-line band buffer (no frame buffer); text in Zephyr's CFB fonts |
+| `app/src/ui.c`, `gfx.c`, `core/text_raster.c` | The screens; drawing straight to the panel through a one-line band buffer (no frame buffer); text in Zephyr's CFB fonts |
 | `app/src/controls.c`, `status_led.c` | Buttons (input subsystem, `gpio-keys`); RGB LED (LED API, `pwm-leds`) and backlight (`gpio-leds`) |
-| `app/src/keys.c` | X and Y pressed together, from key presses and releases (no Zephyr dependencies) |
+| `app/src/core/` | The hardware-independent core: the files above marked "no Zephyr dependencies" (no device APIs), built into the firmware and every test suite from one list, `cmake/meter_core.cmake` |
+| `app/src/core/keys.c` | X and Y pressed together, from key presses and releases (no Zephyr dependencies) |
 | `app/boards/rpi_pico_rp2040_w.overlay`, `.conf` | The Pico W's own parts, which Zephyr adds by board name: the Display Pack 2.0 devicetree, the console on the USB port, the CYW43439's country |
 | `app/src/target/pico/usb_console.c` | Flow control for the console on the Pico's USB port, while a terminal has it open (`CONFIG_METER_USB_CONSOLE_FLOW`) |
 | `tests/meter_units` | Unit tests: channel statistics, network history and fading, text rendering (native_sim, AddressSanitizer) |
