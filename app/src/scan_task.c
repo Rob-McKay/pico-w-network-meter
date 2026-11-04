@@ -115,7 +115,9 @@ static void set_busy(void)
  * @sideeffects Overwrites @c scanning with the scan's results and drives the radio
  *              (scanner_run()); logs a timeout or failure. With CONFIG_METER_DEBUG_WIFI_IRQ,
  *              after either, those of wifi_debug_scan_failed(): blocks for about 110 ms,
- *              reads GPIO 24 and the WHD library's state, wakes the WHD thread, logs.
+ *              reads GPIO 24, the WHD library's state and the chip's registers and log,
+ *              wakes the WHD thread, logs; after a scan that worked, those of
+ *              wifi_debug_scan_ok(): the first time, the same checks on the chip.
  *              errno unchanged.
  */
 static int run_scan(void)
@@ -127,8 +129,12 @@ static int run_scan(void)
 	} else if (ret != 0) {
 		LOG_WRN("Scan failed: %d", ret);
 	}
-	if (ret != 0 && IS_ENABLED(CONFIG_METER_DEBUG_WIFI_IRQ)) {
-		wifi_debug_scan_failed();
+	if (IS_ENABLED(CONFIG_METER_DEBUG_WIFI_IRQ)) {
+		if (ret != 0) {
+			wifi_debug_scan_failed();
+		} else {
+			wifi_debug_scan_ok();
+		}
 	}
 	if (ret == -ETIMEDOUT) {
 		ret = 0;

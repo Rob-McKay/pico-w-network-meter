@@ -31,4 +31,19 @@
  */
 void wifi_debug_scan_failed(void);
 
+/**
+ * @brief After the first scan that works, run the same checks on the Wi-Fi
+ *        chip as wifi_debug_scan_failed() ends with, to compare against.
+ *
+ * Built only with CONFIG_METER_DEBUG_WIFI_IRQ; call it under
+ * IS_ENABLED(CONFIG_METER_DEBUG_WIFI_IRQ), from the scan thread.
+ *
+ * @sideeffects The first time only: records that it ran; sleeps 500 ms, so the WHD thread
+ *              has finished with the scan; wakes the chip's bus, reads its
+ *              registers and logs them, and if the chip answers, reads its firmware's
+ *              console log from its memory and prints it all, blocking the calling thread
+ *              meanwhile. Later calls do nothing. errno unchanged.
+ */
+void wifi_debug_scan_ok(void);
+
 #endif /* METER_WIFI_DEBUG_H_ */

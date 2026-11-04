@@ -17,6 +17,7 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include <zephyr/devicetree.h>
@@ -31,7 +32,9 @@
 #include <whd_chip.h>
 #include <whd_chip_constants.h>
 #include <whd_int.h>
+#include <whd_sdio.h>
 #include <whd_sdpcm.h>
+#include <whd_spi.h>
 #include <whd_thread.h>
 #include <whd_types.h>
 #include <whd_wifi_api.h>
@@ -59,6 +62,9 @@ whd_interface_t airoc_wifi_get_whd_interface(void);
 
 /** How long to give the WHD thread after waking it, ms. */
 #define WAKE_WAIT_MS 100
+
+/** How long to let the WHD thread settle after a scan before reading the chip, ms. */
+#define SETTLE_MS 500
 
 /* The chip's ChipCommon core, whose first register holds the chip's ID in its low 16 bits:
  * at the same backplane address on every Broadcom/Cypress Wi-Fi chip (SI_ENUM_BASE).
@@ -228,60 +234,99 @@ static void let_bus_sleep(whd_driver_t whd)
 	}
 }
 
+/** What the chip's bus registers read. */
+struct chip_regs {
+	uint32_t test;    /**< gSPI test register: 0xFEEDBEAD if the bus works */
+	uint8_t clock;    /**< clock status: SBSDIO_ALP_AVAIL, SBSDIO_HT_AVAIL */
+	uint8_t sleep;    /**< sleep control: SBSDIO_SLPCSR_KEEP_WL_KSO, _WL_DEVON */
+	uint32_t id;      /**< ChipCommon's first register: the chip ID in its low 16 bits */
+	whd_result_t res; /**< the first read that failed; WHD_SUCCESS if none */
+};
+
 /**
- * @brief Check the chip answers on its backplane, by reading its chip ID.
- *
- * WHD's console reader loops until the chip gives it a valid address, so it is only run
- * once the chip is known to answer.
+ * @brief Read the chip's bus registers: its gSPI test register (no clock
+ *        or firmware needed), its clock and sleep status, and its chip ID
+ *        (over the backplane, which needs its clocks).
  *
  * @param whd The WHD driver, its bus awake.
- * @retval 0 It gave the ID WHD found at start-up.
- * @retval -EIO It didn't answer, or gave another ID (logged).
+ * @param[out] r What they read; a read that failed leaves 0.
  *
- * @sideeffects Reads a register over the chip's bus; logs the outcome. errno unchanged.
+ * @sideeffects Reads the registers over the chip's bus. errno unchanged.
  */
-static int check_chip_answers(whd_driver_t whd)
+static void read_chip_regs(whd_driver_t whd, struct chip_regs *r)
 {
-	uint32_t id = 0;
-	whd_result_t res =
-		whd_bus_read_backplane_value(whd, CHIPCOMMON_ID_ADDRESS, 4, (uint8_t *)&id);
-	unsigned int expected = whd_chip_get_chip_id(whd);
+	whd_result_t res[4];
 
-	if (res != WHD_SUCCESS) {
-		LOG_ERR("The Wi-Fi chip doesn't answer on its backplane: 0x%08x",
-			(unsigned int)res);
-		return -EIO;
+	*r = (struct chip_regs){0};
+	res[0] = whd_bus_read_register_value(whd, BUS_FUNCTION, SPI_READ_TEST_REGISTER, 4,
+					     (uint8_t *)&r->test);
+	res[1] = whd_bus_read_register_value(whd, BACKPLANE_FUNCTION, SDIO_CHIP_CLOCK_CSR, 1,
+					     &r->clock);
+	res[2] = whd_bus_read_register_value(whd, BACKPLANE_FUNCTION, SDIO_SLEEP_CSR, 1, &r->sleep);
+	res[3] = whd_bus_read_backplane_value(whd, CHIPCOMMON_ID_ADDRESS, 4, (uint8_t *)&r->id);
+	r->res = WHD_SUCCESS;
+	for (size_t i = 0; i < ARRAY_SIZE(res); i++) {
+		if (res[i] != WHD_SUCCESS) {
+			r->res = res[i];
+			break;
+		}
 	}
-	if ((id & CHIP_ID_MASK) != expected) {
-		LOG_ERR("The Wi-Fi chip's ID reads 0x%08x, not %u", (unsigned int)id, expected);
-		return -EIO;
-	}
-	LOG_INF("The Wi-Fi chip answers on its backplane: chip %u", expected);
-
-	return 0;
 }
 
 /**
- * @brief Print the chip firmware's console log, and whether it trapped or
- *        asserted.
+ * @brief Log the chip's bus registers, and tell whether its ID is right.
+ *
+ * WHD's console reader loops until the chip gives it a valid address, so it is only run
+ * once the chip has given its ID.
+ *
+ * @param whd The WHD driver, its bus awake.
+ * @param when When, for the log.
+ * @retval 0 The ID is the one WHD found at start-up.
+ * @retval -EIO A read failed, or the ID is wrong.
+ *
+ * @sideeffects Those of read_chip_regs(): reads registers over the chip's bus; logs them.
+ *              errno unchanged.
+ */
+static int check_chip_answers(whd_driver_t whd, const char *when)
+{
+	struct chip_regs r;
+	unsigned int expected = whd_chip_get_chip_id(whd);
+
+	read_chip_regs(whd, &r);
+	LOG_INF("Wi-Fi chip %s: test 0x%08x (0xfeedbead if the bus works), clock 0x%02x "
+		"(ALP %s, HT %s), sleep 0x%02x (KSO %s, on %s), ID 0x%08x (want %u), read 0x%08x",
+		when, (unsigned int)r.test, (unsigned int)r.clock,
+		(r.clock & SBSDIO_ALP_AVAIL) != 0U ? "ready" : "off",
+		(r.clock & SBSDIO_HT_AVAIL) != 0U ? "ready" : "off", (unsigned int)r.sleep,
+		(r.sleep & SBSDIO_SLPCSR_KEEP_WL_KSO) != 0U ? "set" : "clear",
+		(r.sleep & SBSDIO_SLPCSR_WL_DEVON) != 0U ? "yes" : "no", (unsigned int)r.id,
+		expected, (unsigned int)r.res);
+
+	return r.res == WHD_SUCCESS && (r.id & CHIP_ID_MASK) == expected ? 0 : -EIO;
+}
+
+/**
+ * @brief Log the chip's bus registers, and if it answers, print its
+ *        firmware's console log and whether it trapped or asserted.
  *
  * whd_wifi_read_wlan_log() prints each new line as "CONSOLE: ..." itself (WPRINT_MACRO);
  * the first call prints all the log the chip holds, later ones what's new.
  *
  * @param whd The WHD driver.
+ * @param when When, for the log.
  *
  * @sideeffects Wakes the chip's bus and keeps it awake meanwhile (keep_bus_awake(),
  *              let_bus_sleep()); reads the chip's memory over it; WHD updates its copy of the
  *              chip's shared area and console position, and prints the log; logs the
  *              outcome. errno unchanged.
  */
-static void dump_chip_log(whd_driver_t whd)
+static void check_chip(whd_driver_t whd, const char *when)
 {
 	static char line[CONSOLE_LINE];
 	const wlan_shared_t *sh = &whd->internal_info.sh;
 	whd_result_t res;
 
-	if (keep_bus_awake(whd) == 0 && check_chip_answers(whd) == 0) {
+	if (keep_bus_awake(whd) == 0 && check_chip_answers(whd, when) == 0) {
 		LOG_INF("The Wi-Fi chip's console log:");
 		res = whd_wifi_read_wlan_log(whd, line, sizeof(line));
 		if (res != WHD_SUCCESS) {
@@ -328,5 +373,29 @@ void wifi_debug_scan_failed(void)
 	snapshot(whd, &s);
 	log_snapshot("after", &s);
 
-	dump_chip_log(whd);
+	check_chip(whd, "after the failure");
+}
+
+/*
+ * Public interface: documented in wifi_debug.h.
+ *
+ * Only the scan thread calls it, so @c checked needs no lock.
+ */
+void wifi_debug_scan_ok(void)
+{
+	static bool checked;
+	whd_driver_t whd;
+
+	if (checked) {
+		return;
+	}
+	checked = true;
+	whd = whd_driver_get();
+	if (whd == NULL) {
+		LOG_ERR("No WHD driver to look at");
+		return;
+	}
+	/* Let the WHD thread finish with the scan first: this reads the chip's bus too. */
+	k_msleep(SETTLE_MS);
+	check_chip(whd, "while working");
 }
