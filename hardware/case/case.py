@@ -144,8 +144,10 @@ AMIGO_HOLE_D = 2.1
 ## USB-C socket: its centre across the board, and above it.
 AMIGO_USB_ACROSS = 11.0
 AMIGO_USB_H = 1.6
-## Opening for a USB-C plug's moulding.
+## Opening for a USB-C plug: just bigger than its metal shell, plus 1 mm on
+## the side towards button A (up the case), for where the socket may sit.
 AMIGO_USB_OPENING = (9.0, 3.5)
+AMIGO_USB_OPENING_EXTRA_A = 1.0
 ## Its corners' radius.
 AMIGO_USB_OPENING_R = 1.5
 ## The PWR button (press to make), and the height of its top above the board:
@@ -376,7 +378,9 @@ def amigo_point(along, across):
 # @sideeffects None.
 def usb_openings():
     _, y = amigo_point(0.0, AMIGO_USB_ACROSS)
-    return end_wall_opening(True, y, Z_AMIGO_TOP + AMIGO_USB_H, AMIGO_USB_OPENING,
+    w, h = AMIGO_USB_OPENING
+    extra = AMIGO_USB_OPENING_EXTRA_A
+    return end_wall_opening(True, y + extra / 2, Z_AMIGO_TOP + AMIGO_USB_H, (w + extra, h),
                             AMIGO_USB_OPENING_R)
 
 
