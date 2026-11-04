@@ -7,12 +7,16 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <zephyr/sys/util.h>
+#include <zephyr/display/cfb.h>
 
 #include "gfx.h"
 #include "paging.h"
 #include "ui.h"
+#include "boot_record.h"
+#include "chan_stats.h"
 
 /* Header and footer bars, pixels. */
 #define BAR_H          20

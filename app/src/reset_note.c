@@ -4,15 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdint.h>
+
 #include <zephyr/fatal.h>
 #include <zephyr/kernel.h>
 #include <zephyr/linker/section_tags.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_ctrl.h>
 #include <zephyr/sys/reboot.h>
+#include <zephyr/irq.h>
+#include <zephyr/sys/clock.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #include "reset_note.h"
 #include "watchdog.h"
+#include "boot_record.h"
 
 LOG_MODULE_REGISTER(reset_note, CONFIG_METER_LOG_LEVEL);
 

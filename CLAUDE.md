@@ -47,6 +47,10 @@ short:
   `BUILD_ASSERT`, Kconfig options prefixed `METER_`. Warnings are errors and
   clang-tidy runs on every file.
 - No unbounded string functions (`strcpy`, `sprintf`, ...).
+- Include what you use: every file, header or source, directly includes the
+  public header of each symbol it uses (`<stdint.h>`, `"chan_stats.h"`,
+  `<zephyr/toolchain.h>`), not relying on another header. clang-tidy's
+  `misc-include-cleaner` and `scripts/check-header-includes.py` check it.
 
 ## Files
 

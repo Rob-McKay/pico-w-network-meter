@@ -7,9 +7,12 @@
 #include <errno.h>
 #include <stdint.h>
 
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/clock.h>
 #include <zephyr/sys/atomic.h>
+#include <zephyr/toolchain.h>
 
 #include "controls.h"
 #include "keys.h"

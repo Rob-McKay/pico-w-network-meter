@@ -12,6 +12,7 @@
 #define METER_CONTROLS_H_
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/clock.h>
 
 /**
  * @brief Start queueing button presses.

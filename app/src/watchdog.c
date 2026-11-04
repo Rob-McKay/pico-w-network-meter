@@ -6,15 +6,19 @@
 
 #include <errno.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/watchdog.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/task_wdt/task_wdt.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/toolchain.h>
 
 #include "reset_note.h"
 #include "watchdog.h"
+#include "boot_record.h"
 
 LOG_MODULE_REGISTER(watchdog, CONFIG_METER_LOG_LEVEL);
 

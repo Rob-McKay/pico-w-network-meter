@@ -9,8 +9,10 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
 
 #include <zephyr/ztest.h>
+#include <zephyr/sys/util.h>
 
 #include "boot_record.h"
 #include "chan_stats.h"

@@ -13,10 +13,13 @@
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <zephyr/drivers/hwinfo.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/ztest.h>
+#include <zephyr/display/cfb.h>
+#include <zephyr/sys/util.h>
 
 #include "ap_history.h"
 #include "boot_record.h"

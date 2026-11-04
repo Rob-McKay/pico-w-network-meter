@@ -8,9 +8,11 @@
 #include <string.h>
 
 #include <zephyr/logging/log.h>
+#include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
+#include <zephyr/net/wifi.h>
 #include <zephyr/net/wifi_mgmt.h>
-#include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #include "country_code.h"
 #include "wifi_country.h"

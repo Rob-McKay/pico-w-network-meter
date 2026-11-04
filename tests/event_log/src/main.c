@@ -18,11 +18,13 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <zephyr/devicetree.h>
 
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/ztest.h>
+#include <zephyr/toolchain.h>
 
 #include "boot_record.h"
 #include "event_log.h"

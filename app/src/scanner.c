@@ -7,16 +7,21 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/clock.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/net/wifi.h>
+#include <zephyr/toolchain.h>
 
 #include "scanner.h"
 #include "wifi_country.h"
+#include "chan_stats.h"
 
 LOG_MODULE_REGISTER(scanner, CONFIG_METER_LOG_LEVEL);
 
