@@ -2,8 +2,8 @@
 # Copyright (c) 2026 Rob McKay
 # SPDX-License-Identifier: Apache-2.0
 #
-# Run the automated tests on native_sim (64-bit host builds). Runs inside
-# the Docker image.
+# Run the automated tests on native_sim (64-bit host builds), then build
+# the firmware for both targets. Runs inside the Docker image.
 #
 #   tests/meter_units   channel statistics (counts, overlap-weighted
 #                       interference, recommendation, dBm arithmetic) and
@@ -22,7 +22,10 @@
 # any warning or finding.
 #
 # After them, scripts/check-header-includes.py checks that every header
-# includes the headers it uses itself.
+# includes the headers it uses itself, and the firmware is built for both
+# targets, Pico W and XIAO ESP32-C5, as scripts/build.sh builds it with its
+# defaults: the same warnings and clang-tidy checks, with each board's own
+# configuration, which the native_sim builds don't see.
 #
 # First, scripts/check-docs.py checks that every function has a Doxygen
 # comment documenting its parameters and return value, and
@@ -80,3 +83,9 @@ expect_ran "$build_dir/run.log" test_left_alone
 # compiled, so headers are checked here, with the test builds' flags).
 "$here/scripts/check-header-includes.py" "$here"/build/test-meter_units \
 	"$here"/build/test-ui_render "$here"/build/test-event_log
+
+# Both firmware targets, with the boards' default settings (as
+# scripts/build.sh builds them; its own build directories are left alone).
+for board in rpi_pico/rp2040/w xiao_esp32c5/esp32c5/hpcore; do
+	west build -p auto -b "$board" -d "$here/build/test-firmware-${board%%/*}" "$here/app"
+done

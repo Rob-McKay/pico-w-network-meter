@@ -2,8 +2,9 @@
 
 Pico W Wi-Fi channel meter: a Zephyr application for a Raspberry Pi Pico W
 with a Pimoroni Pico Display Pack 2.0, built in Docker with Arm Toolchain
-for Embedded (clang). See README.md for the project and docs/USAGE.md for
-using the device.
+for Embedded (clang). A second target, the Seeed XIAO ESP32-C5 with an
+ILI9341 TFT, builds with the Zephyr SDK's GCC (`make xiao`). See README.md
+for the project and docs/USAGE.md for using the device.
 
 Every change follows the rules in [docs/CODING.md](docs/CODING.md) and is
 reviewed against the checklist in
@@ -66,11 +67,13 @@ short:
 ## Checking a change
 
 - `make test` must pass: the documentation check (`scripts/check-docs.py`),
-  the style check, and the native_sim tests under AddressSanitizer. Add tests
-  for new behaviour; screen changes go through `tests/ui_render`.
-- `make pico` must build with no warnings from this repository's code.
+  the style check, the native_sim tests under AddressSanitizer, and a build
+  of both firmware targets. Add tests for new behaviour; screen changes go
+  through `tests/ui_render`.
+- `make pico` and `make xiao` must build with no warnings from this
+  repository's code.
 - If the Dockerfile, west.yml or zephyr/patches change, `make image` first.
-- Say plainly what was and wasn't tested on a real Pico W.
+- Say plainly what was and wasn't tested on a real Pico W or XIAO.
 
 ## Git
 
