@@ -4,8 +4,9 @@
 # Patches to Zephyr modules, applied with "west patch apply" after
 # "west update" (the Dockerfile does both). Each one waits for an upstream
 # pull request; drop it once the west.yml pin includes the merged change.
+# Each comment starts with the target the patch is for.
 patches:
-  # The RP2040's second-stage bootloader is built as a separate CMake
+  # Pico W. The RP2040's second-stage bootloader is built as a separate CMake
   # project that is given only the compiler's path. A GCC cross compiler
   # implies its target; clang (Arm Toolchain for Embedded, Zephyr's LLVM
   # toolchain) assembles it for the host and fails. The LLVM toolchain's
@@ -18,7 +19,7 @@ patches:
     date: 2026-10-25
     upstreamable: true
     merge-status: false
-  # The AIROC driver fills in a scan result's channel, band, signal and
+  # Pico W. The AIROC driver fills in a scan result's channel, band, signal and
   # BSSID only for networks with an SSID, so hidden networks reach the
   # application as 00:00:00:00:00:00 on channel 0 and can't be counted on
   # their channel. Now only the SSID depends on there being one. Not yet
@@ -29,5 +30,19 @@ patches:
     author: Claude
     email: noreply@anthropic.com
     date: 2026-10-25
+    upstreamable: true
+    merge-status: false
+  # XIAO ESP32-C5. The ESP32 Wi-Fi driver passes only the scan type on to
+  # Espressif's library: hidden networks are never reported (show_hidden
+  # stays false), and the dwell times and bands in the scan parameters are
+  # ignored, so a passive scan listens 360 ms on each channel. It now
+  # reports hidden networks, as other Zephyr Wi-Fi drivers do, and passes
+  # the dwell times and bands on. Not yet sent upstream.
+  - path: zephyr/esp32-wifi-scan-params.patch
+    sha256sum: 25cdac5b1e9f0e15106e54e8a073823476fcf23b3df68e35e91e7b4f58a559f1
+    module: zephyr
+    author: Claude
+    email: noreply@anthropic.com
+    date: 2026-11-04
     upstreamable: true
     merge-status: false
