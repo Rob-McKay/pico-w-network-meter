@@ -907,7 +907,7 @@ are weaker to start with.
 
 ### The case generator
 
-`hardware/case/case.py` is parametric (every dimension is a constant), but
+`hardware/pico/case/case.py` is parametric (every dimension is a constant), but
 its layout is built around the Display Pack: the Pico plugs into it, the
 buttons are the pack's, the shelf's posts hold the Pico, and the charger
 hangs at the back. For the new parts:

@@ -62,7 +62,10 @@ short:
 - Patches to Zephyr are carried in `zephyr/patches/` and listed with their
   reason in `zephyr/patches.yml`; they are applied when the image is built.
 - When behaviour, buttons, LED colours or settings change, update README.md,
-  docs/USAGE.md and docs/quick-reference.html (and its PDF).
+  docs/USAGE.md and docs/quick-reference.html (and its PDF), and the guide
+  of every target it affects (`docs/targets/pico.md`,
+  `docs/targets/xiao-esp32c5.md`). Each target's hardware is in
+  `hardware/<target>/`.
 
 ## Checking a change
 
@@ -73,7 +76,8 @@ short:
 - `make pico` and `make xiao` must build with no warnings from this
   repository's code.
 - If the Dockerfile, west.yml or zephyr/patches change, `make image` first.
-- Say plainly what was and wasn't tested on a real Pico W or XIAO.
+- Say plainly what was and wasn't tested on each target's hardware: a
+  Pico W with a Display Pack, a XIAO ESP32-C5 with its TFT.
 
 ## Git
 
