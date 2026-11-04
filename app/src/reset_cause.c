@@ -11,6 +11,7 @@
 #include <zephyr/sys/util.h>
 
 #include "reset_cause.h"
+#include "boot_record.h"
 
 /* Flags for a reset the CPU caused itself by faulting. */
 #define CPU_FAULT_FLAGS (RESET_CPU_LOCKUP | RESET_PARITY | RESET_SECURITY)

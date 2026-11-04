@@ -6,13 +6,17 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include <zephyr/fs/fcb.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #include "event_log.h"
+#include "boot_record.h"
 
 LOG_MODULE_REGISTER(event_log, CONFIG_METER_LOG_LEVEL);
 

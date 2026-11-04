@@ -26,11 +26,15 @@
  */
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_ctrl.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #include "boot_record.h"
 #include "chan_stats.h"

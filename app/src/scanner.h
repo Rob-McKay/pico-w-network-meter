@@ -11,6 +11,7 @@
 #define METER_SCANNER_H_
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/clock.h>
 
 #include "chan_stats.h"
 

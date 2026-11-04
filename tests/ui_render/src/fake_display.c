@@ -9,10 +9,13 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/toolchain.h>
 
 #include <nsi_host_trampolines.h>
 

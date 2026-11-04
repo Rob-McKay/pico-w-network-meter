@@ -12,6 +12,7 @@ repository's own C and Python. `make test` enforces what a tool can check:
 | 2. Single responsibility | review |
 | 3. No unbounded string functions; buffer overflows trapped | clang-tidy, and `_FORTIFY_SOURCE=2` in the firmware |
 | 4. Zephyr's driver models first | review |
+| 5. Every file includes the headers it uses itself | clang-tidy's `misc-include-cleaner` (sources), `scripts/check-header-includes.py` (headers) |
 
 Pull requests are reviewed against these rules with the checklist in
 [.github/pull_request_template.md](../.github/pull_request_template.md),
@@ -148,3 +149,30 @@ drivers: the ST7789V display driver, `gpio-keys` with the input subsystem,
 and `gpio-leds` with the LED API. The Wi-Fi chip is used through Zephyr's
 AIROC driver and Wi-Fi management API. Write a driver only when Zephyr has
 none.
+
+## 5. Include what you use
+
+Every file, header or source, includes the headers that declare what it
+uses itself, and doesn't rely on another header to bring them in. A file
+that uses `uint8_t` includes `<stdint.h>`, even if its own header already
+does; one that uses `struct chan_stats` includes `"chan_stats.h"`, even if
+`ui.h` includes it too. A header can then change what it includes without
+breaking the files that include it.
+
+Take each symbol from its documented public header, not the internal one
+that happens to define it: `<errno.h>` for `EINVAL` (not picolibc's
+`<sys/errno.h>`), `<zephyr/kernel.h>` for the kernel API,
+`<zephyr/ztest.h>` for `zassert_*`, `<zephyr/sys/util.h>` for
+`ARRAY_SIZE` and `IS_ENABLED`. Some symbols have public headers of their
+own that the aggregate headers also include: `<zephyr/toolchain.h>`
+(`BUILD_ASSERT`, `ARG_UNUSED`), `<zephyr/devicetree.h>` (`DT_*`),
+`<zephyr/sys/clock.h>` (`k_timeout_t`, `MSEC_PER_SEC`). Include those
+directly.
+
+clang-tidy's `misc-include-cleaner` checks the sources on every build, and
+`scripts/check-header-includes.py` checks each header on its own, in
+`make test`. `.clang-tidy` lists the internal headers whose symbols come
+from a public header instead (`IgnoreHeaders`), and why. Only missing
+includes are reported: an include that looks unused may be in use through
+a devicetree or Kconfig macro the check can't follow, so removing one is
+left to review.

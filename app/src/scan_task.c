@@ -5,10 +5,14 @@
  */
 
 #include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/sys/clock.h>
+#include <zephyr/toolchain.h>
 
 #include "ap_history.h"
 #include "reset_note.h"
@@ -16,6 +20,8 @@
 #include "scan_task.h"
 #include "scanner.h"
 #include "watchdog.h"
+#include "boot_record.h"
+#include "chan_stats.h"
 
 LOG_MODULE_REGISTER(scan_task, CONFIG_METER_LOG_LEVEL);
 

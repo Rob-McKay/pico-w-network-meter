@@ -8,9 +8,23 @@
 # Disabled, as style preferences or impractical with Zephyr:
 #   readability-identifier-length     i, n, c, ... are idiomatic in C
 #   readability-magic-numbers         register bits and protocol constants
-#   misc-include-cleaner              Zephyr's headers are aggregated
 #   readability-function-size         counts Zephyr's macro expansions
 #   bugprone-easily-swappable-parameters  flags most two-int functions
+#
+# misc-include-cleaner: every file includes the headers that declare what it
+# uses, not relying on another header to include them (docs/CODING.md). Only
+# missing includes are reported: an unused-looking include can be in use
+# through a devicetree or Kconfig macro the check can't see. It sees only
+# the file being compiled; scripts/check-header-includes.py checks the
+# headers. IgnoreHeaders names the headers whose symbols are taken from a
+# public header instead, so a file includes that one:
+#   autoconf.h                  CONFIG_*: Zephyr includes it in every file
+#   sys/errno.h, asm-generic/errno*.h
+#                               E* codes: <errno.h> (picolibc, the host)
+#   zephyr/kernel/.*, zephyr/sleep.h, zephyr/syscalls/.*, zephyr/arch/.*
+#                               the kernel API: <zephyr/kernel.h>, <zephyr/fatal.h>
+#   zephyr/sys/util_macro.h     IS_ENABLED, ...: <zephyr/sys/util.h>
+#   zephyr/ztest_.*             ZTEST, zassert_*: <zephyr/ztest.h>
 #
 # Disabled, as they ask for the C11 Annex K functions (memcpy_s, ...), which
 # neither glibc nor picolibc provides; -D_FORTIFY_SOURCE=2 checks the
@@ -25,7 +39,7 @@
 # Each entry is "regex,alternative,reason"; it needs clang-tidy 20 or later.
 Checks: >
   bugprone-*, cert-*, clang-analyzer-*, misc-*, performance-*, portability-*, readability-*,
-  -readability-identifier-length, -readability-magic-numbers, -misc-include-cleaner,
+  -readability-identifier-length, -readability-magic-numbers,
   -readability-function-size, -bugprone-easily-swappable-parameters,
   -cert-msc24-c, -cert-msc33-c,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
@@ -33,6 +47,9 @@ Checks: >
 WarningsAsErrors: '*'
 # The header filter (this repository's headers) is set by the wrapper.
 CheckOptions:
+  misc-include-cleaner.UnusedIncludes: false
+  misc-include-cleaner.IgnoreHeaders: >-
+    autoconf\.h;sys/errno\.h;asm-generic/errno.*\.h;zephyr/sleep\.h;zephyr/kernel/.*;zephyr/sys/util_macro\.h;zephyr/arch/.*;zephyr/ztest_.*;zephyr/syscalls/.*
   readability-function-cognitive-complexity.Threshold: 25
   readability-function-cognitive-complexity.IgnoreMacros: true
   # In C (before C23) !, && and || yield int: they are not conversions to fix.

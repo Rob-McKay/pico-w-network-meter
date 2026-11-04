@@ -5,6 +5,8 @@
  */
 
 #include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include <zephyr/device.h>
 #include <zephyr/display/cfb.h>
@@ -13,6 +15,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/toolchain.h>
 
 #include "gfx.h"
 #include "rgb565.h"

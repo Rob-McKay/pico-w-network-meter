@@ -21,11 +21,14 @@
  */
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/toolchain.h>
 
 /* How often DTR is checked, ms. */
 #define CHECK_MS 200

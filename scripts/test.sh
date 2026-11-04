@@ -21,6 +21,9 @@
 # runs clang-tidy on it (cmake/strict.cmake), so the builds below fail on
 # any warning or finding.
 #
+# After them, scripts/check-header-includes.py checks that every header
+# includes the headers it uses itself.
+#
 # First, scripts/check-docs.py checks that every function has a Doxygen
 # comment documenting its parameters and return value, and
 # scripts/check-style.sh that the code follows Zephyr's coding style.
@@ -72,3 +75,8 @@ west build -p auto -b native_sim/native/64 -d "$build_dir" "$here/tests/event_lo
 	-DCONFIG_METER_EVENT_LOG_MAX_SECTORS=2
 "$build_dir/zephyr/zephyr.exe" --flash="$build_dir/flash.bin" | tee "$build_dir/run.log"
 expect_ran "$build_dir/run.log" test_left_alone
+
+# Every header includes what it uses (clang-tidy checks only the file being
+# compiled, so headers are checked here, with the test builds' flags).
+"$here/scripts/check-header-includes.py" "$here"/build/test-meter_units \
+	"$here"/build/test-ui_render "$here"/build/test-event_log

@@ -5,8 +5,11 @@
  */
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include <zephyr/sys/util.h>
+#include <zephyr/display/cfb.h>
 
 #include "rgb565.h"
 #include "text_raster.h"

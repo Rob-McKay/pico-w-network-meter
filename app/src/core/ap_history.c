@@ -5,10 +5,12 @@
  */
 
 #include <string.h>
+#include <stdint.h>
 
 #include <zephyr/sys/util.h>
 
 #include "ap_history.h"
+#include "chan_stats.h"
 
 /*
  * Public interface: documented in ap_history.h.
