@@ -107,14 +107,23 @@ console for a second, the dump stops rather than freeze the screen.
 
 **A watchdog restarts it if it hangs.** Zephyr's task watchdog gives the
 main thread 5 s and the scan thread a scan and its wait plus 30 s to check
-in; the RP2040's hardware watchdog (4 s) stands behind it in case the
+in; the chip's hardware watchdog (4 s) stands behind it in case the
 kernel itself stops.
 
 Everything is built in Docker, as in
 [pi-zephyr-inet-radio](https://github.com/Rob-McKay/pi-zephyr-inet-radio), with
 **Arm Toolchain for Embedded** (ATfE 23.1.0: Arm's clang/LLVM bare-metal
-toolchain with picolibc) for the firmware and the host's clang for the unit
-tests. There is no GCC anywhere.
+toolchain with picolibc) for the Pico W firmware and the host's clang for
+the unit tests. The one exception is the XIAO ESP32-C5 firmware, built with
+the Zephyr SDK's GCC because Espressif's SoC support doesn't build with
+clang.
+
+**A second target, the Seeed XIAO ESP32-C5**, with a 2.2" ILI9341 TFT,
+four buttons and an RGB LED, builds with `make xiao`. It has **not been run
+on hardware yet**. Its scans cover both bands, but until the 5 GHz work it
+shows 2.4 GHz only, like the Pico, and counts 5 GHz networks as "other".
+[docs/port-esp32c5.md](docs/port-esp32c5.md) has the wiring, the plan and
+the bring-up checks.
 
 ## Hardware
 
@@ -149,8 +158,9 @@ Intel) or Windows with WSL 2.
 
 ```sh
 make image      # once: the build environment (a few minutes)
-make pico       # the firmware: out/pico/network-meter.uf2
-make test       # unit tests and the documentation check
+make pico       # the Pico W firmware: out/pico/network-meter.uf2
+make xiao       # the XIAO ESP32-C5 firmware: out/xiao/network-meter.bin
+make test       # checks, unit tests, and both firmware builds
 ```
 
 `make shell` opens a shell in the build container.
@@ -163,6 +173,13 @@ Infineon's WHD (`whd_country_code_t` in `whd_types.h`) without its
 
 ```sh
 make pico WIFI_COUNTRY=UNITED_STATES
+```
+
+For the XIAO it is an ISO 3166 code instead (default `GB`; `00` is the
+world-safe set):
+
+```sh
+make xiao WIFI_COUNTRY=US
 ```
 
 Other settings can be passed to CMake from `scripts/build.sh`, for example
@@ -183,6 +200,19 @@ extra flags to `docker build`, such as `--network host` or
 
 For SWD (a Raspberry Pi Debug Probe), `out/pico/network-meter.elf` works with
 OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
+
+**XIAO ESP32-C5**: plug it in by USB-C and, from the host (Docker on a Mac
+can't reach USB), run
+
+```sh
+esptool --chip esp32c5 write-flash 0x2000 out/xiao/network-meter.bin
+```
+
+or flash `out/xiao/network-meter-merged.bin` at offset 0 with a browser
+flasher. If esptool can't connect, hold BOOT while plugging the board in.
+The console is the board's USB serial port (USB Serial/JTAG). Flashing
+leaves the event log, at the end of the flash, alone; `esptool
+erase-flash` wipes it.
 
 ## How the figures are worked out
 
@@ -230,18 +260,21 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
 | `app/src/core/` | The hardware-independent core: the files above marked "no Zephyr dependencies" (no device APIs), built into the firmware and every test suite from one list, `cmake/meter_core.cmake` |
 | `app/src/core/keys.c` | X and Y pressed together, from key presses and releases (no Zephyr dependencies) |
 | `app/boards/rpi_pico_rp2040_w.overlay`, `.conf` | The Pico W's own parts, which Zephyr adds by board name: the Display Pack 2.0 devicetree, the console on the USB port, the CYW43439's country |
+| `app/boards/xiao_esp32c5_esp32c5_hpcore.overlay`, `.conf` | The XIAO ESP32-C5's own parts: the TFT, buttons and RGB LED devicetree, a 64 KB event log partition, flash size, Wi-Fi country, scan dwell time, reset cause |
 | `app/src/target/pico/usb_console.c` | Flow control for the console on the Pico's USB port, while a terminal has it open (`CONFIG_METER_USB_CONSOLE_FLOW`) |
 | `tests/meter_units` | Unit tests: channel statistics, network history and fading, text rendering (native_sim, AddressSanitizer) |
 | `tests/ui_render` | The screens drawn on a fake 320x240 panel: pixel checks and screenshots |
-| `cmake/toolchain.cmake` | Compiler choice: ATfE for the Pico, host clang for native_sim |
+| `cmake/toolchain.cmake` | Compiler choice: ATfE for the Pico, host clang for native_sim, the Zephyr SDK's GCC for the XIAO ESP32-C5 |
 | `cmake/strict.cmake`, `.clang-tidy` | Warnings as errors and clang-tidy on every file ([docs/CODING.md](docs/CODING.md)) |
 | `west.yml` | Zephyr pin, the same commit as the radio project (v4.5.0-rc2), and only the modules needed |
 | `zephyr/patches.yml` | Zephyr patches carried until merged upstream (below) |
 | `Dockerfile`, `Makefile`, `scripts/` | Build environment and wrappers |
 
-## Zephyr patch carried
+## Zephyr patches carried
 
-`zephyr/patches/zephyr/rpi-pico-boot2-clang-target.patch`: the RP2040's
+`zephyr/patches.yml` lists each with its reason. In short:
+
+`zephyr/patches/zephyr/rpi-pico-boot2-clang-target.patch` (Pico W): the RP2040's
 second-stage bootloader is built as a separate CMake project that is only
 told the compiler's path. A GCC cross compiler implies its target. clang
 instead assembles for the host and fails ("unknown CPU name cortex-m0plus").
@@ -249,6 +282,13 @@ The patch passes the LLVM toolchain's target triple on as well. It is
 applied by `west patch apply` when the image is built, and is not yet sent
 upstream. The built image's boot block has a valid CRC and UF2 family ID
 (RP2040).
+
+`airoc-hidden-network-results.patch` (Pico W): the AIROC driver reports a
+hidden network's channel, signal and BSSID, not just a named network's.
+
+`esp32-wifi-scan-params.patch` (XIAO ESP32-C5): the ESP32 driver reports
+hidden networks and passes the scan's dwell times and bands on to
+Espressif's library, which it otherwise ignores.
 
 ## Status
 
@@ -272,7 +312,10 @@ carries `SPDX-License-Identifier: Apache-2.0`.
 Third-party parts keep their own licences: Zephyr and its modules (Apache
 2.0), and the Infineon CYW43439 Wi-Fi firmware and CLM blob that the Docker
 image fetches with `west blobs` (Infineon's licence, in hal_infineon's
-`zephyr/blobs/license.txt`), which are built into the firmware image. Seeed's XIAO ESP32-C5
+`zephyr/blobs/license.txt`), and Espressif's Wi-Fi, PHY and coexistence
+libraries for the ESP32-C5, also fetched with `west blobs` (Apache 2.0, in
+hal_espressif's `zephyr/blobs/license.txt`), which are built into the
+firmware images. Seeed's XIAO ESP32-C5
 schematic, KiCad project and pinout sheet in
 `hardware/xiao-esp32c5/vendor/` are © Seeed Studio, under CC BY-SA 4.0
 (the pinout sheet states no licence of its own); see that folder's

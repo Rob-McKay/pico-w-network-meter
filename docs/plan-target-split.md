@@ -173,7 +173,8 @@ before and after, then diff `build/pico/zephyr/zephyr.dts` and
 | 2. Pico-only configuration into the board files | Done: `refactor-pico-board-files`. Pico `zephyr.bin` byte-identical; `.config` gains only `CONFIG_METER_USB_CONSOLE_FLOW=y`; `zephyr.dts` identical apart from comments. `check-style.sh` and `check-docs.py` now walk subdirectories, so `src/target/` stays checked |
 | 3. Separate the hardware-independent core | Done: `refactor-core-dir`. The link order changes, so `zephyr.bin` differs; instead every image symbol has the same name, type and size, and all 18 app object files have identical code, relocations and data (debug information aside). `.config` identical |
 | 4. Shared hooks (off by default) | Done: `refactor-shared-hooks`, without the reset-note backend (deferred, see step 4). Pico `.config` gains only the new options, at their defaults; `zephyr.dts` identical; `zephyr.bin` +464 B flash, +8 B RAM, all in `boot_record_*`, `event_log_init`/`open_fcb` and `log_one_start`. None of `wifi_country.c`, `reset_cause.c` or `country_code.c` is in the Pico image. With the hooks on, the app builds for the XIAO ESP32-C5 with no warnings |
-| 5–6 | Not started. Step 5 also documents the new event names ("reset button", "HW watchdog", "brown-out", "CPU fault") in `docs/USAGE.md`, when a board first records them |
+| 5. The ESP32-C5 target | Built, not yet run on hardware: `target-xiao-esp32c5`. `make xiao` builds with the Wi-Fi libraries, no warnings and clang-tidy clean (flash 664 KB, SRAM 251 KB of 370 KB). Pico `zephyr.bin` and `zephyr.dts` identical to `main`; `.config` gains only the new modules' `CONFIG_ZEPHYR_*_MODULE` lines. `make test` builds both targets. Two findings: Zephyr's Wi-Fi CMake checks *every* hal_espressif blob, for all ESP chips (41 MB), so the image fetches them all; and on rv32 clang-tidy calls `(unsigned int)(first + 1U)` a redundant cast, so `ui.c` casts `first` instead. The new event names are in `docs/USAGE.md`; the quick reference waits for step 6 |
+| 6 | Not started |
 
 **Comparing Pico builds without the CYW43439 blobs.** Where `west blobs
 fetch hal_infineon` can't run, as in the cloud sessions this plan was
@@ -277,8 +278,8 @@ The port study's sections 6 and 7 hold the details. This step:
 
 - **Image.** `west.yml` gains hal_espressif, mbedtls and tf-psa-crypto.
   The Dockerfile gains the Zephyr SDK minimal with the riscv64 GNU
-  toolchain, esptool and hal_espressif's Python needs, and the C5 Wi-Fi
-  blobs.
+  toolchain, esptool and hal_espressif's Python needs, and hal_espressif's
+  blobs (all of them: Zephyr's Wi-Fi CMake checks every one).
 - **Toolchain.** `cmake/toolchain.cmake` names the `xiao_esp32c5` case
   explicitly (Zephyr SDK, GCC) instead of falling through.
   `scripts/clang-tidy-cross.py` handles RISC-V/GCC compile commands.
