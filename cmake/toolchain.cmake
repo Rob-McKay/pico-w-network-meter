@@ -1,18 +1,23 @@
 # Copyright (c) 2026 Rob McKay
 # SPDX-License-Identifier: Apache-2.0
 #
-# Choose the compiler: clang everywhere. Include before find_package(Zephyr).
+# Choose the compiler: clang, except where a board's SoC support needs GCC.
+# Include before find_package(Zephyr).
 #
-#   rpi_pico     Arm Toolchain for Embedded (ATfE), Arm's LLVM-based
-#                bare-metal toolchain (its armv6m multilib for the RP2040's
-#                Cortex-M0+), pinned to METER_ATFE_VERSION, with
-#                cmake/atfe.conf (lld, compiler-rt, _FORTIFY_SOURCE).
-#   native_sim   the host's clang (the unit tests; ATfE has no Linux
-#                runtimes for AddressSanitizer or coverage).
+#   rpi_pico       Arm Toolchain for Embedded (ATfE), Arm's LLVM-based
+#                  bare-metal toolchain (its armv6m multilib for the
+#                  RP2040's Cortex-M0+), pinned to METER_ATFE_VERSION, with
+#                  cmake/atfe.conf (lld, compiler-rt, _FORTIFY_SOURCE).
+#   native_sim     the host's clang (the unit tests; ATfE has no Linux
+#                  runtimes for AddressSanitizer or coverage).
+#   xiao_esp32c5   the Zephyr SDK's GCC (riscv64-zephyr-elf), Zephyr's
+#                  default: Espressif's SoC support builds only with GCC
+#                  (docs/port-esp32c5.md, section 6). The Docker image
+#                  installs the SDK at $ZEPHYR_SDK_INSTALL_DIR.
 #
-# Zephyr's variant for both is host/llvm, so a toolchain chosen explicitly
-# (ZEPHYR_TOOLCHAIN_VARIANT as a CMake or environment variable) other than
-# that wins, and other boards keep Zephyr's default.
+# Zephyr's variant for the first two is host/llvm, so a toolchain chosen
+# explicitly (ZEPHYR_TOOLCHAIN_VARIANT as a CMake or environment variable)
+# other than that wins, and other boards keep Zephyr's default.
 #
 # ATfE is found at LLVM_TOOLCHAIN_PATH, else $ATFE_PATH, else
 # /opt/atfe-<version> (where the Docker image installs it).
@@ -23,6 +28,10 @@ if(BOARD MATCHES "^rpi_pico")
   set(meter_toolchain atfe)
 elseif(BOARD MATCHES "^native_sim")
   set(meter_toolchain host_clang)
+elseif(BOARD MATCHES "^xiao_esp32c5")
+  # Zephyr's default (the Zephyr SDK) unless one is chosen explicitly.
+  message(STATUS "Toolchain: Zephyr's default for ${BOARD} (the Zephyr SDK's GCC)")
+  return()
 else()
   return()
 endif()

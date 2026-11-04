@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Rob McKay
 # SPDX-License-Identifier: Apache-2.0
 #
-# West manifest for the Pico W network meter.
+# West manifest for the network meter (Pico W and XIAO ESP32-C5).
 #
 # This repository is the manifest ("T2" topology): `west init -l` from here
 # fetches a pinned Zephyr plus only the modules the app needs.
@@ -26,6 +26,11 @@ manifest:
           - hal_rpi_pico
           # Infineon AIROC (CYW43439) Wi-Fi driver and its firmware blob
           - hal_infineon
+          # ESP32-C5 SoC support, Wi-Fi driver and its binary libraries
+          - hal_espressif
+          # The ESP32 Wi-Fi driver selects MBEDTLS and PSA_CRYPTO
+          - mbedtls
+          - tf-psa-crypto
 
   self:
     path: meter
