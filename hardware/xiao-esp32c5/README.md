@@ -6,6 +6,8 @@ the wiring the firmware expects (`app/boards/xiao_esp32c5_esp32c5_hpcore.overlay
 worked out in the [port study](../../docs/port-esp32c5.md), sections 1 and 7.
 
 - [BOM.md](BOM.md): the parts to buy, the antenna among them.
+- [breadboard.svg](breadboard.svg): the display wired up on a breadboard
+  (below).
 - [vendor/](vendor/README.md): Seeed's schematic, KiCad project and pinout
   sheet, which the pin choices and power notes below come from.
 
@@ -37,6 +39,20 @@ battery. The TFT needs only 3.3 V.
 | MTCK back pad, TP5 (4) | RGB LED green cathode, through 680 Ω | LEDC channel 1 |
 | MTDO back pad, TP4 (5) | RGB LED blue cathode, through 680 Ω | LEDC channel 2 |
 | — | TFT SDO (MISO), the module's SD card pins | Not connected: the panel is only written to |
+
+### On a breadboard
+
+![Breadboard wiring](breadboard.svg)
+
+The XIAO in columns 1–7, its USB-C at the column 1 end and its pins in
+rows c and g; the TFT's header in row a, pin 1 (VCC) in column 29 and
+pin 9 (SDO) in column 21, the module lying flat, screen up, over the top
+edge of the board. The 10 kΩ pull-up sits between the CS and VCC columns
+(27 and 29, row e). The buttons, dashed, go in later: each from its pad's
+column (row j) to the bottom − rail, with the − rails joined to the
+XIAO's GND. The diagram assumes the usual 2.2" module pin order (1 VCC,
+2 GND, 3 CS, 4 RESET, 5 DC, 6 SDI, 7 SCK, 8 LED, 9 SDO): check the labels
+on yours.
 
 Buttons use the chip's internal pull-ups, so they need nothing but a
 switch to ground. Without the RGB LED, D7 stays free and the back pads
