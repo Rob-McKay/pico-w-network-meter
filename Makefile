@@ -16,12 +16,21 @@
 #                              BUILD_ARGS=-DCONFIG_METER_LOG_LEVEL_DBG=y
 #                              to log every scan result on the console
 #                              (options stay set until `make clean`)
+#   make xiao                  build the firmware for a Seeed XIAO
+#                              ESP32-C5 with an ILI9341 TFT:
+#                              out/xiao/network-meter.bin (at 0x2000) and
+#                              network-meter-merged.bin (at 0); WIFI_COUNTRY=
+#                              is an ISO code here, default GB; BUILD_ARGS=
+#                              as for pico
 #   make test                  run the unit tests (native_sim) and the
 #                              documentation check
 #   make shell                 interactive shell in the build container
 #
-# Flash: hold BOOTSEL while plugging the Pico W in, then copy
+# Flash a Pico W: hold BOOTSEL while plugging it in, then copy
 # out/pico/network-meter.uf2 to the RPI-RP2 drive.
+# Flash a XIAO ESP32-C5 from the host (Docker on a Mac can't reach USB):
+#   esptool --chip esp32c5 write-flash 0x2000 out/xiao/network-meter.bin
+# or open out/xiao/network-meter-merged.bin in a browser flasher (at 0).
 
 IMAGE ?= pico-w-network-meter
 
@@ -36,7 +45,7 @@ BUILD_FLAGS = $(DOCKER_BUILD_FLAGS) $(if $(EXTRA_CA),--secret id=extra_ca$(comma
 DOCKER_TTY ?= -it
 DOCKER_RUN = docker run --rm $(DOCKER_TTY) -v $(CURDIR):/workdir/meter $(IMAGE)
 
-.PHONY: image image-multiarch pico test shell clean
+.PHONY: image image-multiarch pico xiao test shell clean
 
 image:
 	DOCKER_BUILDKIT=1 docker build $(BUILD_FLAGS) -t $(IMAGE) .
@@ -48,7 +57,7 @@ image-multiarch:
 
 BUILD_ARGS ?=
 
-pico:
+pico xiao:
 	docker run --rm $(DOCKER_TTY) -e WIFI_COUNTRY \
 		-v $(CURDIR):/workdir/meter $(IMAGE) scripts/build.sh $@ $(BUILD_ARGS)
 

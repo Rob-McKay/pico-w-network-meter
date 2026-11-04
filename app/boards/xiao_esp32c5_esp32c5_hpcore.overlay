@@ -1,0 +1,200 @@
+/*
+ * Copyright (c) 2026 Rob McKay
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Seeed XIAO ESP32-C5 with a 2.2" ILI9341 240x320 SPI TFT (a 3.3 V
+ * module), four push buttons to ground and a common-anode RGB LED, wired
+ * as in docs/port-esp32c5.md (section 7, "Wiring"):
+ *
+ *   Function          XIAO pad   GPIO
+ *   TFT SCK           D8         8     SPI2 SCLK (GPIO matrix)
+ *   TFT MOSI (SDI)    D10        10    SPI2 MOSI
+ *   TFT CS            D3         7     strapping pin: an input on the TFT
+ *   TFT DC (RS)       D2         25    strapping pin: an input on the TFT
+ *   TFT RESET         D6         11    (UART0 TX on the board: disabled)
+ *   TFT LED           D9         9     backlight, through a transistor
+ *   Button A, B       D0, D1     1, 0
+ *   Button X, Y       D4, D5     23, 24 (I2C0 on the board: disabled)
+ *   LED red           D7         12    LEDC channel 0
+ *   LED green, blue   MTCK, MTDO 4, 5  pads on the back; LEDC channels 1, 2
+ *
+ * The TFT's MISO is not connected (the driver only writes). The console is
+ * the C5's own USB Serial/JTAG, on the board's USB-C socket (the board's
+ * default).
+ *
+ * The node labels (meter_display, meter_buttons, meter_rgb_led,
+ * meter_led_red/green/blue, meter_leds, meter_backlight) are the ones the
+ * application uses (status_led.c): every board's overlay gives them.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
+
+/ {
+	chosen {
+		zephyr,display = &meter_display;
+	};
+
+	meter_display_bus: mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi2>;
+		dc-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
+		write-only;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		meter_display: ili9341@0 {
+			compatible = "ilitek,ili9341";
+			reg = <0>;
+			/* 10 MHz: the ILI9341's rated write clock. On the same
+			 * module over jumper wires, pi-zephyr-inet-radio ran
+			 * 9.6 MHz; 31.25 MHz left the screen white. Raise it
+			 * (20 MHz on the GPIO matrix) only with short wires.
+			 */
+			mipi-max-frequency = <DT_FREQ_M(10)>;
+			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+			/* The panel's own (portrait) size: the driver swaps
+			 * them for rotation 90, giving the UI 320x240.
+			 */
+			width = <240>;
+			height = <320>;
+			rotation = <90>;
+			/* This module is mirrored left-right in landscape
+			 * (seen on hardware in pi-zephyr-inet-radio); v-mirror
+			 * (MADCTL MY) flips the axis that rotation 90 puts
+			 * across the screen.
+			 */
+			v-mirror;
+			pixel-format = <PANEL_PIXEL_FORMAT_RGB_565X>;
+		};
+	};
+
+	meter_buttons: buttons {
+		compatible = "gpio-keys";
+		debounce-interval-ms = <30>;
+
+		button_a {
+			gpios = <&gpio0 1 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "A";
+			zephyr,code = <INPUT_KEY_A>;
+		};
+
+		button_b {
+			gpios = <&gpio0 0 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "B";
+			zephyr,code = <INPUT_KEY_B>;
+		};
+
+		button_x {
+			gpios = <&gpio0 23 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "X";
+			zephyr,code = <INPUT_KEY_X>;
+		};
+
+		button_y {
+			gpios = <&gpio0 24 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Y";
+			zephyr,code = <INPUT_KEY_Y>;
+		};
+	};
+
+	meter_rgb_led: rgb_led {
+		compatible = "pwm-leds";
+
+		meter_led_red: led_red {
+			pwms = <&ledc0 0 PWM_HZ(1000) PWM_POLARITY_INVERTED>;
+			label = "RGB LED red";
+		};
+
+		meter_led_green: led_green {
+			pwms = <&ledc0 1 PWM_HZ(1000) PWM_POLARITY_INVERTED>;
+			label = "RGB LED green";
+		};
+
+		meter_led_blue: led_blue {
+			pwms = <&ledc0 2 PWM_HZ(1000) PWM_POLARITY_INVERTED>;
+			label = "RGB LED blue";
+		};
+	};
+
+	/* Not "leds": the board has that node, for its yellow user LED. */
+	meter_leds: leds_ext {
+		compatible = "gpio-leds";
+
+		meter_backlight: backlight {
+			gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+			label = "LCD backlight";
+		};
+	};
+};
+
+&pinctrl {
+	spim2_tft: spim2_tft {
+		group1 {
+			pinmux = <SPIM2_SCLK_GPIO8>, <SPIM2_MOSI_GPIO10>;
+			output-low;
+		};
+	};
+
+	ledc0_rgb: ledc0_rgb {
+		group1 {
+			pinmux = <LEDC_CH0_GPIO12>, <LEDC_CH1_GPIO4>, <LEDC_CH2_GPIO5>;
+			output-enable;
+		};
+	};
+};
+
+&spi2 {
+	pinctrl-0 = <&spim2_tft>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+	dma-enabled;
+	status = "okay";
+};
+
+&ledc0 {
+	pinctrl-0 = <&ledc0_rgb>;
+	pinctrl-names = "default";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	channel0@0 {
+		reg = <0x0>;
+		timer = <0>;
+	};
+
+	channel1@1 {
+		reg = <0x1>;
+		timer = <0>;
+	};
+
+	channel2@2 {
+		reg = <0x2>;
+		timer = <0>;
+	};
+};
+
+/* Their pins are buttons, the TFT's reset and the LED here. */
+&uart0 {
+	status = "disabled";
+};
+
+&i2c0 {
+	status = "disabled";
+};
+
+/* The event log (event_log.c): 64 KB, as on the Pico, in place of the
+ * board's 192 KB, whose 48 sectors are more than the log opens
+ * (CONFIG_METER_EVENT_LOG_MAX_SECTORS). It stays at the end of the flash,
+ * which west flash and esptool's write-flash leave alone, so the log
+ * survives an update; esptool erase-flash wipes it.
+ */
+&storage_partition {
+	reg = <0x7b0000 DT_SIZE_K(64)>;
+};
