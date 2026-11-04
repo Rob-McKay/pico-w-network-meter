@@ -10,10 +10,12 @@ project(test_event_log)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/strict.cmake)
 meter_strict_warnings(app)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/meter_core.cmake)
+meter_core(app)
+
 set(APP_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../app/src)
 target_include_directories(app PRIVATE ${APP_SRC})
 target_sources(app PRIVATE
   src/main.c
   ${APP_SRC}/event_log.c
-  ${APP_SRC}/boot_record.c
 )

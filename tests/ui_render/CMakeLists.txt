@@ -10,6 +10,9 @@ project(test_ui_render)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/strict.cmake)
 meter_strict_warnings(app)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/meter_core.cmake)
+meter_core(app)
+
 set(APP_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../app/src)
 target_include_directories(app PRIVATE ${APP_SRC})
 target_sources(app PRIVATE
@@ -17,8 +20,4 @@ target_sources(app PRIVATE
   src/fake_display.c
   ${APP_SRC}/ui.c
   ${APP_SRC}/gfx.c
-  ${APP_SRC}/chan_stats.c
-  ${APP_SRC}/paging.c
-  ${APP_SRC}/boot_record.c
-  ${APP_SRC}/text_raster.c
 )

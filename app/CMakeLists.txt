@@ -10,23 +10,20 @@ project(network_meter)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/strict.cmake)
 meter_strict_warnings(app)
 
+# The hardware-independent core (cmake/meter_core.cmake), then the rest.
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/meter_core.cmake)
+meter_core(app)
+
 target_sources(app PRIVATE
   src/main.c
-  src/chan_stats.c
-  src/ap_history.c
   src/scan_task.c
-  src/scan_health.c
-  src/paging.c
-  src/boot_record.c
   src/event_log.c
   src/reset_note.c
   src/watchdog.c
   src/scanner.c
   src/ui.c
   src/gfx.c
-  src/text_raster.c
   src/controls.c
-  src/keys.c
   src/status_led.c
 )
 
