@@ -44,13 +44,15 @@ battery. The TFT needs only 3.3 V.
 
 ![Breadboard wiring](breadboard.svg)
 
-The XIAO in columns 1–7, its USB-C at the column 1 end and its pins in
-rows c and g; the TFT's header in row a, pin 1 (VCC) in column 29 and
-pin 9 (SDO) in column 21, the module lying flat, screen up, over the top
-edge of the board. The 10 kΩ pull-up sits between the CS and VCC columns
-(27 and 29, row e). The buttons, dashed, go in later: each from its pad's
-column (row j) to the bottom − rail, with the − rails joined to the
-XIAO's GND. The module's pins are 1 VCC, 2 GND, 3 CS, 4 RESET, 5 DC,
+Seen from above, column 1 on the left and row a at the bottom. The XIAO
+is in columns 1–7, its USB-C at the column 1 end, with its 5V…D7 pins in
+row g and its D0…D6 pins in row c. The TFT's header is in row f, pin 1
+(VCC) in column 29 and pin 9 (SDO) in column 21, and the module lies over
+rows a–f and off the bottom edge. Its pins join rows f–j of their columns,
+so its wires go into rows g–j. The 10 kΩ pull-up sits between the CS and
+VCC columns (27 and 29, row j). The buttons, dashed, go in later: each
+from its pad's column (row a) to the bottom − rail, with the − rails joined
+to the XIAO's GND. The module's pins are 1 VCC, 2 GND, 3 CS, 4 RESET, 5 DC,
 6 SDI, 7 SCK, 8 LED, 9 SDO (checked on the module).
 
 Buttons use the chip's internal pull-ups, so they need nothing but a
