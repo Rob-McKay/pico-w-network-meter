@@ -5,16 +5,22 @@ channel is, so you can pick the best channel for your own router. A
 printable one-page version of this guide is in
 [quick-reference.pdf](quick-reference.pdf).
 
+It works the same on both of the meter's targets, the Raspberry Pi Pico W
+with a Pico Display Pack 2.0 and the Seeed XIAO ESP32-C5 with a 2.2" TFT.
+What differs between them, such as flashing and the battery, is in
+[Pico W and XIAO ESP32-C5](#pico-w-and-xiao-esp32-c5) below.
+
 ## Starting up
 
-Plug the Pico W into any USB power supply. The screen shows
-**Scanning...** and the LED turns blue. The first results appear a few
-seconds later. After that the meter scans again every 10 seconds on its
-own.
+Plug the meter into any USB power supply, or switch on its battery. The
+screen shows **Scanning...** and the LED turns blue. The first results
+appear a few seconds later. After that the meter scans again every 10
+seconds on its own.
 
 ## Buttons
 
-The four buttons are beside the screen, two on each side.
+There are four buttons, A, B, X and Y. On the Pico W's Display Pack they
+are beside the screen, A and B on the left, X and Y on the right.
 
 | Button | What it does |
 |---|---|
@@ -80,8 +86,8 @@ such as "10-13 of 13".
 ![Second page of the networks screen](screens/networks-page2.png)
 
 The footer gives how many networks are showing ("heard"), and how many
-results were ignored ("other"): those not on a 2.4 GHz channel, or past
-the 64 the meter keeps. Each access point counts once, so a router with a
+results were ignored ("other"): those not on a 2.4 GHz channel (on the
+XIAO, its 5 GHz networks, for now), or past the 64 the meter keeps. Each access point counts once, so a router with a
 guest network counts twice.
 
 ### Events
@@ -151,7 +157,7 @@ heard nothing for a while.
 
 ## LED
 
-The RGB LED is on the right of the screen.
+The RGB LED is to the right of the screen on the Pico W's Display Pack.
 
 | LED | Meaning |
 |---|---|
@@ -169,30 +175,46 @@ The RGB LED is on the right of the screen.
   to the router.
 - **Walk around:** the readings change from room to room. Press **X** on
   the Channels screen for an immediate scan after moving.
-- **Only 2.4 GHz:** the Pico W's radio cannot hear 5 GHz networks.
+- **Only 2.4 GHz:** the Pico W's radio cannot hear 5 GHz networks. The
+  XIAO's can, but the meter shows only 2.4 GHz for now.
 - **Keep away from USB 3 hubs:** they give off noise across the 2.4 GHz
   band that drowns out all but the strongest networks. Use a long cable or
   a USB charger, away from computers and hubs. If only your own router
   shows up, this is the likely cause.
-- **Serial console:** the Pico's USB socket is also a serial port. On a Mac
-  it appears as `/dev/cu.usbmodem<N>` (`ls /dev/cu.usbmodem*` finds it):
-  open it with `screen /dev/cu.usbmodem<N> 115200`, and quit with Ctrl-A
-  then K. On Linux it is `/dev/ttyACM<N>`. Each scan's per-channel figures
-  are printed there. Logging starts when the port is opened, so the first
-  moments after power-up are not shown.
+- **Serial console:** the board's USB socket is also a serial port. On a
+  Mac it appears as `/dev/cu.usbmodem<N>` (`ls /dev/cu.usbmodem*` finds
+  it): open it with `screen /dev/cu.usbmodem<N> 115200`, and quit with
+  Ctrl-A then K. On Linux it is `/dev/ttyACM<N>`. Each scan's per-channel
+  figures are printed there. On the Pico W, logging starts when the port
+  is opened, so the first moments after power-up are not shown.
 
 ## Settings
 
-Change these when building the firmware: `make pico` with
+Change these when building the firmware: `make pico` or `make xiao` with
 `WIFI_COUNTRY=...`, or `-DCONFIG_...=` options passed to
 `scripts/build.sh` (see the README).
 
 | Setting | Default | |
 |---|---|---|
-| `WIFI_COUNTRY` | `UNITED_KINGDOM` | Which channels may be scanned (the US stops at 11) |
+| `WIFI_COUNTRY` | `UNITED_KINGDOM` (Pico W), `GB` (XIAO) | Which channels may be scanned (the US stops at 11): a WHD country name on the Pico W, an ISO 3166 code on the XIAO |
 | `CONFIG_METER_SCAN_INTERVAL_S` | 10 | Seconds between scans |
 | `CONFIG_METER_RECOVER_AFTER` | 5 | Failed scans in a row before the meter restarts itself (0: never) |
 | `CONFIG_METER_FADE_START_S` | 60 | Seconds at full brightness |
 | `CONFIG_METER_FADE_END_S` | 120 | Seconds until a network is removed |
 | `CONFIG_METER_FADE_MIN_PERCENT` | 40 | Brightness a network fades to before it is removed (0: fade to black) |
 | `CONFIG_METER_LED_BRIGHTNESS` | 2 | LED brightness, percent (1 is the dimmest) |
+
+## Pico W and XIAO ESP32-C5
+
+The screens, buttons and LED are the same on both. These differ; each
+target's guide ([Pico W](targets/pico.md),
+[XIAO ESP32-C5](targets/xiao-esp32c5.md)) has the details.
+
+| | Pico W with Display Pack 2.0 | XIAO ESP32-C5 with 2.2" TFT |
+|---|---|---|
+| **Flashing** | Hold BOOTSEL while plugging it in, copy `network-meter.uf2` to the `RPI-RP2` drive | `esptool --chip esp32c5 write-flash 0x2000 network-meter.bin` over USB-C (hold BOOT while plugging in if it won't connect), or the merged image with a browser flasher |
+| **Battery** | A separate charger (LiPo Amigo Pro) in the printed case; its USB-C socket charges and powers the meter | The XIAO charges a LiPo on its BAT pads from its own USB-C socket, and runs from it when unplugged |
+| **Console** | The Pico's USB socket (inside the case) | The XIAO's USB-C socket |
+| **Bands** | 2.4 GHz only | Hears 2.4 and 5 GHz; shows 2.4 GHz for now |
+| **Unexplained restarts** | All shown as "restart after …" | Named where the chip says why: "HW watchdog", "brown-out", "CPU fault" |
+| **Tested on hardware** | Yes | Not yet |

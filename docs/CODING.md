@@ -20,6 +20,14 @@ which GitHub fills into every new pull request.
 [CLAUDE.md](../CLAUDE.md) summarises them for Claude Code, which reads it
 in every session on this repository.
 
+**Two targets.** Every change must pass `make test`, which builds the
+firmware for both, and `make pico` and `make xiao` must build with no
+warnings from this repository's code. A pull request says what was tested
+on each target's hardware (a Pico W with a Display Pack, a XIAO ESP32-C5
+with its TFT), or that it wasn't. When behaviour, buttons, LED colours or
+settings change, update the README, `docs/USAGE.md`, the quick reference
+and the guide of every target the change affects (`docs/targets/`).
+
 ## 0. The build checks every file
 
 Every target with our code calls `meter_strict_warnings()` from
