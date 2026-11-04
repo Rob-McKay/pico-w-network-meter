@@ -3,9 +3,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Unit tests for the network meter's hardware-independent code: the
- * channel statistics (chan_stats.c) and the text rasteriser
- * (text_raster.c).
+ * Unit tests for the network meter's hardware-independent code: the core
+ * (app/src/core: channel statistics, network history, text rasterising,
+ * scan health, paging, boot records, key chords, country codes) and the
+ * mapping of hwinfo's reset flags (reset_cause.c).
  */
 
 #include <errno.h>
@@ -13,14 +14,17 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <zephyr/drivers/hwinfo.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/ztest.h>
 
 #include "ap_history.h"
 #include "boot_record.h"
 #include "chan_stats.h"
+#include "country_code.h"
 #include "keys.h"
 #include "paging.h"
+#include "reset_cause.h"
 #include "rgb565.h"
 #include "scan_health.h"
 #include "text_raster.h"
@@ -1080,7 +1084,135 @@ ZTEST(meter_boot, test_from_note)
 	zassert_equal(r.uptime_s, 600);
 }
 
+/**
+ * @brief The hardware's reset cause survives the flash format in the byte
+ *        that used to be zero; records from before it, and causes this
+ *        firmware doesn't know, read as unknown.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_boot, test_hw_reset_round_trip)
+{
+	struct boot_record in = {.boot = 7, .cause = BOOT_UNEXPLAINED, .hw_reset = BOOT_HW_PIN};
+	struct boot_record out;
+	uint8_t bytes[BOOT_RECORD_SIZE];
+
+	boot_record_encode(&in, bytes);
+	zassert_equal(bytes[2], BOOT_HW_PIN, "in byte 2");
+	zassert_equal(bytes[3], 0, "byte 3 still zero");
+	zassert_ok(boot_record_decode(bytes, sizeof(bytes), &out));
+	zassert_equal(out.hw_reset, BOOT_HW_PIN);
+
+	bytes[2] = 0;
+	zassert_ok(boot_record_decode(bytes, sizeof(bytes), &out), "a record from before it");
+	zassert_equal(out.hw_reset, BOOT_HW_UNKNOWN);
+
+	bytes[2] = BOOT_HW_COUNT;
+	zassert_ok(boot_record_decode(bytes, sizeof(bytes), &out), "not refused for it");
+	zassert_equal(out.hw_reset, BOOT_HW_UNKNOWN);
+
+	in.hw_reset = BOOT_HW_UNKNOWN;
+	boot_record_encode(&in, bytes);
+	zassert_equal(bytes[2], 0, "unknown writes the old zero byte");
+}
+
+/**
+ * @brief A start the note can't explain is named by the hardware's reset
+ *        cause where there is one; the meter's own restarts are not.
+ *
+ * @sideeffects None. errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_boot, test_describe_hw_reset)
+{
+	struct boot_record r = {.boot = 12, .cause = BOOT_UNEXPLAINED, .uptime_s = 3600};
+	char text[40];
+
+	r.hw_reset = BOOT_HW_PIN;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 reset button after 1h00m");
+	r.hw_reset = BOOT_HW_WATCHDOG;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 HW watchdog after 1h00m");
+	r.hw_reset = BOOT_HW_BROWNOUT;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 brown-out after 1h00m");
+	r.hw_reset = BOOT_HW_CPU_FAULT;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 CPU fault after 1h00m");
+	r.hw_reset = BOOT_HW_SOFTWARE;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 restart after 1h00m", "software adds nothing");
+
+	r.cause = BOOT_POWER_ON;
+	r.hw_reset = BOOT_HW_BROWNOUT;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 brown-out");
+	r.hw_reset = BOOT_HW_POWER_ON;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 power on");
+
+	r.cause = BOOT_WIFI_RESTART;
+	r.hw_reset = BOOT_HW_SOFTWARE;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#12 Wi-Fi restart after 1h00m", "the note's reason wins");
+
+	r.cause = BOOT_UNEXPLAINED;
+	r.boot = 1234;
+	r.uptime_s = (12U * 86400U) + (3U * 3600U);
+	r.hw_reset = BOOT_HW_WATCHDOG;
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_true(strlen(text) <= 32U, "fits the events screen: \"%s\"", text);
+}
+
 ZTEST_SUITE(meter_boot, NULL, NULL, NULL, NULL, NULL);
+
+/**
+ * @brief Two upper-case letters, or "00", are country codes; anything else
+ *        isn't.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_country, test_country_codes)
+{
+	static const char *const good[] = {"GB", "US", "DE", "JP", "00"};
+	static const char *const bad[] = {"", "G", "GBR", "gb", "Gb", "0", "01", "G1", "  ", "@Z"};
+
+	for (size_t i = 0; i < ARRAY_SIZE(good); i++) {
+		zassert_true(country_code_valid(good[i]), "\"%s\"", good[i]);
+	}
+	for (size_t i = 0; i < ARRAY_SIZE(bad); i++) {
+		zassert_false(country_code_valid(bad[i]), "\"%s\"", bad[i]);
+	}
+	zassert_false(country_code_valid(NULL));
+}
+
+ZTEST_SUITE(meter_country, NULL, NULL, NULL, NULL, NULL);
+
+/**
+ * @brief Each hwinfo reset flag maps to its cause, the most telling first
+ *        when several are set.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_reset_cause, test_from_flags)
+{
+	zassert_equal(reset_cause_from_flags(0), BOOT_HW_UNKNOWN);
+	zassert_equal(reset_cause_from_flags(RESET_POR), BOOT_HW_POWER_ON);
+	zassert_equal(reset_cause_from_flags(RESET_PIN), BOOT_HW_PIN);
+	zassert_equal(reset_cause_from_flags(RESET_SOFTWARE), BOOT_HW_SOFTWARE);
+	zassert_equal(reset_cause_from_flags(RESET_WATCHDOG), BOOT_HW_WATCHDOG);
+	zassert_equal(reset_cause_from_flags(RESET_BROWNOUT), BOOT_HW_BROWNOUT);
+	zassert_equal(reset_cause_from_flags(RESET_CPU_LOCKUP), BOOT_HW_CPU_FAULT);
+	zassert_equal(reset_cause_from_flags(RESET_LOW_POWER_WAKE), BOOT_HW_WAKE);
+	zassert_equal(reset_cause_from_flags(RESET_DEBUG), BOOT_HW_OTHER);
+
+	zassert_equal(reset_cause_from_flags(RESET_POR | RESET_BROWNOUT), BOOT_HW_BROWNOUT,
+		      "a brown-out also shows as a power-on");
+	zassert_equal(reset_cause_from_flags(RESET_PIN | RESET_WATCHDOG), BOOT_HW_WATCHDOG);
+	zassert_equal(reset_cause_from_flags(RESET_POR | RESET_PIN), BOOT_HW_PIN);
+}
+
+ZTEST_SUITE(meter_reset_cause, NULL, NULL, NULL, NULL, NULL);
 
 /**
  * @brief Single presses pass through; releases give nothing.

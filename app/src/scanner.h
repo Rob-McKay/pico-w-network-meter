@@ -17,13 +17,16 @@
 /**
  * @brief Find the Wi-Fi interface and listen for scan events.
  *
- * Call once, before scanner_run().
+ * Call once, before scanner_run(). With CONFIG_METER_WIFI_REG_DOMAIN, also
+ * sets the Wi-Fi country (wifi_country_apply()); a driver that refuses it
+ * keeps its own, and scans still run.
  *
  * @retval 0 Ready.
  * @retval -ENODEV No Wi-Fi interface.
  *
  * @sideeffects Sets @c wifi_iface and registers the scan event callback with net_mgmt; logs a
- *              missing interface. errno unchanged.
+ *              missing interface; those of wifi_country_apply() with
+ *              CONFIG_METER_WIFI_REG_DOMAIN. errno unchanged.
  */
 int scanner_init(void);
 

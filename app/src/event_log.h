@@ -28,10 +28,14 @@
  *
  * Flash holding something other than a log (or a log with an unknown
  * format) is erased and started afresh. Opening it again reads it again.
+ * A storage partition with more sectors than
+ * CONFIG_METER_EVENT_LOG_MAX_SECTORS is left untouched.
  *
  * @retval 0 Open.
- * @retval <0 Negative errno: no storage partition, or flash that can't be
- *         read or erased. The log stays closed and empty.
+ * @retval -ENOMEM The storage partition has more sectors than
+ *         CONFIG_METER_EVENT_LOG_MAX_SECTORS. The log stays closed and empty.
+ * @retval <0 Other negative errno: no storage partition, or flash that
+ *         can't be read or erased. The log stays closed and empty.
  *
  * @sideeffects Reads the storage partition, and may erase it; fills the module's FCB state and
  *              its RAM copy of the newest records; logs what it found and any failure. errno

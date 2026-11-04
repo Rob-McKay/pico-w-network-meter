@@ -224,6 +224,9 @@ OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
 | `app/src/watchdog.c` | Task watchdog per thread, with the hardware watchdog behind it |
 | `app/src/ui.c`, `gfx.c`, `core/text_raster.c` | The screens; drawing straight to the panel through a one-line band buffer (no frame buffer); text in Zephyr's CFB fonts |
 | `app/src/controls.c`, `status_led.c` | Buttons (input subsystem, `gpio-keys`); RGB LED (LED API, `pwm-leds`) and backlight (`gpio-leds`) |
+| `app/src/core/country_code.c` | Wi-Fi country codes: what `CONFIG_METER_WIFI_COUNTRY` may be (no Zephyr dependencies) |
+| `app/src/wifi_country.c` | Sets the Wi-Fi country through Zephyr's regulatory-domain request, for drivers that take it (`CONFIG_METER_WIFI_COUNTRY`; not the Pico W's) |
+| `app/src/reset_cause.c` | The hardware's reset cause, kept in each start's record (`CONFIG_METER_RESET_CAUSE_HWINFO`; not the Pico W's) |
 | `app/src/core/` | The hardware-independent core: the files above marked "no Zephyr dependencies" (no device APIs), built into the firmware and every test suite from one list, `cmake/meter_core.cmake` |
 | `app/src/core/keys.c` | X and Y pressed together, from key presses and releases (no Zephyr dependencies) |
 | `app/boards/rpi_pico_rp2040_w.overlay`, `.conf` | The Pico W's own parts, which Zephyr adds by board name: the Display Pack 2.0 devicetree, the console on the USB port, the CYW43439's country |

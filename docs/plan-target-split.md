@@ -135,7 +135,7 @@ board `.conf` need not mention it.
 | `METER_SCAN_DWELL_PASSIVE_MS`, `METER_SCAN_DWELL_ACTIVE_MS` | `0`: driver default | `130`, `0` | nothing; `scanner.c` passes them in `wifi_scan_params` (needs the driver patch on the C5) |
 | `METER_SCAN_TIMEOUT_S` (exists) | 15 | 30 until the dwell is tuned | |
 | `METER_RESET_CAUSE_HWINFO` (bool) | `n` | `y` | nothing; records `hwinfo_get_reset_cause()` (power-on, pin, software, watchdog, panic, brown-out) in the boot record. The boot record format needs a field: `boot_record.c` and its tests |
-| `METER_RESET_NOTE_RETAINED` (bool) | `n`: `__noinit` | `n` at first; `y` only if hardware testing shows the note lost (port study, risk 6) | splits `reset_note.c`'s storage into a noinit backend (today) and a Zephyr retention backend on `retainedmem0` |
+| `METER_RESET_NOTE_RETAINED` (bool) | `n`: `__noinit` | `n` at first; `y` only if hardware testing shows the note lost (port study, risk 6) | splits `reset_note.c`'s storage into a noinit backend (today) and a Zephyr retention backend on `retainedmem0`. **Deferred** (see step 4) |
 | `METER_EVENT_LOG_MAX_SECTORS` (int) | 16 | 16 (with the 64 KB partition below) | the constant `MAX_SECTORS`; plus a clear `LOG_ERR` naming the partition when it has more sectors than this |
 | `METER_USB_CONSOLE_FLOW` (bool, in `src/target/pico/Kconfig`) | `y if USBD_CDC_ACM_CLASS` | not available | `target_sources_ifdef(CONFIG_USBD_CDC_ACM_CLASS ...)` |
 
@@ -172,7 +172,8 @@ before and after, then diff `build/pico/zephyr/zephyr.dts` and
 | 1. Neutral names | Done: `refactor-neutral-names`. Pico `zephyr.bin` and `.config` byte-identical, `zephyr.dts` identical apart from the renamed labels and comments, screenshots byte-identical |
 | 2. Pico-only configuration into the board files | Done: `refactor-pico-board-files`. Pico `zephyr.bin` byte-identical; `.config` gains only `CONFIG_METER_USB_CONSOLE_FLOW=y`; `zephyr.dts` identical apart from comments. `check-style.sh` and `check-docs.py` now walk subdirectories, so `src/target/` stays checked |
 | 3. Separate the hardware-independent core | Done: `refactor-core-dir`. The link order changes, so `zephyr.bin` differs; instead every image symbol has the same name, type and size, and all 18 app object files have identical code, relocations and data (debug information aside). `.config` identical |
-| 4–6 | Not started |
+| 4. Shared hooks (off by default) | Done: `refactor-shared-hooks`, without the reset-note backend (deferred, see step 4). Pico `.config` gains only the new options, at their defaults; `zephyr.dts` identical; `zephyr.bin` +464 B flash, +8 B RAM, all in `boot_record_*`, `event_log_init`/`open_fcb` and `log_one_start`. None of `wifi_country.c`, `reset_cause.c` or `country_code.c` is in the Pico image. With the hooks on, the app builds for the XIAO ESP32-C5 with no warnings |
+| 5–6 | Not started. Step 5 also documents the new event names ("reset button", "HW watchdog", "brown-out", "CPU fault") in `docs/USAGE.md`, when a board first records them |
 
 **Comparing Pico builds without the CYW43439 blobs.** Where `west blobs
 fetch hal_infineon` can't run, as in the cloud sessions this plan was
@@ -249,6 +250,17 @@ debug information records line numbers.
   dwell parameters in `scanner.c`, the hwinfo reset cause in
   `boot_record`, the reset-note backend split and
   `METER_EVENT_LOG_MAX_SECTORS`.
+- *As done*: all but the reset-note backend split. The ESP32-C5
+  datasheet (§4.1.3.2) says every reset but a chip reset keeps internal
+  memory, so `__noinit` should survive the meter's restarts there as on
+  the RP2040. The only risk left is the boot ROM overwriting it, which only
+  hardware can show. The backend is built if step 5's hardware tests show
+  the note lost, not before.
+- *Found on the way*: `event_log_init()` treated a sector table that
+  doesn't fit as foreign data, erasing the whole partition at every start
+  and still failing. It now leaves the partition alone and logs why
+  (`-ENOMEM`). The new `meter_event_log_too_small` test fails against the
+  old behaviour.
 - Unit tests for every pure part:
   - the new boot-record field and its description ("reset button",
     "brown-out", ...);
