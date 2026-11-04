@@ -21,14 +21,15 @@ LOG_MODULE_REGISTER(event_log, CONFIG_METER_LOG_LEVEL);
 #define FCB_MAGIC     0x4d54524cU
 /* The FCB's format version: the records' own version is inside them. */
 #define FCB_VERSION   1U
-/* Most flash sectors the log uses. */
-#define MAX_SECTORS   16U
 
 /* The log in flash, and a copy of its newest records in RAM: a ring, the
  * oldest at recent_start. Main thread only.
  */
 static struct fcb fcb;
-static struct flash_sector sectors[MAX_SECTORS];
+/* struct fcb counts sectors in a uint16_t. */
+BUILD_ASSERT(CONFIG_METER_EVENT_LOG_MAX_SECTORS <= UINT16_MAX, "too many sectors for the FCB");
+static struct flash_sector sectors[CONFIG_METER_EVENT_LOG_MAX_SECTORS];
+static uint32_t sector_count;
 static bool log_open;
 static struct boot_record recent[EVENT_LOG_RECENT];
 static size_t recent_start;
@@ -137,25 +138,35 @@ static int dump_entry(struct fcb_entry_ctx *ctx, void *arg)
 }
 
 /**
- * @brief Set up the FCB over the storage partition's sectors.
+ * @brief Read the storage partition's sector table.
+ *
+ * @retval 0 Read.
+ * @retval -ENOMEM The partition has more sectors than CONFIG_METER_EVENT_LOG_MAX_SECTORS.
+ * @retval <0 Another negative errno from the flash map.
+ *
+ * @sideeffects Reads the flash layout; fills @c sectors and @c sector_count. errno unchanged.
+ */
+static int load_sectors(void)
+{
+	sector_count = ARRAY_SIZE(sectors);
+
+	return flash_area_get_sectors(LOG_PARTITION, &sector_count, sectors);
+}
+
+/**
+ * @brief Set up the FCB over the storage partition's sectors (load_sectors()).
  *
  * @retval 0 Open.
- * @retval <0 Negative errno from the flash map or the FCB.
+ * @retval <0 Negative errno from the FCB: the sectors hold something else.
  *
- * @sideeffects Reads the storage partition; fills @c fcb and @c sectors. errno unchanged.
+ * @sideeffects Reads the storage partition; fills @c fcb. errno unchanged.
  */
 static int open_fcb(void)
 {
-	uint32_t count = ARRAY_SIZE(sectors);
-	int ret = flash_area_get_sectors(LOG_PARTITION, &count, sectors);
-
-	if (ret != 0) {
-		return ret;
-	}
 	fcb = (struct fcb){
 		.f_magic = FCB_MAGIC,
 		.f_version = FCB_VERSION,
-		.f_sector_cnt = (uint16_t)count,
+		.f_sector_cnt = (uint16_t)sector_count,
 		.f_sectors = sectors,
 	};
 
@@ -188,7 +199,9 @@ static int erase_partition(void)
  * Public interface: documented in event_log.h.
  *
  * fcb_init() refuses sectors that hold something else; those are erased once and the log
- * started again. The RAM copy starts empty, so opening the log again reads it afresh.
+ * started again. A partition whose sector table doesn't fit is a configuration error, not
+ * foreign data: erasing it would change nothing, so it is left alone. The RAM copy starts
+ * empty, so opening the log again reads it afresh.
  */
 int event_log_init(void)
 {
@@ -198,6 +211,17 @@ int event_log_init(void)
 	recent_start = 0;
 	recent_count = 0;
 	last_boot = 0;
+	ret = load_sectors();
+	if (ret == -ENOMEM) {
+		LOG_ERR("Event log off: storage_partition has more than %u sectors "
+			"(CONFIG_METER_EVENT_LOG_MAX_SECTORS)",
+			(unsigned int)CONFIG_METER_EVENT_LOG_MAX_SECTORS);
+		return ret;
+	}
+	if (ret != 0) {
+		LOG_ERR("Event log off: no storage_partition layout (%d)", ret);
+		return ret;
+	}
 	ret = open_fcb();
 
 	if (ret != 0) {

@@ -1,0 +1,17 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+#
+# The event log's options (src/event_log.c). Sourced by app/Kconfig and by
+# tests/event_log/Kconfig, which builds event_log.c on its own.
+
+config METER_EVENT_LOG_MAX_SECTORS
+	int "Most flash sectors the event log can use"
+	default 16
+	range 2 1024
+	help
+	  Room for the storage partition's sector table. A partition with
+	  more sectors than this can't be opened: the log is then left off,
+	  with an error naming the partition, and the partition is not
+	  touched. Each sector costs 8 bytes of RAM. Pick the partition's
+	  size to match rather than raise this: the Pico W's 64 KB
+	  partition has 16 sectors of 4 KB.

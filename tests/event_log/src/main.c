@@ -6,9 +6,20 @@
  * The event log (event_log.c) on native_sim's simulated flash: it keeps
  * records across a reopen, as across a restart; erases its oldest sector
  * when full; and starts afresh on flash that holds something else.
+ *
+ * A storage partition with more sectors than
+ * CONFIG_METER_EVENT_LOG_MAX_SECTORS is a configuration error, not foreign
+ * data: the log stays off and the flash untouched. scripts/test.sh builds
+ * this suite twice to cover both: as configured (meter_event_log), and with
+ * a limit below the partition's sectors (meter_event_log_too_small). Each
+ * build compiles only the suite that fits it: ztest counts a suite excluded
+ * at run time as one that didn't run, and fails.
  */
 
+#include <errno.h>
 #include <string.h>
+
+#include <zephyr/devicetree.h>
 
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/ztest.h>
@@ -16,7 +27,13 @@
 #include "boot_record.h"
 #include "event_log.h"
 
-#define LOG_PARTITION PARTITION_ID(storage_partition)
+#define LOG_PARTITION  PARTITION_ID(storage_partition)
+/* The storage partition's sectors, from the devicetree: its size over its flash's erase block
+ * size. Each build compiles the suite that fits CONFIG_METER_EVENT_LOG_MAX_SECTORS.
+ */
+#define PARTITION_NODE DT_NODELABEL(storage_partition)
+#define PARTITION_SECTORS                                                                          \
+	(DT_REG_SIZE(PARTITION_NODE) / DT_PROP(DT_GPARENT(PARTITION_NODE), erase_block_size))
 
 /**
  * @brief Erase the log's partition before each test.
@@ -34,6 +51,8 @@ static void erase(void *fixture)
 	zassert_ok(flash_area_erase(fa, 0, fa->fa_size));
 	flash_area_close(fa);
 }
+
+#if PARTITION_SECTORS <= CONFIG_METER_EVENT_LOG_MAX_SECTORS
 
 /**
  * @brief Add a start to the log, as the meter does at start-up.
@@ -172,3 +191,36 @@ ZTEST(meter_event_log, test_dump)
 }
 
 ZTEST_SUITE(meter_event_log, NULL, NULL, erase, NULL, NULL);
+
+#else /* the partition has more sectors than the log allows */
+
+/**
+ * @brief A partition with more sectors than the log allows leaves the log
+ *        off, with -ENOMEM, and the flash as it was: it is not erased as
+ *        foreign data, every start.
+ *
+ * @sideeffects Writes and reads the simulated flash. errno unchanged.
+ */
+ZTEST(meter_event_log_too_small, test_left_alone)
+{
+	struct boot_record r = {.boot = 1, .cause = BOOT_POWER_ON};
+	const struct flash_area *fa;
+	uint8_t marker[16];
+	uint8_t back[sizeof(marker)];
+
+	(void)memset(marker, 0x5a, sizeof(marker));
+	zassert_ok(flash_area_open(LOG_PARTITION, &fa));
+	zassert_ok(flash_area_write(fa, 0, marker, sizeof(marker)));
+
+	zassert_equal(event_log_init(), -ENOMEM);
+	zassert_equal(event_log_count(), 0);
+	zassert_equal(event_log_add(&r), -ENODEV, "the log stays closed");
+
+	zassert_ok(flash_area_read(fa, 0, back, sizeof(back)));
+	flash_area_close(fa);
+	zassert_mem_equal(back, marker, sizeof(marker), "not erased");
+}
+
+ZTEST_SUITE(meter_event_log_too_small, NULL, NULL, erase, NULL, NULL);
+
+#endif

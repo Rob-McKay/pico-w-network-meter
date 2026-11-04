@@ -29,6 +29,55 @@ config METER_SCAN_PASSIVE
 	  weak and distant networks that an active scan, with its short
 	  stay on each channel, misses. A sweep takes a second or two.
 
+config METER_SCAN_DWELL_PASSIVE_MS
+	int "Time on each channel in a passive scan, ms"
+	default 0
+	range 0 1500
+	help
+	  How long a passive scan listens on each channel (Zephyr's
+	  wifi_scan_params.dwell_time_passive). 0 leaves it to the Wi-Fi
+	  driver. Beacons come about every 102 ms, so 120-150 ms hears
+	  every network once a sweep; longer makes a sweep slower. Drivers
+	  that ignore the setting scan as before.
+
+config METER_SCAN_DWELL_ACTIVE_MS
+	int "Time on each channel in an active scan, ms"
+	default 0
+	range 0 1500
+	help
+	  How long an active scan (METER_SCAN_PASSIVE=n) stays on each
+	  channel (wifi_scan_params.dwell_time_active). 0 leaves it to the
+	  Wi-Fi driver.
+
+config METER_WIFI_COUNTRY
+	string "Wi-Fi country, ISO 3166 alpha-2"
+	default ""
+	help
+	  The regulatory domain the meter asks the Wi-Fi driver for at
+	  start-up (NET_REQUEST_WIFI_REG_DOMAIN), which decides the channels
+	  it scans: for example "GB", "US", "DE", or "00" for the world-safe
+	  set. Empty leaves it to the driver: on the Pico W, the AIROC
+	  driver has no regulatory-domain request and takes its country
+	  from CONFIG_WHD_WIFI_COUNTRY instead.
+
+config METER_WIFI_REG_DOMAIN
+	bool
+	default y if METER_WIFI_COUNTRY != ""
+	help
+	  Set when METER_WIFI_COUNTRY names a country: builds
+	  src/wifi_country.c.
+
+config METER_RESET_CAUSE_HWINFO
+	bool "Record the hardware's reset cause with each start"
+	select HWINFO
+	help
+	  Reads the reset cause from the hardware (hwinfo_get_reset_cause())
+	  and keeps it in each start's record, so the events screen can
+	  name what the restart note can't tell apart: the reset button, a
+	  hardware watchdog, a brown-out, a CPU fault. Only for boards whose
+	  hwinfo driver reports it reliably: the RP2040's keeps the last
+	  power-on until the next one, so the Pico W leaves this off.
+
 config METER_RETRY_S
 	int "Seconds before retrying a scan that heard nothing"
 	default 2
@@ -96,6 +145,9 @@ config METER_SCAN_STACK_SIZE
 config METER_SCAN_PRIORITY
 	int "Scan thread priority"
 	default 5
+
+# The event log's options, shared with tests/event_log.
+rsource "Kconfig.event_log"
 
 # Options that only one target has (src/target/<target>/Kconfig).
 rsource "src/target/*/Kconfig"

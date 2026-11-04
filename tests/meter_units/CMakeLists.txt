@@ -17,4 +17,5 @@ set(APP_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../app/src)
 target_include_directories(app PRIVATE ${APP_SRC})
 target_sources(app PRIVATE
   src/main.c
+  ${APP_SRC}/reset_cause.c
 )

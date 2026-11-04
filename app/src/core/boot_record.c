@@ -48,14 +48,15 @@ static int32_t from_twos_complement(uint32_t v)
 /*
  * Public interface: documented in boot_record.h.
  *
- * Layout: version, cause, two zero bytes, then boot, uptime_s, detail and arg as 32-bit
- * little-endian values; detail as its two's complement bits.
+ * Layout: version, cause, hw_reset, a zero byte, then boot, uptime_s, detail and arg as 32-bit
+ * little-endian values; detail as its two's complement bits. hw_reset takes what was a zero
+ * byte, so records from before it read as BOOT_HW_UNKNOWN and the version stays 1.
  */
 void boot_record_encode(const struct boot_record *r, uint8_t *out)
 {
 	out[0] = RECORD_VERSION;
 	out[1] = r->cause;
-	out[2] = 0;
+	out[2] = r->hw_reset;
 	out[3] = 0;
 	sys_put_le32(r->boot, &out[4]);
 	sys_put_le32(r->uptime_s, &out[8]);
@@ -73,6 +74,7 @@ int boot_record_decode(const uint8_t *in, size_t len, struct boot_record *r)
 		return -EINVAL;
 	}
 	r->cause = in[1];
+	r->hw_reset = in[2] < BOOT_HW_COUNT ? in[2] : (uint8_t)BOOT_HW_UNKNOWN;
 	r->boot = sys_get_le32(&in[4]);
 	r->uptime_s = sys_get_le32(&in[8]);
 	r->detail = from_twos_complement(sys_get_le32(&in[12]));
@@ -107,6 +109,33 @@ static void duration(uint32_t s, char *buf, size_t size)
 	}
 }
 
+/**
+ * @brief Name a hardware reset cause that explains a restart the note can't.
+ *
+ * Each name is at most as long as "Wi-Fi restart", so that a description fits the events
+ * screen as the others do.
+ *
+ * @param hw_reset enum boot_hw_reset.
+ * @return The name, or NULL for a cause that adds nothing ("restart" says as much).
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static const char *hw_reset_name(uint8_t hw_reset)
+{
+	switch (hw_reset) {
+	case BOOT_HW_PIN:
+		return "reset button";
+	case BOOT_HW_WATCHDOG:
+		return "HW watchdog";
+	case BOOT_HW_BROWNOUT:
+		return "brown-out";
+	case BOOT_HW_CPU_FAULT:
+		return "CPU fault";
+	default:
+		return NULL;
+	}
+}
+
 /*
  * Public interface: documented in boot_record.h.
  */
@@ -114,6 +143,7 @@ void boot_record_describe(const struct boot_record *r, char *buf, size_t size)
 {
 	char ran[16];
 	unsigned int boot = (unsigned int)r->boot;
+	const char *hw = hw_reset_name(r->hw_reset);
 
 	if (size == 0U) {
 		return;
@@ -121,7 +151,8 @@ void boot_record_describe(const struct boot_record *r, char *buf, size_t size)
 	duration(r->uptime_s, ran, sizeof(ran));
 	switch (r->cause) {
 	case BOOT_POWER_ON:
-		(void)snprintf(buf, size, "#%u power on", boot);
+		(void)snprintf(buf, size, "#%u %s", boot,
+			       r->hw_reset == BOOT_HW_BROWNOUT ? "brown-out" : "power on");
 		break;
 	case BOOT_WIFI_RESTART:
 		(void)snprintf(buf, size, "#%u Wi-Fi restart after %s", boot, ran);
@@ -134,7 +165,8 @@ void boot_record_describe(const struct boot_record *r, char *buf, size_t size)
 			       r->detail == BOOT_WATCHED_SCAN ? "scan" : "main", ran);
 		break;
 	case BOOT_UNEXPLAINED:
-		(void)snprintf(buf, size, "#%u restart after %s", boot, ran);
+		(void)snprintf(buf, size, "#%u %s after %s", boot, hw != NULL ? hw : "restart",
+			       ran);
 		break;
 	default:
 		(void)snprintf(buf, size, "#%u unknown start", boot);
@@ -189,6 +221,7 @@ bool boot_note_valid(const struct boot_note *n)
 void boot_record_from_note(const struct boot_note *n, uint32_t boot, struct boot_record *r)
 {
 	r->boot = boot;
+	r->hw_reset = BOOT_HW_UNKNOWN;
 	if (!boot_note_valid(n) || n->cause == BOOT_POWER_ON) {
 		r->cause = BOOT_POWER_ON;
 		r->uptime_s = 0;

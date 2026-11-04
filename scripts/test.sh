@@ -13,7 +13,9 @@
 #                       as out/screens/*.ppm
 #   tests/event_log     the event log of starts (event_log.c) on native_sim's
 #                       simulated flash: kept across a reopen, rotated when
-#                       full, started afresh on foreign data
+#                       full, started afresh on foreign data; built a second
+#                       time allowing fewer sectors than the partition has,
+#                       where the log must stay off and the flash untouched
 #
 # Every build compiles our code with -Wall -Wextra -Wpedantic -Werror and
 # runs clang-tidy on it (cmake/strict.cmake), so the builds below fail on
@@ -35,14 +37,38 @@ for f in channels networks networks-page2 events faded; do
 	: > "$here/out/screens/$f.ppm"
 done
 
+## @brief Fail unless a test run passed a given test: a suite whose
+#        predicate doesn't hold is skipped, which ztest doesn't count as a
+#        failure.
+#
+# @param 1 The run's output.
+# @param 2 The test's name.
+#
+# @sideeffects Reads the output; prints and exits with status 1 if the test didn't pass.
+expect_ran() {
+	if ! grep -q "PASS - $2 " "$1"; then
+		echo "$2 didn't run: its suite was skipped" >&2
+		exit 1
+	fi
+}
+
 cd "$here"
 for t in meter_units ui_render event_log; do
 	build_dir="$here/build/test-$t"
 	west build -p auto -b native_sim/native/64 -d "$build_dir" "$here/tests/$t"
 	if [ "$t" = event_log ]; then
 		# The simulated flash goes in a file: keep it in the build directory.
-		"$build_dir/zephyr/zephyr.exe" --flash="$build_dir/flash.bin"
+		"$build_dir/zephyr/zephyr.exe" --flash="$build_dir/flash.bin" | tee "$build_dir/run.log"
+		expect_ran "$build_dir/run.log" test_dump
 	else
 		"$build_dir/zephyr/zephyr.exe"
 	fi
 done
+
+# The event log again, allowing 2 sectors where native_sim's storage partition
+# has 4: only the meter_event_log_too_small suite fits that build.
+build_dir="$here/build/test-event_log-too-small"
+west build -p auto -b native_sim/native/64 -d "$build_dir" "$here/tests/event_log" -- \
+	-DCONFIG_METER_EVENT_LOG_MAX_SECTORS=2
+"$build_dir/zephyr/zephyr.exe" --flash="$build_dir/flash.bin" | tee "$build_dir/run.log"
+expect_ran "$build_dir/run.log" test_left_alone

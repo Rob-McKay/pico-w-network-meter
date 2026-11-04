@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # The meter's hardware-independent core, app/src/core/: channel statistics,
-# network history, scan health, paging, boot records, key chords and text
-# rasterising. It uses no Zephyr device API (only utility headers such as
-# sys/util.h), so it builds for every target and is unit tested on
-# native_sim. The firmware and every test suite take it from this one list.
+# network history, scan health, paging, boot records, key chords, text
+# rasterising and Wi-Fi country codes. It uses no Zephyr device API (only
+# utility headers such as sys/util.h), so it builds for every target and is
+# unit tested on native_sim. The firmware and every test suite take it from
+# this one list.
 # Include after find_package(Zephyr).
 
 set(METER_CORE_DIR ${CMAKE_CURRENT_LIST_DIR}/../app/src/core)
@@ -17,6 +18,7 @@ set(METER_CORE_SOURCES
   ${METER_CORE_DIR}/boot_record.c
   ${METER_CORE_DIR}/keys.c
   ${METER_CORE_DIR}/text_raster.c
+  ${METER_CORE_DIR}/country_code.c
 )
 
 # @brief Build the core into a target, and let its sources include the

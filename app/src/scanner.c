@@ -16,6 +16,7 @@
 #include <zephyr/sys/util.h>
 
 #include "scanner.h"
+#include "wifi_country.h"
 
 LOG_MODULE_REGISTER(scanner, CONFIG_METER_LOG_LEVEL);
 
@@ -181,6 +182,9 @@ int scanner_init(void)
 		return -ENODEV;
 	}
 
+	if (IS_ENABLED(CONFIG_METER_WIFI_REG_DOMAIN)) {
+		(void)wifi_country_apply(wifi_iface);
+	}
 	net_mgmt_init_event_callback(&scan_cb, on_scan_event, SCAN_EVENTS);
 	net_mgmt_add_event_callback(&scan_cb);
 
@@ -242,6 +246,8 @@ static int request_scan(void)
 	struct wifi_scan_params params = {
 		.scan_type = IS_ENABLED(CONFIG_METER_SCAN_PASSIVE) ? WIFI_SCAN_TYPE_PASSIVE
 								   : WIFI_SCAN_TYPE_ACTIVE,
+		.dwell_time_active = CONFIG_METER_SCAN_DWELL_ACTIVE_MS,
+		.dwell_time_passive = CONFIG_METER_SCAN_DWELL_PASSIVE_MS,
 	};
 	int ret = net_mgmt(NET_REQUEST_WIFI_SCAN, wifi_iface, &params, sizeof(params));
 

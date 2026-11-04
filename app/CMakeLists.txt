@@ -26,6 +26,9 @@ target_sources(app PRIVATE
   src/controls.c
   src/status_led.c
 )
+# Hooks a board's .conf turns on (app/Kconfig).
+target_sources_ifdef(CONFIG_METER_WIFI_REG_DOMAIN app PRIVATE src/wifi_country.c)
+target_sources_ifdef(CONFIG_METER_RESET_CAUSE_HWINFO app PRIVATE src/reset_cause.c)
 
 # Target-only code: src/target/<target>/, each file under its own option.
 # The Pico's: flow control for the console on its USB port.

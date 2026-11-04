@@ -27,6 +27,24 @@ enum boot_cause {
 	BOOT_CAUSE_COUNT,
 };
 
+/**
+ * The hardware's reset cause, where a board records it
+ * (CONFIG_METER_RESET_CAUSE_HWINFO): it tells apart what the restart note
+ * can't, such as the reset button and a hardware watchdog.
+ */
+enum boot_hw_reset {
+	BOOT_HW_UNKNOWN,   /**< not recorded (and every record from before it was) */
+	BOOT_HW_POWER_ON,  /**< power-on reset */
+	BOOT_HW_PIN,       /**< the reset pin: the reset button */
+	BOOT_HW_SOFTWARE,  /**< a software reset, such as sys_reboot() */
+	BOOT_HW_WATCHDOG,  /**< a hardware watchdog */
+	BOOT_HW_BROWNOUT,  /**< the supply dropped too low */
+	BOOT_HW_CPU_FAULT, /**< the CPU locked up or panicked */
+	BOOT_HW_WAKE,      /**< waking from a low-power state */
+	BOOT_HW_OTHER,     /**< something else the hardware reported */
+	BOOT_HW_COUNT,
+};
+
 /** Threads the watchdog watches: a watchdog restart's detail. */
 enum boot_watched {
 	BOOT_WATCHED_MAIN, /**< the main thread: display, buttons, LED */
@@ -40,6 +58,7 @@ struct boot_record {
 	int32_t detail;    /**< Wi-Fi: last error; crash: reason; watchdog: boot_watched */
 	uint32_t arg;      /**< Wi-Fi: failed scans in a row; crash: program counter */
 	uint8_t cause;     /**< enum boot_cause */
+	uint8_t hw_reset;  /**< enum boot_hw_reset */
 };
 
 /** A record's size in flash, bytes. */
@@ -71,6 +90,9 @@ void boot_record_encode(const struct boot_record *r, uint8_t *out);
 /**
  * @brief Read a record from its flash format.
  *
+ * A hardware reset cause this firmware doesn't know reads as
+ * BOOT_HW_UNKNOWN, so a record is never refused for it.
+ *
  * @param in The bytes.
  * @param len How many there are.
  * @param[out] r The record.
@@ -85,7 +107,11 @@ int boot_record_decode(const uint8_t *in, size_t len, struct boot_record *r);
  * @brief Describe a record in a line of text, such as
  *        "#12 Wi-Fi restart after 2h31m".
  *
- * The time is how long the run before it lasted.
+ * The time is how long the run before it lasted. Where the record has the
+ * hardware's reset cause, a start the note can't explain is named by it:
+ * "#12 reset button after 1h00m", "#12 HW watchdog after 1h00m",
+ * "#12 brown-out" for a power-on the supply caused, and so on. The meter's
+ * own restarts (Wi-Fi, crash, hung thread) are named by the note.
  *
  * @param r The record.
  * @param[out] buf The text, cut to fit and always terminated.

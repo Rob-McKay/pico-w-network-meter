@@ -38,6 +38,7 @@
 #include "event_log.h"
 #include "keys.h"
 #include "paging.h"
+#include "reset_cause.h"
 #include "reset_note.h"
 #include "scan_task.h"
 #include "scanner.h"
@@ -218,8 +219,15 @@ static void log_one_start(const struct boot_record *r, void *arg)
 		return;
 	}
 	boot_record_describe(r, text, sizeof(text));
-	LOG_INF("%s: cause %u, ran %u s, detail %d, arg 0x%08x", text, (unsigned int)r->cause,
-		(unsigned int)r->uptime_s, (int)r->detail, (unsigned int)r->arg);
+	if (r->hw_reset == BOOT_HW_UNKNOWN) {
+		LOG_INF("%s: cause %u, ran %u s, detail %d, arg 0x%08x", text,
+			(unsigned int)r->cause, (unsigned int)r->uptime_s, (int)r->detail,
+			(unsigned int)r->arg);
+	} else {
+		LOG_INF("%s: cause %u, ran %u s, detail %d, arg 0x%08x, hw %u", text,
+			(unsigned int)r->cause, (unsigned int)r->uptime_s, (int)r->detail,
+			(unsigned int)r->arg, (unsigned int)r->hw_reset);
+	}
 	*stalled = !wait_for_console();
 }
 
@@ -344,12 +352,14 @@ static void start_io(void)
  *        on the console and the events screen.
  *
  * Takes the note the run before left (reset_note_take()) first, before
- * anything else can restart the meter.
+ * anything else can restart the meter. With CONFIG_METER_RESET_CAUSE_HWINFO,
+ * the record also keeps the hardware's reset cause (reset_cause_take()).
  *
- * @sideeffects Those of reset_note_take(), event_log_init() and event_log_add(): starts this
- *              run's note, reads and writes the flash log; logs the newest starts; gives the
- *              UI its event source (ui_set_events()). errno may be set by snprintf() (only on
- *              an output error).
+ * @sideeffects Those of reset_note_take(), reset_cause_take() (with
+ *              CONFIG_METER_RESET_CAUSE_HWINFO), event_log_init() and event_log_add(): starts
+ *              this run's note, reads and clears the hardware's reset cause, reads and writes
+ *              the flash log; logs the newest starts; gives the UI its event source
+ *              (ui_set_events()). errno may be set by snprintf() (only on an output error).
  */
 static void log_start(void)
 {
@@ -362,6 +372,9 @@ static void log_start(void)
 		return;
 	}
 	boot_record_from_note(&note, event_log_last_boot() + 1U, &r);
+	if (IS_ENABLED(CONFIG_METER_RESET_CAUSE_HWINFO)) {
+		r.hw_reset = reset_cause_take();
+	}
 	(void)event_log_add(&r);
 	for (size_t i = 0; i < MIN(event_log_count(), (size_t)STARTS_ON_CONSOLE); i++) {
 		const struct boot_record *e = event_log_get(i);
