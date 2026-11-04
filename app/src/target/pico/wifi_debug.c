@@ -27,9 +27,14 @@
 
 #include <cyabs_rtos_impl.h>
 #include <whd_bus_common.h>
+#include <whd_bus_protocol_interface.h>
+#include <whd_chip.h>
+#include <whd_chip_constants.h>
 #include <whd_int.h>
 #include <whd_sdpcm.h>
 #include <whd_thread.h>
+#include <whd_types.h>
+#include <whd_wifi_api.h>
 
 #include "wifi_debug.h"
 #include "wifi_irq_state.h"
@@ -54,6 +59,15 @@ whd_interface_t airoc_wifi_get_whd_interface(void);
 
 /** How long to give the WHD thread after waking it, ms. */
 #define WAKE_WAIT_MS 100
+
+/* The chip's ChipCommon core, whose first register holds the chip's ID in its low 16 bits:
+ * at the same backplane address on every Broadcom/Cypress Wi-Fi chip (SI_ENUM_BASE).
+ */
+#define CHIPCOMMON_ID_ADDRESS 0x18000000U
+#define CHIP_ID_MASK          0xffffU
+
+/** The longest line of the chip's console log printed, with its terminator. */
+#define CONSOLE_LINE 128U
 
 /* The driver asks the chip for an active-low interrupt and waits for a falling edge
  * (CY_WIFI_HOST_WAKE_IRQ_EVENT is GPIO_INT_TRIG_LOW); the devicetree flags are active high,
@@ -170,6 +184,117 @@ static void log_snapshot(const char *when, const struct whd_snapshot *s)
 		s->waiting ? ", asleep waiting to be woken" : "");
 }
 
+/**
+ * @brief Ask the chip's bus to stay awake, and wake it.
+ *
+ * As WHD_WLAN_KEEP_AWAKE() does, without its assertion; undo with let_bus_sleep().
+ *
+ * @param whd The WHD driver.
+ * @retval 0 Awake.
+ * @retval -EIO It didn't wake (the WHD error is logged).
+ *
+ * @sideeffects Counts a keep-awake request in WHD's state; drives the chip's bus to wake it;
+ *              logs a failure. errno unchanged.
+ */
+static int keep_bus_awake(whd_driver_t whd)
+{
+	whd_result_t res;
+
+	whd->internal_info.whd_wlan_status.keep_wlan_awake++;
+	res = whd_ensure_wlan_bus_is_up(whd);
+	if (res != WHD_SUCCESS) {
+		LOG_ERR("The Wi-Fi chip's bus won't wake: 0x%08x", (unsigned int)res);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Undo keep_bus_awake().
+ *
+ * As WHD_WLAN_LET_SLEEP() does.
+ *
+ * @param whd The WHD driver.
+ *
+ * @sideeffects Removes a keep-awake request from WHD's state; if none are left, wakes the
+ *              WHD thread (whd_thread_notify()), which lets the bus sleep. errno unchanged.
+ */
+static void let_bus_sleep(whd_driver_t whd)
+{
+	whd->internal_info.whd_wlan_status.keep_wlan_awake--;
+	if (whd->internal_info.whd_wlan_status.keep_wlan_awake == 0U) {
+		whd_thread_notify(whd);
+	}
+}
+
+/**
+ * @brief Check the chip answers on its backplane, by reading its chip ID.
+ *
+ * WHD's console reader loops until the chip gives it a valid address, so it is only run
+ * once the chip is known to answer.
+ *
+ * @param whd The WHD driver, its bus awake.
+ * @retval 0 It gave the ID WHD found at start-up.
+ * @retval -EIO It didn't answer, or gave another ID (logged).
+ *
+ * @sideeffects Reads a register over the chip's bus; logs the outcome. errno unchanged.
+ */
+static int check_chip_answers(whd_driver_t whd)
+{
+	uint32_t id = 0;
+	whd_result_t res =
+		whd_bus_read_backplane_value(whd, CHIPCOMMON_ID_ADDRESS, 4, (uint8_t *)&id);
+	unsigned int expected = whd_chip_get_chip_id(whd);
+
+	if (res != WHD_SUCCESS) {
+		LOG_ERR("The Wi-Fi chip doesn't answer on its backplane: 0x%08x",
+			(unsigned int)res);
+		return -EIO;
+	}
+	if ((id & CHIP_ID_MASK) != expected) {
+		LOG_ERR("The Wi-Fi chip's ID reads 0x%08x, not %u", (unsigned int)id, expected);
+		return -EIO;
+	}
+	LOG_INF("The Wi-Fi chip answers on its backplane: chip %u", expected);
+
+	return 0;
+}
+
+/**
+ * @brief Print the chip firmware's console log, and whether it trapped or
+ *        asserted.
+ *
+ * whd_wifi_read_wlan_log() prints each new line as "CONSOLE: ..." itself (WPRINT_MACRO);
+ * the first call prints all the log the chip holds, later ones what's new.
+ *
+ * @param whd The WHD driver.
+ *
+ * @sideeffects Wakes the chip's bus and keeps it awake meanwhile (keep_bus_awake(),
+ *              let_bus_sleep()); reads the chip's memory over it; WHD updates its copy of the
+ *              chip's shared area and console position, and prints the log; logs the
+ *              outcome. errno unchanged.
+ */
+static void dump_chip_log(whd_driver_t whd)
+{
+	static char line[CONSOLE_LINE];
+	const wlan_shared_t *sh = &whd->internal_info.sh;
+	whd_result_t res;
+
+	if (keep_bus_awake(whd) == 0 && check_chip_answers(whd) == 0) {
+		LOG_INF("The Wi-Fi chip's console log:");
+		res = whd_wifi_read_wlan_log(whd, line, sizeof(line));
+		if (res != WHD_SUCCESS) {
+			LOG_ERR("Can't read the chip's console log: 0x%08x", (unsigned int)res);
+		} else {
+			LOG_INF("Chip firmware: flags 0x%08x, trap at 0x%08x, assert line %u",
+				(unsigned int)sh->flags, (unsigned int)sh->trap_addr,
+				(unsigned int)sh->assert_line);
+		}
+	}
+	let_bus_sleep(whd);
+}
+
 /*
  * Public interface: documented in wifi_debug.h.
  *
@@ -202,4 +327,6 @@ void wifi_debug_scan_failed(void)
 	k_msleep(WAKE_WAIT_MS);
 	snapshot(whd, &s);
 	log_snapshot("after", &s);
+
+	dump_chip_log(whd);
 }
