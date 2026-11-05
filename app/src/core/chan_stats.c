@@ -35,6 +35,18 @@
 /* The standard, non-overlapping channels, in order. */
 static const uint8_t standard_channels[] = {1, 6, 11};
 
+/* The 5 GHz 20 MHz channels, four to an 80 MHz block, in order. */
+static const uint8_t channels_5g[CHAN_5G_COUNT] = {
+	36,  40,  44,  48,  52,  56,  60,  64,  100, 104, 108, 112, 116, 120,
+	124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165, 169, 173, 177,
+};
+
+/* The DFS (radar detection) 5 GHz channels: 52-64 and 100-144. */
+#define DFS_LOW_FIRST  52
+#define DFS_LOW_LAST   64
+#define DFS_HIGH_FIRST 100
+#define DFS_HIGH_LAST  144
+
 /* 10^(r/10) for r = 0..9, times MANTISSA_ONE. */
 static const uint32_t db_mantissa[DB_PER_DECADE] = {
 	10000, 12589, 15849, 19953, 25119, 31623, 39811, 50119, 63096, 79433,
@@ -156,6 +168,87 @@ int chan_power_to_dbm(uint64_t power)
 /*
  * Public interface: documented in chan_stats.h.
  */
+int chan_5g_index(uint8_t channel)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(channels_5g); i++) {
+		if (channels_5g[i] == channel) {
+			return (int)i;
+		}
+	}
+
+	return -1;
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+uint8_t chan_5g_channel(size_t index)
+{
+	return index < ARRAY_SIZE(channels_5g) ? channels_5g[index] : 0U;
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+bool chan_5g_dfs(uint8_t channel)
+{
+	return (channel >= DFS_LOW_FIRST && channel <= DFS_LOW_LAST) ||
+	       (channel >= DFS_HIGH_FIRST && channel <= DFS_HIGH_LAST);
+}
+
+/**
+ * @brief Find the 80 MHz block a 5 GHz channel belongs to.
+ *
+ * @param channel Channel number.
+ * @return 0 (36-48) to CHAN_5G_BLOCKS - 1 (165-177), or -1 if it isn't a
+ *         5 GHz channel the meter knows.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int block_5g(uint8_t channel)
+{
+	int i = chan_5g_index(channel);
+
+	return i < 0 ? -1 : i / CHAN_5G_BLOCK_CHANNELS;
+}
+
+/**
+ * @brief Give an 80 MHz block's first channel.
+ *
+ * @param block 0 (36-48) to CHAN_5G_BLOCKS - 1 (165-177).
+ * @return 36, 52, 100, 116, 132, 149 or 165.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint8_t block_first(int block)
+{
+	return channels_5g[(size_t)block * CHAN_5G_BLOCK_CHANNELS];
+}
+
+/**
+ * @brief Tell whether an access point's channel is one of its band's.
+ *
+ * @param ap The access point.
+ * @return True for 2.4 GHz channels CHAN_FIRST..CHAN_LAST and the 5 GHz
+ *         channels chan_5g_index() knows.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static bool on_known_channel(const struct chan_ap *ap)
+{
+	switch (ap->band) {
+	case CHAN_BAND_2G4:
+		return ap->channel >= CHAN_FIRST && ap->channel <= CHAN_LAST;
+	case CHAN_BAND_5G:
+		return chan_5g_index(ap->channel) >= 0;
+	default:
+		return false;
+	}
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
 void chan_stats_reset(struct chan_stats *s)
 {
 	memset(s, 0, sizeof(*s));
@@ -168,7 +261,7 @@ void chan_stats_reset(struct chan_stats *s)
  */
 int chan_stats_add(struct chan_stats *s, const struct chan_ap *ap)
 {
-	if (ap->channel < CHAN_FIRST || ap->channel > CHAN_LAST) {
+	if (!on_known_channel(ap)) {
 		s->ignored++;
 		return -EINVAL;
 	}
@@ -211,6 +304,10 @@ void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan
 
 	for (size_t i = 0; i < s->ap_count; i++) {
 		const struct chan_ap *ap = &s->aps[i];
+
+		if (ap->band != CHAN_BAND_2G4) {
+			continue;
+		}
 		int overlap = overlap_mhz(ap->channel, channel);
 		uint64_t share =
 			(chan_dbm_to_power(ap->rssi) * (unsigned int)overlap) / CHAN_WIDTH_MHZ;
@@ -228,6 +325,63 @@ void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan
 		power += share;
 	}
 
+	out->interference = (int16_t)chan_power_to_dbm(power);
+	out->others = (int16_t)chan_power_to_dbm(power - best_power);
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+size_t chan_stats_band_count(const struct chan_stats *s, enum chan_band band)
+{
+	size_t n = 0;
+
+	for (size_t i = 0; i < s->ap_count; i++) {
+		if (s->aps[i].band == (uint8_t)band) {
+			n++;
+		}
+	}
+
+	return n;
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ *
+ * A network's RSSI is measured on its 20 MHz primary channel, which stands
+ * for its power on each 20 MHz of its block, so it counts at full weight on
+ * every channel of the block.
+ */
+void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out)
+{
+	uint64_t power = 0;
+	uint64_t best_power = 0;
+	int block = block_5g(channel);
+
+	out->channel = channel;
+	out->ap_count = 0;
+	out->best_rssi = CHAN_RSSI_NONE;
+	out->freshness = 0;
+	for (size_t i = 0; block >= 0 && i < s->ap_count; i++) {
+		const struct chan_ap *ap = &s->aps[i];
+
+		if (ap->band != CHAN_BAND_5G || block_5g(ap->channel) != block) {
+			continue;
+		}
+		uint64_t share = chan_dbm_to_power(ap->rssi);
+
+		if (ap->channel == channel) {
+			out->ap_count++;
+			if (ap->rssi > out->best_rssi) {
+				out->best_rssi = ap->rssi;
+				best_power = share;
+			}
+		}
+		if (ap->freshness > out->freshness) {
+			out->freshness = ap->freshness;
+		}
+		power += share;
+	}
 	out->interference = (int16_t)chan_power_to_dbm(power);
 	out->others = (int16_t)chan_power_to_dbm(power - best_power);
 }
@@ -256,19 +410,101 @@ uint8_t chan_stats_recommend(const struct chan_stats *s)
 	return best.channel;
 }
 
+/**
+ * @brief Count the 5 GHz networks in an 80 MHz block.
+ *
+ * @param s Statistics.
+ * @param block 0 to CHAN_5G_BLOCKS - 1.
+ * @return Networks whose primary channel is in the block.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static size_t block_networks(const struct chan_stats *s, int block)
+{
+	size_t n = 0;
+
+	for (size_t i = 0; i < s->ap_count; i++) {
+		if (s->aps[i].band == CHAN_BAND_5G && block_5g(s->aps[i].channel) == block) {
+			n++;
+		}
+	}
+
+	return n;
+}
+
+/**
+ * @brief Tell whether one 80 MHz block is a better choice than another.
+ *
+ * @param s Statistics.
+ * @param a The candidate block, 0 to CHAN_5G_BLOCKS - 1.
+ * @param b The best block so far, of a lower number.
+ * @return True if @p a has less interference; on a tie, fewer networks;
+ *         then if @p a is free of DFS and @p b isn't.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static bool block_better(const struct chan_stats *s, int a, int b)
+{
+	uint8_t first_a = block_first(a);
+	uint8_t first_b = block_first(b);
+	struct chan_info ia;
+	struct chan_info ib;
+
+	chan_stats_channel_5g(s, first_a, &ia);
+	chan_stats_channel_5g(s, first_b, &ib);
+	if (ia.interference != ib.interference) {
+		return ia.interference < ib.interference;
+	}
+	size_t na = block_networks(s, a);
+	size_t nb = block_networks(s, b);
+
+	if (na != nb) {
+		return na < nb;
+	}
+
+	return !chan_5g_dfs(first_a) && chan_5g_dfs(first_b);
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ *
+ * Blocks are tried lowest first, and a later one wins only if it is
+ * strictly better, so a full tie goes to the lower block.
+ */
+uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks)
+{
+	int best = -1;
+
+	for (int b = 0; b < CHAN_5G_BLOCKS; b++) {
+		if ((blocks & BIT(b)) == 0U) {
+			continue;
+		}
+		if (best < 0 || block_better(s, b, best)) {
+			best = b;
+		}
+	}
+
+	return best < 0 ? 0U : block_first(best);
+}
+
 /*
  * Public interface: documented in chan_stats.h.
  *
  * An insertion sort straight into the output array, keeping only as many entries as it
  * has room for: a scan holds at most CHAN_MAX_APS access points.
  */
-size_t chan_stats_strongest(const struct chan_stats *s, const struct chan_ap **out, size_t max)
+size_t chan_stats_strongest(const struct chan_stats *s, enum chan_band band,
+			    const struct chan_ap **out, size_t max)
 {
 	size_t n = 0;
 
 	/* Insertion sort into out[]: a scan has at most CHAN_MAX_APS. */
 	for (size_t i = 0; i < s->ap_count; i++) {
 		const struct chan_ap *ap = &s->aps[i];
+
+		if (ap->band != (uint8_t)band) {
+			continue;
+		}
 		size_t pos = n;
 
 		while (pos > 0 && out[pos - 1]->rssi < ap->rssi) {
@@ -303,8 +539,8 @@ size_t chan_stats_strongest(const struct chan_stats *s, const struct chan_ap **o
 static bool chan_ap_equal(const struct chan_ap *a, const struct chan_ap *b)
 {
 	return strcmp(a->ssid, b->ssid) == 0 && memcmp(a->bssid, b->bssid, CHAN_BSSID_LEN) == 0 &&
-	       a->channel == b->channel && a->rssi == b->rssi && a->secured == b->secured &&
-	       a->freshness == b->freshness;
+	       a->channel == b->channel && a->band == b->band && a->rssi == b->rssi &&
+	       a->secured == b->secured && a->freshness == b->freshness;
 }
 
 /*

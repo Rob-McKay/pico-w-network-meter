@@ -85,9 +85,20 @@ There's no case for it yet.
 ## Known issues and limits
 
 - **Only partly checked on hardware**: see the list below.
-- **2.4 GHz shown only, for now.** The radio scans both bands, but until
-  the 5 GHz work (port study, section 5) the meter shows 2.4 GHz channels
-  only, and counts 5 GHz networks in the Networks footer's "other".
+- **5 GHz on the console only, for now.** The radio scans both bands,
+  and the meter keeps the 5 GHz networks (`CONFIG_METER_BAND_5G`, on in
+  the board's `.conf`). The console lists each 5 GHz channel a network
+  reaches and the quietest 80 MHz block ("5 GHz: use 36-48 (80 MHz)").
+  The screens still show 2.4 GHz only, and count 5 GHz networks in the
+  Networks footer's "other", until the 5 GHz screens (port study,
+  section 5).
+- **5 GHz widths are assumed.** Zephyr's scan results don't give a
+  network's channel width, so every 5 GHz network is taken to use its
+  whole 80 MHz block, as nearly every home router does. A 20 or 40 MHz
+  network is counted on channels it doesn't use. The recommendation
+  considers 36-48, 52-64, 100-112 and 116-128; 132-144 and 149-161 only
+  with `CONFIG_METER_RECOMMEND_5G_132` and `_UPPER` (allowed in the US,
+  not at 80 MHz or full power in the UK).
 - **Driver patch.** The ESP32 Wi-Fi driver needs a carried Zephyr patch
   (`esp32-wifi-scan-params.patch`) to report hidden networks and to honour
   the scan's 130 ms dwell time per channel; without it a sweep of both
@@ -122,6 +133,7 @@ with esptool 4 on macOS:
 | Scans | Every scan succeeds; one every 15–16 s, so a sweep of both bands takes 5–6 s with the patched 130 ms dwell. Channel 13 is heard (country GB), and 4–10 networks a scan count as "other" (5 GHz) |
 | Hidden networks | Shown |
 | Buttons | All four work (tried with a wire link to ground): A and B change screens, X scans now on the Channels screen, X and Y page up and down the Networks list |
+| 5 GHz on the console | Works: "21 results from the driver, 21 networks kept", "13 networks on 2.4 GHz, 8 on 5 GHz, 0 other" (before, the 8 counted as "other"), the 5 GHz channels reached and the recommended 80 MHz block, with the 4 KB log buffer dropping nothing |
 | Event log | Works: the first start shows as "#1 power on", so the log in flash (`storage_partition`, 64 KB) opens and records |
 | Power cut, reset button | Both show as "power on". The reset button resets the whole chip through its enable pin: the chip reports a power-on, and the restart note in RAM doesn't survive it, so the meter can't tell it from a power cut |
 

@@ -151,7 +151,7 @@ static size_t list_length(const struct screen *scr)
 {
 	switch (scr->view) {
 	case UI_VIEW_NETWORKS:
-		return scr->shown.ap_count;
+		return chan_stats_band_count(&scr->shown, CHAN_BAND_2G4);
 	case UI_VIEW_EVENTS:
 		return event_log_count();
 	default:
