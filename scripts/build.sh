@@ -80,15 +80,20 @@ case "$target" in
   xiao)
     # Simple boot (no MCUboot): the ROM loads the application image
     # straight from CONFIG_BOOTLOADER_OFFSET_IN_FLASH (0x2000), where west
-    # flash writes it. The merged image's header gets the same flash
-    # settings as the build's.
-    # .config lines such as CONFIG_ESPTOOLPY_FLASHMODE="dio", unquoted.
-    eval "$(sed -n 's/^CONFIG_\(ESPTOOLPY_FLASH\(MODE\|FREQ\|SIZE\)\|BOOTLOADER_OFFSET_IN_FLASH\)=\("\{0,1\}[0-9A-Za-z]*"\{0,1\}\)$/\1=\3/p' \
-      "$build_dir/zephyr/.config")"
+    # flash writes it. The build already writes the flash mode, speed and
+    # size into the image's header, so the merged image is that image after
+    # erased flash (0xFF) up to the offset. esptool merge-bin would give the
+    # same bytes, but it always prints a hint to use --format hex, which
+    # browser flashers don't take.
+    offset=$(sed -n 's/^CONFIG_BOOTLOADER_OFFSET_IN_FLASH=\(0x[0-9a-fA-F]*\)$/\1/p' \
+      "$build_dir/zephyr/.config")
+    if [[ -z $offset ]]; then
+      echo "CONFIG_BOOTLOADER_OFFSET_IN_FLASH not found in the build's .config" >&2
+      exit 1
+    fi
     cp "$build_dir/zephyr/zephyr.bin" "$out/network-meter.bin"
-    esptool --chip esp32c5 merge-bin --flash-mode "$ESPTOOLPY_FLASHMODE" \
-      --flash-freq "$ESPTOOLPY_FLASHFREQ" --flash-size "$ESPTOOLPY_FLASHSIZE" \
-      -o "$out/network-meter-merged.bin" "$BOOTLOADER_OFFSET_IN_FLASH" "$out/network-meter.bin"
+    { head -c "$((offset))" /dev/zero | tr '\0' '\377'; cat "$out/network-meter.bin"; } \
+      > "$out/network-meter-merged.bin"
     echo "Firmware: out/$target/network-meter.bin (at 0x2000)," \
       "out/$target/network-meter-merged.bin (at 0)"
     ;;
