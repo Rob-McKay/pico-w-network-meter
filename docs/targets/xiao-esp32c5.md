@@ -95,11 +95,12 @@ There's no case for it yet.
 - **Reset causes.** The meter records the chip's reset cause, so the
   events screen can say "HW watchdog", "brown-out" or "CPU fault" (see
   USAGE). The XIAO's own reset button resets the whole chip, which shows
-  as a power-on, not "reset button".
+  as a power-on, not "reset button" (checked on hardware).
 - **The restart note.** Why the meter restarted itself is kept in RAM
-  that start-up doesn't clear. Whether that RAM survives the ESP32-C5's
-  restarts is still to be checked: if it doesn't, every restart will show
-  as a power-on.
+  that start-up doesn't clear. A reset through the chip's enable pin (the
+  reset button) loses it, as a power cut does. Whether it survives the
+  meter's own software restarts is still to be checked: if it doesn't,
+  those will show as power-ons too.
 - **SPI without DMA.** The TFT's SPI bus runs without DMA: on the C5,
   `dma-enabled` also needs `dmas` channels and the GDMA controller
   enabled, and without them the panel never started (the first run's
@@ -122,15 +123,17 @@ with esptool 4 on macOS:
 | Hidden networks | Shown |
 | Buttons A and B | Work (tried with a wire link to ground) |
 | Event log | Works: the first start shows as "#1 power on", so the log in flash (`storage_partition`, 64 KB) opens and records |
+| Power cut, reset button | Both show as "power on". The reset button resets the whole chip through its enable pin: the chip reports a power-on, and the restart note in RAM doesn't survive it, so the meter can't tell it from a power cut |
 
 Not checked yet:
 
 1. Buttons X and Y, and the RGB LED.
 2. The console with no host attached (it must not block on a charger or a
    battery).
-3. Restarts: what the events screen shows after a power cut, the reset
-   button, a Wi-Fi restart and a crash (whether the restart note
-   survives), and that the log keeps its starts across a reflash.
+3. The meter's own restarts: whether the restart note survives a
+   software restart (a Wi-Fi restart, a crash, a hung thread), so the
+   events screen says why, and that the log keeps its starts across a
+   reflash.
 4. Running for hours: no watchdog restarts or driver failures.
 5. A faster SPI clock (20 MHz with short wires).
 6. Current draw and battery life.
