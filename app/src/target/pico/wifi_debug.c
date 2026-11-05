@@ -119,6 +119,7 @@ struct whd_snapshot {
 	uint32_t queued_control; /**< of which control messages (requests) */
 	bool bus_up;             /**< WHD thinks the chip's bus is awake */
 	bool irq_flag;           /**< the WHD thread has an interrupt to handle */
+	bool save_restore;       /**< the bus sleeps in the chip's save/restore deep sleep */
 	bool waiting;            /**< the WHD thread is asleep on its semaphore */
 	char state[32];          /**< the WHD thread's state, as Zephyr names it */
 };
@@ -193,6 +194,7 @@ static void snapshot(whd_driver_t whd, struct whd_snapshot *s)
 	s->queued_control = sdpcm->npkt_in_q[ARRAY_SIZE(sdpcm->npkt_in_q) - 1U];
 	s->bus_up = whd_bus_is_up(whd) == WHD_TRUE;
 	s->irq_flag = whd->thread_info.bus_interrupt == WHD_TRUE;
+	s->save_restore = whd->chip_info.save_restore_enable == WHD_TRUE;
 	s->waiting = thread->base.pended_on == &whd->thread_info.transceive_semaphore.wait_q;
 	(void)k_thread_state_str(thread, s->state, sizeof(s->state));
 	k_sched_unlock();
@@ -209,10 +211,10 @@ static void snapshot(whd_driver_t whd, struct whd_snapshot *s)
 static void log_snapshot(const char *when, const struct whd_snapshot *s)
 {
 	LOG_INF("WHD %s: credits %u (seq %u, max %u), queued %u (%u requests), bus %s, "
-		"interrupt flag %s, thread %s%s",
+		"save/restore sleep %s, interrupt flag %s, thread %s%s",
 		when, (unsigned int)s->credits, (unsigned int)s->tx_seq, (unsigned int)s->tx_max,
 		(unsigned int)s->queued, (unsigned int)s->queued_control, s->bus_up ? "up" : "down",
-		s->irq_flag ? "set" : "clear", s->state,
+		s->save_restore ? "on" : "off", s->irq_flag ? "set" : "clear", s->state,
 		s->waiting ? ", asleep waiting to be woken" : "");
 }
 
@@ -498,20 +500,62 @@ void wifi_debug_scan_failed(void)
 	check_chip(whd, "after the failure");
 }
 
+/**
+ * @brief Stop the chip's bus sleeping in its save/restore deep sleep.
+ *
+ * With save/restore on, WHD lets the bus sleep by clearing the chip's keep-SDIO-on (KSO)
+ * bit, which puts most of the chip in deep sleep, and wakes it by setting KSO again; off,
+ * it only drops its request for the fast (HT) clock, and the chip stays on. The switch is
+ * made only while the bus is up, with KSO set: from a bus asleep with KSO clear, the HT
+ * request alone wouldn't wake the chip. The scheduler is locked so the WHD thread can't
+ * let the bus sleep between the check and the switch.
+ *
+ * @param whd The WHD driver.
+ * @retval 0 Switched off (or already off).
+ * @retval -EAGAIN The bus wasn't up: try again later.
+ *
+ * @sideeffects Wakes the chip's bus (keep_bus_awake(), let_bus_sleep()); with the scheduler
+ *              locked, clears WHD's save/restore flag; logs the outcome. errno unchanged.
+ */
+static int stop_save_restore(whd_driver_t whd)
+{
+	bool switched = false;
+
+	if (whd->chip_info.save_restore_enable == WHD_FALSE) {
+		return 0;
+	}
+	(void)keep_bus_awake(whd);
+	k_sched_lock();
+	if (whd_bus_is_up(whd) == WHD_TRUE) {
+		whd->chip_info.save_restore_enable = WHD_FALSE;
+		switched = true;
+	}
+	k_sched_unlock();
+	let_bus_sleep(whd);
+	if (!switched) {
+		LOG_WRN("The Wi-Fi chip's bus wasn't up: keeping save/restore sleep for now");
+		return -EAGAIN;
+	}
+	LOG_WRN("Save/restore sleep off: the Wi-Fi chip stays on between requests "
+		"(CONFIG_METER_DEBUG_WIFI_NO_SR)");
+
+	return 0;
+}
+
 /*
  * Public interface: documented in wifi_debug.h.
  *
- * Only the scan thread calls it, so @c checked needs no lock.
+ * Only the scan thread calls it, so @c checked and @c sr_off need no lock.
  */
 void wifi_debug_scan_ok(void)
 {
 	static bool checked;
+	static bool sr_off;
 	whd_driver_t whd;
 
-	if (checked) {
+	if (checked && (sr_off || !IS_ENABLED(CONFIG_METER_DEBUG_WIFI_NO_SR))) {
 		return;
 	}
-	checked = true;
 	whd = whd_driver_get();
 	if (whd == NULL) {
 		LOG_ERR("No WHD driver to look at");
@@ -519,5 +563,11 @@ void wifi_debug_scan_ok(void)
 	}
 	/* Let the WHD thread finish with the scan first: this reads the chip's bus too. */
 	k_msleep(SETTLE_MS);
-	check_chip(whd, "while working");
+	if (!checked) {
+		checked = true;
+		check_chip(whd, "while working");
+	}
+	if (IS_ENABLED(CONFIG_METER_DEBUG_WIFI_NO_SR) && !sr_off) {
+		sr_off = stop_save_restore(whd) == 0;
+	}
 }

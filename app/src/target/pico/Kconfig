@@ -14,6 +14,17 @@ config METER_DEBUG_WIFI_IRQ
 	  again (src/target/pico/wifi_debug.c). Reads WHD internals; for
 	  debug builds only.
 
+config METER_DEBUG_WIFI_NO_SR
+	bool "Keep the Wi-Fi chip out of its save/restore deep sleep"
+	depends on METER_DEBUG_WIFI_IRQ
+	help
+	  For testing whether the chip's save/restore deep sleep is what
+	  makes it stop answering: after the first scan that works, stops
+	  the WHD library letting the chip's bus sleep that way (it only
+	  drops the fast clock instead), so the chip stays on between
+	  requests. Uses more power. Changes WHD internals; for debug
+	  builds only.
+
 config METER_USB_CONSOLE_FLOW
 	bool "Console flow control that follows DTR"
 	default y
