@@ -6,7 +6,7 @@ A [Zephyr RTOS](https://zephyrproject.org) firmware that works as a
 | Target | Hardware | Build | Guide |
 |---|---|---|---|
 | **Pico W** | Raspberry Pi Pico W with a Pimoroni Pico Display Pack 2.0 | `make pico` | [docs/targets/pico.md](docs/targets/pico.md) |
-| **XIAO ESP32-C5** | Seeed XIAO ESP32-C5 with a 2.2" ILI9341 TFT, four buttons and an RGB LED (not yet run on hardware) | `make xiao` | [docs/targets/xiao-esp32c5.md](docs/targets/xiao-esp32c5.md) |
+| **XIAO ESP32-C5** | Seeed XIAO ESP32-C5 with a 2.2" ILI9341 TFT, four buttons and an RGB LED (first runs on a breadboard) | `make xiao` | [docs/targets/xiao-esp32c5.md](docs/targets/xiao-esp32c5.md) |
 
 Each target's guide has its hardware and pins, flashing, the serial
 console, the battery, and its known issues. The screens, buttons and LED
@@ -259,9 +259,9 @@ Espressif's library, which it otherwise ignores.
 ## Status
 
 The firmware for both targets and the tests build and pass in the Docker
-image, and the UI is checked by `tests/ui_render`. The XIAO ESP32-C5 has
-not been run on hardware yet. Each target's guide lists what to check
-first on new hardware.
+image, and the UI is checked by `tests/ui_render`. The XIAO ESP32-C5 runs
+on a breadboard: it scans, shows the screens and takes all four buttons.
+Its guide lists what has and hasn't been checked on hardware yet.
 
 ## Licence
 

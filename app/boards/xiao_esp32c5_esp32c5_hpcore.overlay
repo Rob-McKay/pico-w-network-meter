@@ -153,7 +153,11 @@
 	pinctrl-0 = <&spim2_tft>;
 	pinctrl-names = "default";
 	cs-gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
-	dma-enabled;
+	/* No dma-enabled: on the C5 that needs dmas = <&dma ...> and the
+	 * GDMA controller (&dma) enabled too, and without them every transfer
+	 * fails ("DMA channel is not configured"), so the panel never starts.
+	 * The CPU-driven transfers are fast enough at the panel's 10 MHz.
+	 */
 	status = "okay";
 };
 
