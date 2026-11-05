@@ -72,6 +72,32 @@ whd_interface_t airoc_wifi_get_whd_interface(void);
 #define CHIPCOMMON_ID_ADDRESS 0x18000000U
 #define CHIP_ID_MASK          0xffffU
 
+/* WHD's private bus state (struct whd_bus_common_info in hal_infineon's
+ * WHD/COMMON/src/whd_bus_common.c, at the revision west.yml pins), mirrored to read the
+ * backplane window WHD believes the chip has. Debug builds only: re-check it on any
+ * hal_infineon update.
+ */
+struct whd_bus_common_mirror {
+	whd_bool_t bus_is_up;
+	whd_time_t delayed_bus_release_deadline;
+	whd_bool_t delayed_bus_release_scheduled;
+	uint32_t delayed_bus_release_timeout_ms;
+	volatile uint32_t delayed_bus_release_timeout_ms_request;
+	uint32_t backplane_window_current_base_address;
+	whd_bool_t bus_flow_control;
+	volatile whd_bool_t resource_download_abort;
+};
+
+/** The chip's backplane window registers, high byte first, and their shifts. */
+static const struct {
+	uint32_t reg;
+	unsigned int shift;
+} window_regs[] = {
+	{SDIO_BACKPLANE_ADDRESS_HIGH, 24U},
+	{SDIO_BACKPLANE_ADDRESS_MID, 16U},
+	{SDIO_BACKPLANE_ADDRESS_LOW, 8U},
+};
+
 /** The longest line of the chip's console log printed, with its terminator. */
 #define CONSOLE_LINE 128U
 
@@ -306,17 +332,110 @@ static int check_chip_answers(whd_driver_t whd, const char *when)
 }
 
 /**
+ * @brief Read the backplane window the chip has: the base address its
+ *        backplane reads and writes go to.
+ *
+ * The window registers are the chip's own (function 1), read without the window.
+ *
+ * @param whd The WHD driver, its bus awake.
+ * @param[out] base The window's base address.
+ * @retval 0 Read.
+ * @retval -EIO A read failed (logged).
+ *
+ * @sideeffects Reads three registers over the chip's bus; logs a failure. errno unchanged.
+ */
+static int read_chip_window(whd_driver_t whd, uint32_t *base)
+{
+	*base = 0;
+	for (size_t i = 0; i < ARRAY_SIZE(window_regs); i++) {
+		uint8_t byte = 0;
+		whd_result_t res = whd_bus_read_register_value(whd, BACKPLANE_FUNCTION,
+							       window_regs[i].reg, 1, &byte);
+
+		if (res != WHD_SUCCESS) {
+			LOG_ERR("Can't read the chip's backplane window: 0x%08x",
+				(unsigned int)res);
+			return -EIO;
+		}
+		*base |= (uint32_t)byte << window_regs[i].shift;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Set the chip's backplane window to a base address.
+ *
+ * @param whd The WHD driver, its bus awake.
+ * @param base The base address.
+ * @retval 0 Set.
+ * @retval -EIO A write failed (logged).
+ *
+ * @sideeffects Writes three registers over the chip's bus; logs a failure. errno unchanged.
+ */
+static int write_chip_window(whd_driver_t whd, uint32_t base)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(window_regs); i++) {
+		whd_result_t res =
+			whd_bus_write_register_value(whd, BACKPLANE_FUNCTION, window_regs[i].reg, 1,
+						     (base >> window_regs[i].shift) & 0xffU);
+
+		if (res != WHD_SUCCESS) {
+			LOG_ERR("Can't set the chip's backplane window: 0x%08x", (unsigned int)res);
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Compare the chip's backplane window with the one WHD believes it
+ *        has, and if they differ, set the chip's to WHD's.
+ *
+ * WHD writes a window register only when the base it needs differs from the one it
+ * remembers. If the two have come apart, every backplane access goes to the wrong
+ * address: reads give nonsense, and writes land in the wrong place.
+ *
+ * @param whd The WHD driver, its bus awake.
+ * @param when When, for the log.
+ *
+ * @sideeffects Reads WHD's remembered window; reads the chip's window registers, and if they
+ *              differ, writes them; logs both and any repair. errno unchanged.
+ */
+static void check_window(whd_driver_t whd, const char *when)
+{
+	const struct whd_bus_common_mirror *common =
+		(const struct whd_bus_common_mirror *)whd->bus_common_info;
+	uint32_t wanted = common->backplane_window_current_base_address;
+	uint32_t chip;
+
+	if (read_chip_window(whd, &chip) != 0) {
+		return;
+	}
+	LOG_INF("Wi-Fi chip %s: backplane window 0x%08x, WHD thinks 0x%08x%s", when,
+		(unsigned int)chip, (unsigned int)wanted, chip == wanted ? "" : ": OUT OF STEP");
+	if (chip != wanted && write_chip_window(whd, wanted) == 0) {
+		LOG_WRN("Set the chip's backplane window to WHD's, 0x%08x", (unsigned int)wanted);
+	}
+}
+
+/**
  * @brief Log the chip's bus registers, and if it answers, print its
  *        firmware's console log and whether it trapped or asserted.
  *
  * whd_wifi_read_wlan_log() prints each new line as "CONSOLE: ..." itself (WPRINT_MACRO);
  * the first call prints all the log the chip holds, later ones what's new.
  *
+ * Checks the backplane window first (check_window()), and sets it right if it is out of
+ * step, so that the ID and the log are read from where they are.
+ *
  * @param whd The WHD driver.
  * @param when When, for the log.
  *
  * @sideeffects Wakes the chip's bus and keeps it awake meanwhile (keep_bus_awake(),
- *              let_bus_sleep()); reads the chip's memory over it; WHD updates its copy of the
+ *              let_bus_sleep()); those of check_window(): may rewrite the chip's backplane
+ *              window; reads the chip's memory over the bus; WHD updates its copy of the
  *              chip's shared area and console position, and prints the log; logs the
  *              outcome. errno unchanged.
  */
@@ -326,7 +445,10 @@ static void check_chip(whd_driver_t whd, const char *when)
 	const wlan_shared_t *sh = &whd->internal_info.sh;
 	whd_result_t res;
 
-	if (keep_bus_awake(whd) == 0 && check_chip_answers(whd, when) == 0) {
+	if (keep_bus_awake(whd) == 0) {
+		check_window(whd, when);
+	}
+	if (whd_bus_is_up(whd) == WHD_TRUE && check_chip_answers(whd, when) == 0) {
 		LOG_INF("The Wi-Fi chip's console log:");
 		res = whd_wifi_read_wlan_log(whd, line, sizeof(line));
 		if (res != WHD_SUCCESS) {
