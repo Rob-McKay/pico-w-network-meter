@@ -4,7 +4,7 @@ The meter's second target. Build it with `make xiao`; the
 [README](../../README.md) covers the build and what the meter shows, and
 [USAGE.md](../USAGE.md) how to use it. **First runs on a breadboard**
 (November 2026, list below): it scans, shows the screens and takes button
-presses. What hasn't been checked yet is marked so; the rest comes from
+presses on all four buttons. What hasn't been checked yet is marked so; the rest comes from
 the build, the board's documents and the [port study](../port-esp32c5.md).
 
 ## Hardware
@@ -121,13 +121,13 @@ with esptool 4 on macOS:
 | The TFT | Shows the screens as expected, once SPI DMA was dropped (above) |
 | Scans | Every scan succeeds; one every 15–16 s, so a sweep of both bands takes 5–6 s with the patched 130 ms dwell. Channel 13 is heard (country GB), and 4–10 networks a scan count as "other" (5 GHz) |
 | Hidden networks | Shown |
-| Buttons A and B | Work (tried with a wire link to ground) |
+| Buttons | All four work (tried with a wire link to ground): A and B change screens, X and Y page up and down the Networks list |
 | Event log | Works: the first start shows as "#1 power on", so the log in flash (`storage_partition`, 64 KB) opens and records |
 | Power cut, reset button | Both show as "power on". The reset button resets the whole chip through its enable pin: the chip reports a power-on, and the restart note in RAM doesn't survive it, so the meter can't tell it from a power cut |
 
 Not checked yet:
 
-1. Buttons X and Y, and the RGB LED.
+1. The RGB LED, and X's scan-now on the Channels screen.
 2. The console with no host attached (it must not block on a charger or a
    battery).
 3. The meter's own restarts: whether the restart note survives a

@@ -260,7 +260,7 @@ Espressif's library, which it otherwise ignores.
 
 The firmware for both targets and the tests build and pass in the Docker
 image, and the UI is checked by `tests/ui_render`. The XIAO ESP32-C5 runs
-on a breadboard: it scans, shows the screens and takes button presses.
+on a breadboard: it scans, shows the screens and takes all four buttons.
 Its guide lists what has and hasn't been checked on hardware yet.
 
 ## Licence
