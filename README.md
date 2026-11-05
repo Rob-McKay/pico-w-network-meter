@@ -61,9 +61,9 @@ fails, the Wi-Fi chip's interrupt line (GPIO 24) and the Wi-Fi library's
 state (its credits, queue, bus and thread), then wakes the library's thread
 to read from the chip and logs it again
 (`app/src/target/pico/wifi_debug.c`; for finding why scans stop working
-after a few hours). Adding `-DCONFIG_METER_DEBUG_WIFI_NO_SR=y` also keeps the
-chip out of its save/restore deep sleep between requests, to test whether
-that sleep is what stops it answering; it uses more power.
+after a few hours). Adding `-DCONFIG_METER_DEBUG_WIFI_BUS_AWAKE=y` also keeps the
+chip's bus up, so the chip stays out of its save/restore deep sleep, to test
+whether that sleep is what stops it answering; it uses more power.
 
 Scans are **passive** by default: the radio listens on each channel long
 enough to hear every network's beacons, instead of sending probe requests

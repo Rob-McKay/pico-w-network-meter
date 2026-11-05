@@ -63,6 +63,11 @@ whd_interface_t airoc_wifi_get_whd_interface(void);
 /** How long to give the WHD thread after waking it, ms. */
 #define WAKE_WAIT_MS 100
 
+/** With CONFIG_METER_DEBUG_WIFI_BUS_AWAKE, how long WHD keeps the bus up after a
+ * transfer, ms: an hour, far longer than the time between scans.
+ */
+#define BUS_AWAKE_MS (60U * 60U * 1000U)
+
 /** How long to let the WHD thread settle after a scan before reading the chip, ms. */
 #define SETTLE_MS 500
 
@@ -501,61 +506,44 @@ void wifi_debug_scan_failed(void)
 }
 
 /**
- * @brief Stop the chip's bus sleeping in its save/restore deep sleep.
+ * @brief Stop WHD letting the chip's bus sleep.
  *
- * With save/restore on, WHD lets the bus sleep by clearing the chip's keep-SDIO-on (KSO)
- * bit, which puts most of the chip in deep sleep, and wakes it by setting KSO again; off,
- * it only drops its request for the fast (HT) clock, and the chip stays on. The switch is
- * made only while the bus is up, with KSO set: from a bus asleep with KSO clear, the HT
- * request alone wouldn't wake the chip. The scheduler is locked so the WHD thread can't
- * let the bus sleep between the check and the switch.
+ * After each transfer WHD can keep the bus up for a while before letting it sleep; when it
+ * lets it sleep, on the CYW43439 it clears the chip's keep-SDIO-on bit, and the chip goes
+ * into its save/restore deep sleep. Asking for a delay of BUS_AWAKE_MS, which each
+ * transfer starts again, keeps the bus up, and the chip out of deep sleep, while the meter
+ * scans. WHD's own setter for the delay is declared but not built, so this sets the request
+ * it would have set (an aligned 32-bit store, which the RP2040 makes atomic); the WHD
+ * thread applies it the next time it waits.
  *
  * @param whd The WHD driver.
- * @retval 0 Switched off (or already off).
- * @retval -EAGAIN The bus wasn't up: try again later.
  *
- * @sideeffects Wakes the chip's bus (keep_bus_awake(), let_bus_sleep()); with the scheduler
- *              locked, clears WHD's save/restore flag; logs the outcome. errno unchanged.
+ * @sideeffects Sets WHD's delayed bus release request; logs it. errno unchanged.
  */
-static int stop_save_restore(whd_driver_t whd)
+static void keep_bus_up(whd_driver_t whd)
 {
-	bool switched = false;
+	struct whd_bus_common_mirror *common = (struct whd_bus_common_mirror *)whd->bus_common_info;
 
-	if (whd->chip_info.save_restore_enable == WHD_FALSE) {
-		return 0;
-	}
-	(void)keep_bus_awake(whd);
-	k_sched_lock();
-	if (whd_bus_is_up(whd) == WHD_TRUE) {
-		whd->chip_info.save_restore_enable = WHD_FALSE;
-		switched = true;
-	}
-	k_sched_unlock();
-	let_bus_sleep(whd);
-	if (!switched) {
-		LOG_WRN("The Wi-Fi chip's bus wasn't up: keeping save/restore sleep for now");
-		return -EAGAIN;
-	}
-	LOG_WRN("Save/restore sleep off: the Wi-Fi chip stays on between requests "
-		"(CONFIG_METER_DEBUG_WIFI_NO_SR)");
-
-	return 0;
+	common->delayed_bus_release_timeout_ms_request = BUS_AWAKE_MS;
+	LOG_WRN("Keeping the Wi-Fi chip's bus up, out of save/restore deep sleep, for %u ms "
+		"after each transfer (CONFIG_METER_DEBUG_WIFI_BUS_AWAKE)",
+		(unsigned int)BUS_AWAKE_MS);
 }
 
 /*
  * Public interface: documented in wifi_debug.h.
  *
- * Only the scan thread calls it, so @c checked and @c sr_off need no lock.
+ * Only the scan thread calls it, so @c checked needs no lock.
  */
 void wifi_debug_scan_ok(void)
 {
 	static bool checked;
-	static bool sr_off;
 	whd_driver_t whd;
 
-	if (checked && (sr_off || !IS_ENABLED(CONFIG_METER_DEBUG_WIFI_NO_SR))) {
+	if (checked) {
 		return;
 	}
+	checked = true;
 	whd = whd_driver_get();
 	if (whd == NULL) {
 		LOG_ERR("No WHD driver to look at");
@@ -563,11 +551,8 @@ void wifi_debug_scan_ok(void)
 	}
 	/* Let the WHD thread finish with the scan first: this reads the chip's bus too. */
 	k_msleep(SETTLE_MS);
-	if (!checked) {
-		checked = true;
-		check_chip(whd, "while working");
-	}
-	if (IS_ENABLED(CONFIG_METER_DEBUG_WIFI_NO_SR) && !sr_off) {
-		sr_off = stop_save_restore(whd) == 0;
+	check_chip(whd, "while working");
+	if (IS_ENABLED(CONFIG_METER_DEBUG_WIFI_BUS_AWAKE)) {
+		keep_bus_up(whd);
 	}
 }
