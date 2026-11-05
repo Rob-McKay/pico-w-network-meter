@@ -614,7 +614,7 @@ static void show_networks(const struct chan_stats *s, size_t first)
 {
 	const struct chan_ap *list[CHAN_MAX_APS];
 	size_t rows = ui_list_rows();
-	size_t n = chan_stats_strongest(s, list, ARRAY_SIZE(list));
+	size_t n = chan_stats_strongest(s, CHAN_BAND_2G4, list, ARRAY_SIZE(list));
 
 	for (size_t i = 0; i < rows; i++) {
 		draw_network(BAR_H + PAD + ((int)i * ROW_H),
@@ -626,6 +626,7 @@ static void show_networks(const struct chan_stats *s, size_t first)
  * @brief Write the networks screen's footer text: how many networks, and
  *        which are showing when they don't all fit.
  *
+ * The list is 2.4 GHz only, so "other" counts the 5 GHz networks too.
  * @param s Scan statistics.
  * @param first First network showing.
  * @param[out] buf The text.
@@ -637,15 +638,16 @@ static void show_networks(const struct chan_stats *s, size_t first)
 static void networks_footer(const struct chan_stats *s, size_t first, char *buf, size_t size)
 {
 	size_t rows = ui_list_rows();
-	unsigned int other = (unsigned int)(s->ignored + s->dropped);
+	size_t heard = chan_stats_band_count(s, CHAN_BAND_2G4);
+	unsigned int other =
+		(unsigned int)(s->ignored + s->dropped + chan_stats_band_count(s, CHAN_BAND_5G));
 
-	if (s->ap_count <= rows) {
-		(void)snprintf(buf, size, "%u heard, %u other", (unsigned int)s->ap_count, other);
+	if (heard <= rows) {
+		(void)snprintf(buf, size, "%u heard, %u other", (unsigned int)heard, other);
 		return;
 	}
 	(void)snprintf(buf, size, "%u-%u of %u, %u other", (unsigned int)first + 1U,
-		       (unsigned int)MIN(first + rows, s->ap_count), (unsigned int)s->ap_count,
-		       other);
+		       (unsigned int)MIN(first + rows, heard), (unsigned int)heard, other);
 }
 
 /**
@@ -667,7 +669,7 @@ static void recommend_text(const struct chan_stats *s, char *buf, size_t size)
 	};
 	struct chan_info best;
 
-	if (s->ap_count == 0U) {
+	if (chan_stats_band_count(s, CHAN_BAND_2G4) == 0U) {
 		(void)snprintf(buf, size, "Nothing heard");
 		return;
 	}
@@ -689,7 +691,8 @@ static void show_channels_screen(const struct chan_stats *s, unsigned int scan_n
 {
 	char text[LINE_MAX];
 
-	(void)snprintf(text, sizeof(text), "%u networks", (unsigned int)s->ap_count);
+	(void)snprintf(text, sizeof(text), "%u networks",
+		       (unsigned int)chan_stats_band_count(s, CHAN_BAND_2G4));
 	draw_bar(0, "Channels", text);
 	show_channels(s, full);
 	recommend_text(s, text, sizeof(text));
@@ -710,7 +713,7 @@ static void show_networks_screen(const struct chan_stats *s, unsigned int scan_n
 {
 	char text[LINE_MAX];
 
-	first = paging_clamp(first, s->ap_count, ui_list_rows());
+	first = paging_clamp(first, chan_stats_band_count(s, CHAN_BAND_2G4), ui_list_rows());
 	draw_bar(0, "Networks", "strongest first");
 	show_networks(s, first);
 	networks_footer(s, first, text, sizeof(text));

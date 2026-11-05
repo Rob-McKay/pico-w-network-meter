@@ -85,9 +85,20 @@ There's no case for it yet.
 ## Known issues and limits
 
 - **Only partly checked on hardware**: see the list below.
-- **2.4 GHz shown only, for now.** The radio scans both bands, but until
-  the 5 GHz work (port study, section 5) the meter shows 2.4 GHz channels
-  only, and counts 5 GHz networks in the Networks footer's "other".
+- **5 GHz on the console only, for now.** The radio scans both bands,
+  and the meter keeps the 5 GHz networks (`CONFIG_METER_BAND_5G`, on in
+  the board's `.conf`). The console lists each 5 GHz channel a network
+  reaches and the quietest 80 MHz block ("5 GHz: use 36-48 (80 MHz)").
+  The screens still show 2.4 GHz only, and count 5 GHz networks in the
+  Networks footer's "other", until the 5 GHz screens (port study,
+  section 5).
+- **5 GHz widths are assumed.** Zephyr's scan results don't give a
+  network's channel width, so every 5 GHz network is taken to use its
+  whole 80 MHz block, as nearly every home router does. A 20 or 40 MHz
+  network is counted on channels it doesn't use. The recommendation
+  considers 36-48, 52-64, 100-112 and 116-128; 132-144 and 149-161 only
+  with `CONFIG_METER_RECOMMEND_5G_132` and `_UPPER` (allowed in the US,
+  not at 80 MHz or full power in the UK).
 - **Driver patch.** The ESP32 Wi-Fi driver needs a carried Zephyr patch
   (`esp32-wifi-scan-params.patch`) to report hidden networks and to honour
   the scan's 130 ms dwell time per channel; without it a sweep of both

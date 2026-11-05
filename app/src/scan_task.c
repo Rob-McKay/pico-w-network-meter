@@ -65,6 +65,67 @@ static struct ap_history history;
 static struct scan_task_state progress;
 
 /**
+ * @brief Say which 5 GHz 80 MHz blocks the recommendation may pick.
+ *
+ * @return A mask for chan_stats_recommend_5g(): 36-48, 52-64, 100-112 and
+ *         116-128, plus 132-144 and 149-161 if the settings allow them.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint32_t blocks_5g(void)
+{
+	uint32_t blocks = BIT(0) | BIT(1) | BIT(2) | BIT(3);
+
+	if (IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132)) {
+		blocks |= BIT(4);
+	}
+	if (IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER)) {
+		blocks |= BIT(5);
+	}
+
+	return blocks;
+}
+
+/**
+ * @brief Log one channel's figures, if anything reaches it.
+ *
+ * @param info The channel's figures.
+ *
+ * @sideeffects Writes a log message. errno unchanged.
+ */
+static void report_channel(const struct chan_info *info)
+{
+	if (info->ap_count > 0U || info->interference != CHAN_RSSI_NONE) {
+		LOG_INF("  ch %2u: %u networks, strongest %4d dBm, interference %4d dBm, "
+			"total %4d dBm",
+			(unsigned int)info->channel, (unsigned int)info->ap_count, info->best_rssi,
+			info->others, info->interference);
+	}
+}
+
+/**
+ * @brief Log a scan's 5 GHz results on the console: each channel reached,
+ *        and the best 80 MHz block.
+ *
+ * @param s The scan.
+ *
+ * @sideeffects Writes log messages. errno unchanged.
+ */
+static void report_5g(const struct chan_stats *s)
+{
+	uint8_t best = chan_stats_recommend_5g(s, blocks_5g());
+	struct chan_info info;
+
+	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
+		chan_stats_channel_5g(s, chan_5g_channel(i), &info);
+		report_channel(&info);
+	}
+	chan_stats_channel_5g(s, best, &info);
+	LOG_INF("  5 GHz: use %u-%u (80 MHz), interference %d dBm", (unsigned int)best,
+		(unsigned int)(best + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U))), info.interference);
+}
+
+/**
  * @brief Log a scan's results on the console.
  *
  * @param s The scan.
@@ -74,18 +135,23 @@ static struct scan_task_state progress;
  */
 static void report(const struct chan_stats *s, unsigned int scan_no)
 {
-	LOG_INF("Scan %u: %u networks on 2.4 GHz, %u other", scan_no, (unsigned int)s->ap_count,
-		(unsigned int)(s->ignored + s->dropped));
+	unsigned int n_2g4 = (unsigned int)chan_stats_band_count(s, CHAN_BAND_2G4);
+	unsigned int other = (unsigned int)(s->ignored + s->dropped);
+
+	if (IS_ENABLED(CONFIG_METER_BAND_5G)) {
+		LOG_INF("Scan %u: %u networks on 2.4 GHz, %u on 5 GHz, %u other", scan_no, n_2g4,
+			(unsigned int)chan_stats_band_count(s, CHAN_BAND_5G), other);
+	} else {
+		LOG_INF("Scan %u: %u networks on 2.4 GHz, %u other", scan_no, n_2g4, other);
+	}
 	for (uint8_t ch = CHAN_FIRST; ch <= CHAN_LAST; ch++) {
 		struct chan_info info;
 
 		chan_stats_channel(s, ch, &info);
-		if (info.ap_count > 0U || info.interference != CHAN_RSSI_NONE) {
-			LOG_INF("  ch %2u: %u networks, strongest %4d dBm, interference %4d dBm, "
-				"total %4d dBm",
-				(unsigned int)ch, (unsigned int)info.ap_count, info.best_rssi,
-				info.others, info.interference);
-		}
+		report_channel(&info);
+	}
+	if (IS_ENABLED(CONFIG_METER_BAND_5G)) {
+		report_5g(s);
 	}
 	for (size_t i = 0; i < s->ap_count; i++) {
 		LOG_DBG("  %-32s ch %2u %4d dBm", s->aps[i].ssid, (unsigned int)s->aps[i].channel,

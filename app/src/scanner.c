@@ -49,7 +49,8 @@ static K_SEM_DEFINE(scan_done, 0, 1);
 /**
  * @brief Convert a Zephyr scan result to an access point record.
  *
- * Only 2.4 GHz results get a channel; anything else is left at 0, which
+ * 2.4 GHz results, and 5 GHz ones with CONFIG_METER_BAND_5G, keep their
+ * band and channel; anything else is left on channel 0, which
  * chan_stats_add() counts as ignored.
  *
  * @param r Zephyr's scan result.
@@ -65,7 +66,13 @@ static void to_chan_ap(const struct wifi_scan_result *r, struct chan_ap *ap)
 	memcpy(ap->ssid, r->ssid, len);
 	ap->ssid[len] = '\0';
 	memcpy(ap->bssid, r->mac, MIN((size_t)r->mac_length, sizeof(ap->bssid)));
-	ap->channel = r->band == WIFI_FREQ_BAND_2_4_GHZ ? r->channel : 0U;
+	if (r->band == WIFI_FREQ_BAND_2_4_GHZ) {
+		ap->band = CHAN_BAND_2G4;
+		ap->channel = r->channel;
+	} else if (IS_ENABLED(CONFIG_METER_BAND_5G) && r->band == WIFI_FREQ_BAND_5_GHZ) {
+		ap->band = CHAN_BAND_5G;
+		ap->channel = r->channel;
+	}
 	ap->rssi = r->rssi;
 	ap->secured = r->security != WIFI_SECURITY_TYPE_NONE;
 	ap->freshness = CHAN_FRESH;
