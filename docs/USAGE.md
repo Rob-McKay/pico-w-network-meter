@@ -217,4 +217,4 @@ target's guide ([Pico W](targets/pico.md),
 | **Console** | The Pico's USB socket (inside the case) | The XIAO's USB-C socket |
 | **Bands** | 2.4 GHz only | Hears 2.4 and 5 GHz; shows 2.4 GHz for now |
 | **Unexplained restarts** | All shown as "restart after …" | Named where the chip says why: "HW watchdog", "brown-out", "CPU fault" |
-| **Tested on hardware** | Yes | Not yet |
+| **Tested on hardware** | Yes | On a breadboard: scans, screens, buttons A and B ([details](targets/xiao-esp32c5.md#checked-on-hardware)) |

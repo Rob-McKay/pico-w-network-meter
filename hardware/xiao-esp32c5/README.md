@@ -1,8 +1,9 @@
 # XIAO ESP32-C5: wiring, power and parts
 
 The meter on a Seeed Studio XIAO ESP32-C5, with a 2.2" ILI9341 SPI TFT,
-four push buttons and an RGB LED, wired by hand. **Not yet built**: this is
-the wiring the firmware expects (`app/boards/xiao_esp32c5_esp32c5_hpcore.overlay`),
+four push buttons and an RGB LED, wired by hand. Running on a breadboard
+([below](#on-a-breadboard)); no case yet. This is the wiring the firmware
+expects (`app/boards/xiao_esp32c5_esp32c5_hpcore.overlay`),
 worked out in the [port study](../../docs/port-esp32c5.md), sections 1 and 7.
 
 - [BOM.md](BOM.md): the parts to buy, the antenna among them.

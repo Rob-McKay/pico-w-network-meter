@@ -2,9 +2,10 @@
 
 The meter's second target. Build it with `make xiao`; the
 [README](../../README.md) covers the build and what the meter shows, and
-[USAGE.md](../USAGE.md) how to use it. **It has not been run on hardware
-yet**: everything below is from the build, the board's documents and the
-[port study](../port-esp32c5.md).
+[USAGE.md](../USAGE.md) how to use it. **First runs on a breadboard**
+(November 2026, list below): it scans, shows the screens and takes button
+presses. What hasn't been checked yet is marked so; the rest comes from
+the build, the board's documents and the [port study](../port-esp32c5.md).
 
 ## Hardware
 
@@ -49,6 +50,15 @@ USB; `pip install esptool`), run
 esptool --chip esp32c5 write-flash 0x2000 out/xiao/network-meter.bin
 ```
 
+esptool 5 needs Python 3.10 or later. With macOS's own Python 3.9, use
+esptool 4 (4.9 or later knows the C5), which spells the command with an
+underscore and has no `esptool` command of its own:
+
+```sh
+python3 -m pip install --upgrade "esptool<5"
+python3 -m esptool --chip esp32c5 write_flash 0x2000 out/xiao/network-meter.bin
+```
+
 or flash `out/xiao/network-meter-merged.bin` at offset 0 with a browser
 flasher. If esptool can't connect, hold **BOOT** while plugging the board
 in. On Linux, `west flash` also works from inside Docker with
@@ -74,7 +84,7 @@ There's no case for it yet.
 
 ## Known issues and limits
 
-- **Not yet run on hardware.**
+- **Only partly checked on hardware**: see the list below.
 - **2.4 GHz shown only, for now.** The radio scans both bands, but until
   the 5 GHz work (port study, section 5) the meter shows 2.4 GHz channels
   only, and counts 5 GHz networks in the Networks footer's "other".
@@ -90,21 +100,37 @@ There's no case for it yet.
   that start-up doesn't clear. Whether that RAM survives the ESP32-C5's
   restarts is still to be checked: if it doesn't, every restart will show
   as a power-on.
+- **SPI without DMA.** The TFT's SPI bus runs without DMA: on the C5,
+  `dma-enabled` also needs `dmas` channels and the GDMA controller
+  enabled, and without them the panel never started (the first run's
+  black screen). CPU-driven transfers are fast enough at 10 MHz.
 - **Strapping pins.** The TFT's CS and DC are on strapping pins (GPIO7,
   GPIO25). With the chip's factory eFuses neither affects booting; the
   10 kΩ pull-up on CS keeps the panel deselected while it boots.
 
-## Things to check on new hardware
+## Checked on hardware
 
-From the port study's plan (section 8):
+On the breadboard ([hardware/xiao-esp32c5/](../../hardware/xiao-esp32c5/README.md#on-a-breadboard)),
+with esptool 4 on macOS:
 
-1. Flashing, and the console with and without a host attached (it must
-   not block on a charger or a battery).
-2. The TFT: orientation, mirroring and colours, then the SPI clock
-   (10 MHz; 20 MHz with short wires).
-3. The buttons and the RGB LED.
-4. 2.4 GHz scans with the patched dwell time: scan durations on the
-   console, and hidden networks.
-5. Restarts: what the events screen shows after a Wi-Fi restart, a crash
-   and the reset button.
+| Check | Result |
+|---|---|
+| Flashing over USB-C | Works (`write_flash 0x2000`) |
+| Console with a host attached | Works: the scans' figures, no errors |
+| The TFT | Shows the screens as expected, once SPI DMA was dropped (above) |
+| Scans | Every scan succeeds; one every 15–16 s, so a sweep of both bands takes 5–6 s with the patched 130 ms dwell. Channel 13 is heard (country GB), and 4–10 networks a scan count as "other" (5 GHz) |
+| Hidden networks | Shown |
+| Buttons A and B | Work (tried with a wire link to ground) |
+| Event log | Works: the first start shows as "#1 power on", so the log in flash (`storage_partition`, 64 KB) opens and records |
+
+Not checked yet:
+
+1. Buttons X and Y, and the RGB LED.
+2. The console with no host attached (it must not block on a charger or a
+   battery).
+3. Restarts: what the events screen shows after a power cut, the reset
+   button, a Wi-Fi restart and a crash (whether the restart note
+   survives), and that the log keeps its starts across a reflash.
+4. Running for hours: no watchdog restarts or driver failures.
+5. A faster SPI clock (20 MHz with short wires).
 6. Current draw and battery life.
