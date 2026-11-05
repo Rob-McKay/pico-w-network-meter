@@ -1,7 +1,8 @@
 # Wi-Fi network meter
 
 A [Zephyr RTOS](https://zephyrproject.org) firmware that works as a
-2.4 GHz Wi-Fi channel meter, for two targets:
+Wi-Fi channel meter, for two targets: 2.4 GHz on both, and 5 GHz as well
+on the XIAO ESP32-C5.
 
 | Target | Hardware | Build | Guide |
 |---|---|---|---|
@@ -124,9 +125,16 @@ the unit tests. The one exception is the XIAO ESP32-C5 firmware, built with
 the Zephyr SDK's GCC because Espressif's SoC support doesn't build with
 clang.
 
-The XIAO's radio also hears 5 GHz, but until the 5 GHz work
-([docs/port-esp32c5.md](docs/port-esp32c5.md), section 5) it shows
-2.4 GHz only, like the Pico, and counts 5 GHz networks as "other".
+**5 GHz on the XIAO.** A Channels 5 GHz screen follows the 2.4 GHz one:
+the channels in the 80 MHz blocks routers use (36-48 to 149-161), each
+network counted across its whole block, as the meter can't tell how wide
+a network is, and the quietest block recommended ("Use 52-64: clear").
+The Networks list and the LED follow the band of the last Channels screen
+viewed. The 2.4 GHz screens are the same on both targets.
+
+| Channels 5 GHz | Networks 5 GHz |
+|---|---|
+| ![5 GHz channels screen](docs/screens/channels-5g.png) | ![5 GHz networks screen](docs/screens/networks-5g.png) |
 
 ## Hardware
 

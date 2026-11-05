@@ -489,6 +489,23 @@ uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks)
 
 /*
  * Public interface: documented in chan_stats.h.
+ */
+uint32_t chan_5g_blocks(bool with_132, bool with_upper)
+{
+	uint32_t blocks = BIT(0) | BIT(1) | BIT(2) | BIT(3);
+
+	if (with_132) {
+		blocks |= BIT(4);
+	}
+	if (with_upper) {
+		blocks |= BIT(5);
+	}
+
+	return blocks;
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
  *
  * An insertion sort straight into the output array, keeping only as many entries as it
  * has room for: a scan holds at most CHAN_MAX_APS access points.

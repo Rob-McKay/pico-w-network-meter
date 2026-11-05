@@ -35,7 +35,7 @@
 #include "boot_record.h"
 #include "chan_stats.h"
 
-/** A screen. */
+/** A screen. The channels and networks screens show one band (ui_show()). */
 enum ui_view {
 	UI_VIEW_CHANNELS,
 	UI_VIEW_NETWORKS,
@@ -64,7 +64,14 @@ int ui_init(void);
  * Only the parts that hold data are redrawn, without clearing them first,
  * unless @p full: then the whole screen is (after a change of view).
  *
+ * The 2.4 GHz screens are titled "Channels" and "Networks", the 5 GHz ones
+ * "Channels 5 GHz" and "Networks 5 GHz". The 5 GHz chart shows the 80 MHz
+ * blocks 36-48 to 149-161, labelled by their first channel (bold without
+ * DFS), the recommended block highlighted.
+ *
  * @param view Screen to show.
+ * @param band The band of the channels and networks screens (enum
+ *        chan_band); unused by the events screen.
  * @param s The scan's statistics.
  * @param scan_no Scans so far, shown in the footer.
  * @param first The networks or events screen's first row, counting from 0:
@@ -74,8 +81,8 @@ int ui_init(void);
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, size_t first,
-	     bool full);
+void ui_show(enum ui_view view, enum chan_band band, const struct chan_stats *s,
+	     unsigned int scan_no, size_t first, bool full);
 
 /** Gets the events screen's records: 0 for the newest. */
 typedef const struct boot_record *(*ui_event_get_fn)(size_t i);

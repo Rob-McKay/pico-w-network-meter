@@ -93,15 +93,18 @@ static enum status level_status(enum chan_level level)
 
 /**
  * @brief Pick the LED status: scanning (or no scan finished yet), failed,
- *        or how busy the recommended channel is.
+ *        or how busy the recommended channel (on 5 GHz, 80 MHz block) is.
  *
  * @param s The networks showing.
  * @param state The scan thread's progress.
+ * @param band The band whose recommendation counts: the last channels
+ *        screen's.
  * @return The status.
  *
  * @sideeffects None; errno unchanged.
  */
-static enum status led_status(const struct chan_stats *s, const struct scan_task_state *state)
+static enum status led_status(const struct chan_stats *s, const struct scan_task_state *state,
+			      enum chan_band band)
 {
 	struct chan_info best;
 
@@ -111,14 +114,43 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 	if (state->last_error != 0) {
 		return STATUS_ERROR;
 	}
-	chan_stats_channel(s, chan_stats_recommend(s), &best);
+	if (band == CHAN_BAND_5G) {
+		chan_stats_channel_5g(
+			s,
+			chan_stats_recommend_5g(
+				s, chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
+						  IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER))),
+			&best);
+	} else {
+		chan_stats_channel(s, chan_stats_recommend(s), &best);
+	}
 
 	return level_status(chan_stats_level(best.interference));
 }
 
+/* A screen A and B step through: a view, and for a channels screen its band. */
+struct page {
+	enum ui_view view;
+	enum chan_band band; /* CHAN_BAND_COUNT: keep the band of the last channels screen */
+};
+
+/* The screens in order. The 5 GHz channels screen is left out without
+ * CONFIG_METER_BAND_5G.
+ */
+static const struct page pages[] = {
+	{UI_VIEW_CHANNELS, CHAN_BAND_2G4},
+	{UI_VIEW_CHANNELS, CHAN_BAND_5G},
+	{UI_VIEW_NETWORKS, CHAN_BAND_COUNT},
+	{UI_VIEW_EVENTS, CHAN_BAND_COUNT},
+};
+
 /* What the screen shows, to redraw only when something changes. */
 struct screen {
-	enum ui_view view;
+	size_t page;              /* index in pages[] */
+	enum ui_view view;        /* pages[page].view */
+	enum chan_band band;      /* the band of the last channels screen: the networks
+				   * screen lists it, and the LED shows its recommendation
+				   */
 	size_t first;             /* networks or events screen: first row shown */
 	bool full;                /* the whole screen needs drawing */
 	unsigned int drawn_scans; /* scan count on screen */
@@ -128,14 +160,27 @@ struct screen {
 /**
  * @brief Change the screen shown, back to the top of its list.
  *
+ * Steps through pages[], skipping the 5 GHz channels screen without
+ * CONFIG_METER_BAND_5G. A channels screen sets the band; the others keep
+ * it.
+ *
  * @param[in,out] scr What is on screen.
- * @param step 1 for the next screen, -1 for the previous one.
+ * @param step 1 for the next screen, -1 (or any other value) for the
+ *        previous one.
  *
  * @sideeffects None (writes only through @p scr); errno unchanged.
  */
 static void change_view(struct screen *scr, int step)
 {
-	scr->view = (enum ui_view)(((int)scr->view + UI_VIEW_COUNT + step) % UI_VIEW_COUNT);
+	const size_t n = ARRAY_SIZE(pages);
+
+	do {
+		scr->page = (scr->page + (step > 0 ? 1U : n - 1U)) % n;
+	} while (!IS_ENABLED(CONFIG_METER_BAND_5G) && pages[scr->page].band == CHAN_BAND_5G);
+	scr->view = pages[scr->page].view;
+	if (pages[scr->page].band != CHAN_BAND_COUNT) {
+		scr->band = pages[scr->page].band;
+	}
 	scr->first = 0;
 }
 
@@ -151,7 +196,7 @@ static size_t list_length(const struct screen *scr)
 {
 	switch (scr->view) {
 	case UI_VIEW_NETWORKS:
-		return chan_stats_band_count(&scr->shown, CHAN_BAND_2G4);
+		return chan_stats_band_count(&scr->shown, scr->band);
 	case UI_VIEW_EVENTS:
 		return event_log_count();
 	default:
@@ -324,7 +369,7 @@ static void update_screen(struct screen *scr, const struct chan_stats *next, uns
 	}
 	scr->shown = *next;
 	scr->first = paging_clamp(scr->first, list_length(scr), ui_list_rows());
-	ui_show(scr->view, &scr->shown, scans, scr->first, scr->full);
+	ui_show(scr->view, scr->band, &scr->shown, scans, scr->first, scr->full);
 	scr->drawn_scans = scans;
 	scr->full = false;
 }
@@ -403,7 +448,12 @@ static void log_start(void)
 int main(void)
 {
 	/* Static: struct screen holds a whole scan, too big for the stack. */
-	static struct screen scr = {.view = UI_VIEW_CHANNELS, .full = true};
+	static struct screen scr = {
+		.page = 0,
+		.view = UI_VIEW_CHANNELS,
+		.band = CHAN_BAND_2G4,
+		.full = true,
+	};
 	static struct chan_stats next;
 
 	log_start();
@@ -427,7 +477,7 @@ int main(void)
 			scr.full = true;
 		}
 		scan_task_snapshot(k_uptime_get(), &next, &state);
-		status_set(led_status(&next, &state));
+		status_set(led_status(&next, &state, scr.band));
 		if (state.scans > 0U) { /* "Scanning..." until the first scan ends */
 			update_screen(&scr, &next, state.scans);
 		}

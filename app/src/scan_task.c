@@ -65,28 +65,6 @@ static struct ap_history history;
 static struct scan_task_state progress;
 
 /**
- * @brief Say which 5 GHz 80 MHz blocks the recommendation may pick.
- *
- * @return A mask for chan_stats_recommend_5g(): 36-48, 52-64, 100-112 and
- *         116-128, plus 132-144 and 149-161 if the settings allow them.
- *
- * @sideeffects None; errno unchanged.
- */
-static uint32_t blocks_5g(void)
-{
-	uint32_t blocks = BIT(0) | BIT(1) | BIT(2) | BIT(3);
-
-	if (IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132)) {
-		blocks |= BIT(4);
-	}
-	if (IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER)) {
-		blocks |= BIT(5);
-	}
-
-	return blocks;
-}
-
-/**
  * @brief Log one channel's figures, if anything reaches it.
  *
  * @param info The channel's figures.
@@ -114,7 +92,9 @@ static void report_channel(const struct chan_info *info)
  */
 static void report_5g(const struct chan_stats *s)
 {
-	uint8_t best = chan_stats_recommend_5g(s, blocks_5g());
+	uint8_t best = chan_stats_recommend_5g(
+		s, chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
+				  IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER)));
 	struct chan_info info;
 
 	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
