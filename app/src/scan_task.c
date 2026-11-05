@@ -105,7 +105,8 @@ static void report_channel(const struct chan_info *info)
 
 /**
  * @brief Log a scan's 5 GHz results on the console: each channel reached,
- *        and the best 80 MHz block.
+ *        and the best 80 MHz block with how busy it is ("nothing heard"
+ *        rather than CHAN_RSSI_NONE's -127 dBm).
  *
  * @param s The scan.
  *
@@ -121,8 +122,16 @@ static void report_5g(const struct chan_stats *s)
 		report_channel(&info);
 	}
 	chan_stats_channel_5g(s, best, &info);
-	LOG_INF("  5 GHz: use %u-%u (80 MHz), interference %d dBm", (unsigned int)best,
-		(unsigned int)(best + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U))), info.interference);
+	unsigned int last = (unsigned int)best + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U));
+
+	if (info.interference == CHAN_RSSI_NONE) {
+		LOG_INF("  5 GHz: use %u-%u (80 MHz): clear, nothing heard", (unsigned int)best,
+			last);
+	} else {
+		LOG_INF("  5 GHz: use %u-%u (80 MHz): %s, interference %d dBm", (unsigned int)best,
+			last, chan_level_name(chan_stats_level(info.interference)),
+			info.interference);
+	}
 }
 
 /**

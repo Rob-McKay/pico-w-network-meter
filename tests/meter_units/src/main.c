@@ -588,6 +588,19 @@ ZTEST(meter_chan, test_strongest_band)
 }
 
 /**
+ * @brief Each level has the name the screens and the console show.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_level_name)
+{
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_CLEAR), "clear");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_MODERATE), "moderate");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_BUSY), "busy");
+	zassert_str_equal(chan_level_name((enum chan_level)3), "?");
+}
+
+/**
  * @brief Interference levels split at -85 and -70 dBm.
  *
  * @sideeffects None; errno unchanged.

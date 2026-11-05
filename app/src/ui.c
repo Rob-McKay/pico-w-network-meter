@@ -662,11 +662,6 @@ static void networks_footer(const struct chan_stats *s, size_t first, char *buf,
  */
 static void recommend_text(const struct chan_stats *s, char *buf, size_t size)
 {
-	static const char *const level_names[] = {
-		[CHAN_LEVEL_CLEAR] = "clear",
-		[CHAN_LEVEL_MODERATE] = "moderate",
-		[CHAN_LEVEL_BUSY] = "busy",
-	};
 	struct chan_info best;
 
 	if (chan_stats_band_count(s, CHAN_BAND_2G4) == 0U) {
@@ -675,7 +670,7 @@ static void recommend_text(const struct chan_stats *s, char *buf, size_t size)
 	}
 	chan_stats_channel(s, chan_stats_recommend(s), &best);
 	(void)snprintf(buf, size, "Use ch %u: %s", (unsigned int)best.channel,
-		       level_names[chan_stats_level(best.interference)]);
+		       chan_level_name(chan_stats_level(best.interference)));
 }
 
 /**

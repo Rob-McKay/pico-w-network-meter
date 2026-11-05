@@ -321,6 +321,17 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size);
 enum chan_level chan_stats_level(int interference);
 
 /**
+ * @brief Name a level, as the screens and the console show it.
+ *
+ * @param level enum chan_level.
+ * @return "clear", "moderate" or "busy"; "?" for a value that isn't a
+ *         level.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+const char *chan_level_name(enum chan_level level);
+
+/**
  * @brief Convert a power in dBm to a linear power.
  *
  * Exposed for the unit tests.

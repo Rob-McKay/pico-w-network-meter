@@ -580,6 +580,20 @@ enum chan_level chan_stats_level(int interference)
 /*
  * Public interface: documented in chan_stats.h.
  */
+const char *chan_level_name(enum chan_level level)
+{
+	static const char *const names[] = {
+		[CHAN_LEVEL_CLEAR] = "clear",
+		[CHAN_LEVEL_MODERATE] = "moderate",
+		[CHAN_LEVEL_BUSY] = "busy",
+	};
+
+	return (size_t)level < ARRAY_SIZE(names) ? names[level] : "?";
+}
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
 bool chan_is_standard(uint8_t channel)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(standard_channels); i++) {
