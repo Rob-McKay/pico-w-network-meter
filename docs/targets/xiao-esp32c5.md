@@ -133,6 +133,7 @@ with esptool 4 on macOS:
 | Scans | Every scan succeeds; one every 15–16 s, so a sweep of both bands takes 5–6 s with the patched 130 ms dwell. Channel 13 is heard (country GB), and 4–10 networks a scan count as "other" (5 GHz) |
 | Hidden networks | Shown |
 | Buttons | All four work (tried with a wire link to ground): A and B change screens, X scans now on the Channels screen, X and Y page up and down the Networks list |
+| 5 GHz on the console | Works: "21 results from the driver, 21 networks kept", "13 networks on 2.4 GHz, 8 on 5 GHz, 0 other" (before, the 8 counted as "other"), the 5 GHz channels reached and the recommended 80 MHz block, with the 4 KB log buffer dropping nothing |
 | Event log | Works: the first start shows as "#1 power on", so the log in flash (`storage_partition`, 64 KB) opens and records |
 | Power cut, reset button | Both show as "power on". The reset button resets the whole chip through its enable pin: the chip reports a power-on, and the restart note in RAM doesn't survive it, so the meter can't tell it from a power cut |
 
