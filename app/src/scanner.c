@@ -116,9 +116,15 @@ static void on_result(const struct wifi_scan_result *r)
 	if (is_empty_record(&ap)) {
 		return;
 	}
-	LOG_DBG("Result: %02x:%02x:%02x:%02x:%02x:%02x ch %u %d dBm \"%s\"", ap.bssid[0],
-		ap.bssid[1], ap.bssid[2], ap.bssid[3], ap.bssid[4], ap.bssid[5],
-		(unsigned int)ap.channel, ap.rssi, ap.ssid);
+	/* The width and centre channel come from a carried Zephyr patch
+	 * (wifi-scan-result-width.patch); drivers that don't fill them give
+	 * "UNKNOWN" and 0.
+	 */
+	LOG_DBG("Result: %02x:%02x:%02x:%02x:%02x:%02x ch %u, %s centre %u, %d dBm \"%s\"",
+		ap.bssid[0], ap.bssid[1], ap.bssid[2], ap.bssid[3], ap.bssid[4], ap.bssid[5],
+		(unsigned int)ap.channel,
+		wifi_bandwidth_txt((enum wifi_frequency_bandwidths)r->bandwidth),
+		(unsigned int)r->center_channel, ap.rssi, ap.ssid);
 
 	k_mutex_lock(&scan_lock, K_FOREVER);
 	if (target != NULL) {
