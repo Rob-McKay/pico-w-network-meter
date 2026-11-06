@@ -233,6 +233,8 @@ SHELF_NOTCH = (8.0, 4.0)
 ## into its sockets.
 LEG_SIZE = 3.0
 LEG_PIN_D = 1.8
+## The shelf's holes for those pins: 0.3 mm looser than FIT, from a test print.
+LEG_HOLE_D = LEG_PIN_D + FIT + 0.3
 LEG_PIN_H = 1.2
 LEG_GAP = 0.2
 ## Snap hooks from the back cover that hold the charger on its posts, with or
@@ -571,7 +573,7 @@ def shelf():
     plate -= box(x0, i0 - 1, Z_SHELF - 1, x0 + nx, i0 + ny, Z_LAYER + 1)
     plate -= box(x0, HEIGHT - i0 - ny, Z_SHELF - 1, x0 + nx, HEIGHT - i0 + 1, Z_LAYER + 1)
     for x, y in leg_points():
-        plate -= cylinder(x, y, Z_SHELF - 1, Z_LAYER + 1, LEG_PIN_D + FIT)
+        plate -= cylinder(x, y, Z_SHELF - 1, Z_LAYER + 1, LEG_HOLE_D)
     return plate - usb_openings()
 
 
