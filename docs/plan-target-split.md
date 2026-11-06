@@ -347,6 +347,16 @@ a capability, not a board name. For example, a Kconfig option
 The Pico's 2.4 GHz behaviour stays guarded by the existing tests and
 screenshots.
 
+**Done**, in that form: `CONFIG_METER_BAND_5G`, on in the XIAO's `.conf`.
+Stage 1 (#24) kept the 5 GHz networks and worked out their channels,
+80 MHz blocks and recommendation, reported on the console. Stage 2 (#25,
+#28) added the Channels 5 GHz and Networks 5 GHz screens and made the LED
+follow the band. The Pico's screenshots stayed byte-identical
+throughout, and the XIAO's screens are checked on hardware
+([targets/xiao-esp32c5.md](targets/xiao-esp32c5.md#checked-on-hardware)).
+Still open: a network's real width, which Zephyr's scan results don't
+carry, so every 5 GHz network is taken to be 80 MHz wide.
+
 ## Risks
 
 - **Renames break muscle memory and open branches.** Do steps 1–3 close
