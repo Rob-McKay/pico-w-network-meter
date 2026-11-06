@@ -129,8 +129,8 @@ clang.
 the channels in the 80 MHz blocks routers use (36-48 to 149-161), each
 network counted across its whole block, as the meter can't tell how wide
 a network is, and the quietest block recommended ("Use 52-64: clear").
-The Networks list and the LED follow the band of the last Channels screen
-viewed. The 2.4 GHz screens are the same on both targets.
+A Networks 5 GHz list follows it, and the LED shows the band of the
+screen last viewed. The 2.4 GHz screens are the same on both targets.
 
 | Channels 5 GHz | Networks 5 GHz |
 |---|---|

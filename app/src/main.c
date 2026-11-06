@@ -128,19 +128,21 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 	return level_status(chan_stats_level(best.interference));
 }
 
-/* A screen A and B step through: a view, and for a channels screen its band. */
+/* A screen A and B step through: a view, and for a channels or networks
+ * screen its band.
+ */
 struct page {
 	enum ui_view view;
-	enum chan_band band; /* CHAN_BAND_COUNT: keep the band of the last channels screen */
+	enum chan_band band; /* CHAN_BAND_COUNT: keep the band of the screen before */
 };
 
-/* The screens in order. The 5 GHz channels screen is left out without
+/* The screens in order: each band's channels and networks, side by side,
+ * then the events. The 5 GHz ones are left out without
  * CONFIG_METER_BAND_5G.
  */
 static const struct page pages[] = {
-	{UI_VIEW_CHANNELS, CHAN_BAND_2G4},
-	{UI_VIEW_CHANNELS, CHAN_BAND_5G},
-	{UI_VIEW_NETWORKS, CHAN_BAND_COUNT},
+	{UI_VIEW_CHANNELS, CHAN_BAND_2G4}, {UI_VIEW_NETWORKS, CHAN_BAND_2G4},
+	{UI_VIEW_CHANNELS, CHAN_BAND_5G},  {UI_VIEW_NETWORKS, CHAN_BAND_5G},
 	{UI_VIEW_EVENTS, CHAN_BAND_COUNT},
 };
 
@@ -148,8 +150,8 @@ static const struct page pages[] = {
 struct screen {
 	size_t page;              /* index in pages[] */
 	enum ui_view view;        /* pages[page].view */
-	enum chan_band band;      /* the band of the last channels screen: the networks
-				   * screen lists it, and the LED shows its recommendation
+	enum chan_band band;      /* the band of the last channels or networks screen:
+				   * the LED shows its recommendation
 				   */
 	size_t first;             /* networks or events screen: first row shown */
 	bool full;                /* the whole screen needs drawing */
@@ -160,9 +162,9 @@ struct screen {
 /**
  * @brief Change the screen shown, back to the top of its list.
  *
- * Steps through pages[], skipping the 5 GHz channels screen without
- * CONFIG_METER_BAND_5G. A channels screen sets the band; the others keep
- * it.
+ * Steps through pages[], skipping the 5 GHz screens without
+ * CONFIG_METER_BAND_5G. A channels or networks screen sets the band; the
+ * events screen keeps it.
  *
  * @param[in,out] scr What is on screen.
  * @param step 1 for the next screen, -1 (or any other value) for the

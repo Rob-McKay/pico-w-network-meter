@@ -86,9 +86,9 @@ There's no case for it yet.
 
 - **Only partly checked on hardware**: see the list below.
 - **5 GHz.** The radio scans both bands, and the meter keeps the 5 GHz
-  networks (`CONFIG_METER_BAND_5G`, on in the board's `.conf`): a
-  Channels 5 GHz screen after the 2.4 GHz one, and the Networks list and
-  the LED follow the band of the last Channels screen viewed (USAGE). The
+  networks (`CONFIG_METER_BAND_5G`, on in the board's `.conf`): Channels
+  5 GHz and Networks 5 GHz screens after the 2.4 GHz ones, and the LED
+  follows the band of the screen last viewed (USAGE). The
   console lists each 5 GHz channel a network reaches and the quietest
   80 MHz block ("5 GHz: use 52-64 (80 MHz): clear, nothing heard").
   Channels 165-177 aren't charted, though their networks are listed.
@@ -134,8 +134,8 @@ with esptool 4 on macOS:
 | Hidden networks | Shown |
 | Buttons | All four work (tried with a wire link to ground): A and B change screens, X scans now on the Channels screen, X and Y page up and down the Networks list |
 | 5 GHz on the console | Works: "21 results from the driver, 21 networks kept", "13 networks on 2.4 GHz, 8 on 5 GHz, 0 other" (before, the 8 counted as "other"), the 5 GHz channels reached and the recommended 80 MHz block, with the 4 KB log buffer dropping nothing |
-| Channels 5 GHz screen | Shown after Channels (A). The six blocks are labelled 36, 52, 100, 116, 132, 149, by their first channel, and the network count sits over the column of its channel ("2" over 40, the block's second column). 36-48 is red (a -44 dBm network), the recommended block's "52" is highlighted, and the footer reads "Use 52-64: clear" |
-| Networks 5 GHz | A from Channels 5 GHz lists the 5 GHz networks, the channel numbers right-aligned ("40" under the end of "100") |
+| Channels 5 GHz screen | Shown (A). The six blocks are labelled 36, 52, 100, 116, 132, 149, by their first channel, and the network count sits over the column of its channel ("2" over 40, the block's second column). 36-48 is red (a -44 dBm network), the recommended block's "52" is highlighted, and the footer reads "Use 52-64: clear" |
+| Networks 5 GHz | Lists the 5 GHz networks, the channel numbers right-aligned ("40" under the end of "100") |
 | Event log | Works: the first start shows as "#1 power on", so the log in flash (`storage_partition`, 64 KB) opens and records |
 | Power cut, reset button | Both show as "power on". The reset button resets the whole chip through its enable pin: the chip reports a power-on, and the restart note in RAM doesn't survive it, so the meter can't tell it from a power cut |
 
