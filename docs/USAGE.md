@@ -1,7 +1,8 @@
 # Using the network meter
 
-The meter listens for 2.4 GHz Wi-Fi networks and shows how crowded each
-channel is, so you can pick the best channel for your own router. A
+The meter listens for Wi-Fi networks and shows how crowded each channel
+is, so you can pick the best channel for your own router: 2.4 GHz on both
+targets, and 5 GHz as well on the XIAO ESP32-C5. A
 printable one-page version of this guide is in
 [quick-reference.pdf](quick-reference.pdf).
 
@@ -24,9 +25,9 @@ are beside the screen, A and B on the left, X and Y on the right.
 
 | Button | What it does |
 |---|---|
-| **A** | Next screen |
+| **A** | Next screen: Channels, Channels 5 GHz (XIAO only), Networks, Events |
 | **B** | Previous screen |
-| **X** | Channels screen: scan now, without waiting for the next scan. Networks and Events screens: previous page |
+| **X** | Channels screens: scan now, without waiting for the next scan. Networks and Events screens: previous page |
 | **Y** | Networks and Events screens: next page |
 | **X** and **Y** together | Events screen: print the whole log on the serial console |
 
@@ -59,6 +60,37 @@ are beside the screen, A and B on the left, X and Y on the right.
   on the right.
 - **Header:** how many networks are showing.
 
+### Channels 5 GHz (XIAO ESP32-C5)
+
+![5 GHz channels screen](screens/channels-5g.png)
+
+The same idea for 5 GHz, after the 2.4 GHz screen. 5 GHz channels don't
+overlap each other the way 2.4 GHz ones do; instead a router joins
+neighbouring channels into one wider channel. Most home routers use
+**80 MHz**, four channels, so the chart groups the channels in fours:
+
+- **Four columns to a block**, 36-48, 52-64, 100-112, 116-128, 132-144
+  and 149-161, labelled by the block's first channel, with a gap between
+  blocks.
+- **Bright bar:** the strongest network whose main channel is this one.
+  **Dim bars:** every other network in the block. The meter can't tell how
+  wide a network is, so it counts every 5 GHz network across its whole
+  80 MHz block: a block with one network on it lights up all four columns.
+- **The number above a bar:** networks on that channel ("+" for 10 or
+  more).
+- **Bold labels** are the blocks without DFS (36 and 149). On the others,
+  a router must first listen for radar for a minute before it can use the
+  channel, and may have to move if it hears some.
+- **The highlighted label** is the recommended block, the quietest the
+  meter is set to consider (36-48 to 116-128; see
+  [Settings](#settings)). On a tie it prefers fewer networks, then a block
+  without DFS, then the lower block.
+- **Footer:** "Use 52-64: clear": the block to set your router's 5 GHz
+  channel to (any channel of it, at 80 MHz), and how busy it is.
+
+Channels 165-177 aren't charted, but their networks are counted and
+listed.
+
 ### Networks
 
 ![Networks screen](screens/networks.png)
@@ -85,10 +117,17 @@ such as "10-13 of 13".
 
 ![Second page of the networks screen](screens/networks-page2.png)
 
+**One band at a time.** On the XIAO, the list shows the band of the last
+Channels screen you looked at: after Channels 5 GHz it is titled
+"Networks 5 GHz" and lists only 5 GHz networks.
+
+![5 GHz networks screen](screens/networks-5g.png)
+
 The footer gives how many networks are showing ("heard"), and how many
-results were ignored ("other"): those not on a 2.4 GHz channel (on the
-XIAO, its 5 GHz networks, for now), or past the 64 the meter keeps. Each access point counts once, so a router with a
-guest network counts twice.
+results were ignored ("other"): those on no channel the meter knows (on
+the Pico W, any 5 GHz network that reaches it), or past the 64 the meter
+keeps. Each access point counts once, so a router with a guest network
+counts twice.
 
 ### Events
 
@@ -168,6 +207,10 @@ The RGB LED is to the right of the screen on the Pico W's Display Pack.
 | **Magenta** | The last scan failed; it is retried after 2 seconds. After 5 failures in a row the meter restarts itself |
 | Off | Starting up |
 
+On the XIAO, the LED follows the band of the last Channels screen you
+looked at: after Channels 5 GHz it shows how busy the recommended 5 GHz
+block is.
+
 ## Tips
 
 - **Choosing a channel:** set your router to the channel the meter
@@ -175,8 +218,8 @@ The RGB LED is to the right of the screen on the Pico W's Display Pack.
   to the router.
 - **Walk around:** the readings change from room to room. Press **X** on
   the Channels screen for an immediate scan after moving.
-- **Only 2.4 GHz:** the Pico W's radio cannot hear 5 GHz networks. The
-  XIAO's can, but the meter shows only 2.4 GHz for now.
+- **Only 2.4 GHz on the Pico W:** its radio cannot hear 5 GHz networks.
+  The XIAO hears both bands.
 - **Keep away from USB 3 hubs:** they give off noise across the 2.4 GHz
   band that drowns out all but the strongest networks. Use a long cable or
   a USB charger, away from computers and hubs. If only your own router
@@ -203,6 +246,8 @@ Change these when building the firmware: `make pico` or `make xiao` with
 | `CONFIG_METER_FADE_END_S` | 120 | Seconds until a network is removed |
 | `CONFIG_METER_FADE_MIN_PERCENT` | 40 | Brightness a network fades to before it is removed (0: fade to black) |
 | `CONFIG_METER_LED_BRIGHTNESS` | 2 | LED brightness, percent (1 is the dimmest) |
+| `CONFIG_METER_RECOMMEND_5G_132` | off | XIAO: also recommend the 5 GHz block 132-144 (allowed in the US; not at 80 MHz in Europe and the UK) |
+| `CONFIG_METER_RECOMMEND_5G_UPPER` | off | XIAO: also recommend 149-161 (full power in the US; low-power and indoor only in the UK) |
 
 ## Pico W and XIAO ESP32-C5
 
@@ -215,6 +260,6 @@ target's guide ([Pico W](targets/pico.md),
 | **Flashing** | Hold BOOTSEL while plugging it in, copy `network-meter.uf2` to the `RPI-RP2` drive | `esptool --chip esp32c5 write-flash 0x2000 network-meter.bin` over USB-C (hold BOOT while plugging in if it won't connect), or the merged image with a browser flasher |
 | **Battery** | A separate charger (LiPo Amigo Pro) in the printed case; its USB-C socket charges and powers the meter | The XIAO charges a LiPo on its BAT pads from its own USB-C socket, and runs from it when unplugged |
 | **Console** | The Pico's USB socket (inside the case) | The XIAO's USB-C socket |
-| **Bands** | 2.4 GHz only | Hears 2.4 and 5 GHz; shows 2.4 GHz for now |
+| **Bands** | 2.4 GHz only | 2.4 and 5 GHz: a Channels 5 GHz screen, and the Networks list and the LED follow the last Channels screen viewed |
 | **Unexplained restarts** | All shown as "restart after …" | Named where the chip says why: "HW watchdog", "brown-out", "CPU fault" |
 | **Tested on hardware** | Yes | On a breadboard: scans, screens, buttons ([details](targets/xiao-esp32c5.md#checked-on-hardware)) |

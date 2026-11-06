@@ -563,6 +563,20 @@ ZTEST(meter_chan, test_recommend_5g)
 }
 
 /**
+ * @brief The allowed blocks: always 36-48 to 116-128; 132-144 and 149-161
+ *        when asked for; never 165-177.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_5g_blocks)
+{
+	zassert_equal(chan_5g_blocks(false, false), BIT(0) | BIT(1) | BIT(2) | BIT(3));
+	zassert_equal(chan_5g_blocks(true, false), chan_5g_blocks(false, false) | BIT(4));
+	zassert_equal(chan_5g_blocks(false, true), chan_5g_blocks(false, false) | BIT(5));
+	zassert_equal(chan_5g_blocks(true, true) & BIT(6), 0U, "165-177 never");
+}
+
+/**
  * @brief The strongest-first list keeps to the band asked for.
  *
  * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
@@ -585,6 +599,19 @@ ZTEST(meter_chan, test_strongest_band)
 	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_5G, list, ARRAY_SIZE(list)), 2);
 	zassert_equal(list[0]->channel, 36);
 	zassert_equal(list[1]->channel, 149);
+}
+
+/**
+ * @brief Each level has the name the screens and the console show.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_level_name)
+{
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_CLEAR), "clear");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_MODERATE), "moderate");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_BUSY), "busy");
+	zassert_str_equal(chan_level_name((enum chan_level)3), "?");
 }
 
 /**

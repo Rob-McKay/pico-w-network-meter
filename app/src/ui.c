@@ -19,42 +19,54 @@
 #include "chan_stats.h"
 
 /* Header and footer bars, pixels. */
-#define BAR_H          20
+#define BAR_H           20
 /* Height of the text font, pixels. */
-#define FONT_H         16
+#define FONT_H          16
 /* Space between text and the edge of its bar, pixels. */
-#define PAD            2
+#define PAD             2
 /* Width of the chart's dBm labels: "-100" would not fit; "-80" does. */
-#define AXIS_W         34
+#define AXIS_W          34
 /* Space each side of a bar in its column, pixels. */
-#define BAR_GAP        3
+#define BAR_GAP         3
 /* Width of the strongest network's bar, in the middle of a column, pixels. */
-#define SIGNAL_W       6
+#define SIGNAL_W        6
 /* Brightness of the interference bar beside it, out of 255: 60%. */
-#define DIM_LEVEL      153
+#define DIM_LEVEL       153
 /* Channels on the chart: 1-13 (14 is Japan-only, 802.11b). */
-#define CHART_CHANNELS 13
+#define CHART_CHANNELS  13
+/* The 5 GHz chart: the 80 MHz blocks 36-48 to 149-161 (165-177 is rarely
+ * allowed), four 10-pixel columns each, with a gap between blocks: 270 of
+ * the 286 pixels beside the axis.
+ */
+#define CHART_5G_BLOCKS 6
+#define COL_5G_W        10
+#define BLOCK_GAP       6
+/* A 5 GHz column's bars: 1 pixel each side, a 4-pixel bright bar between
+ * 2-pixel dim ones.
+ */
+#define BAR_GAP_5G      1
+#define SIGNAL_5G_W     4
 /* Range of the chart, dBm. */
-#define DBM_MIN        (-100)
-#define DBM_MAX        (-30)
+#define DBM_MIN         (-100)
+#define DBM_MAX         (-30)
 /* The chart's grid lines are GRID_STEP_DB apart; every LABEL_STEP_DB is labelled. */
-#define GRID_STEP_DB   10
-#define LABEL_STEP_DB  20
+#define GRID_STEP_DB    10
+#define LABEL_STEP_DB   20
 /* Signal strength boundaries of the network list's colours, dBm. */
-#define RSSI_GOOD      (-60)
-#define RSSI_FAIR      (-75)
+#define RSSI_GOOD       (-60)
+#define RSSI_FAIR       (-75)
 /* A row of the network list, pixels. */
-#define ROW_H          20
+#define ROW_H           20
 /* Columns of the network list, in characters: with NAME_GAP, 318 of the
  * panel's 320 pixels in the 10-pixel font.
  */
-#define SSID_CHARS     24
-#define CHAN_CHARS     3
-#define RSSI_CHARS     4
+#define SSID_CHARS      24
+#define CHAN_CHARS      3
+#define RSSI_CHARS      4
 /* Space between a network's name and its channel, pixels. */
-#define NAME_GAP       8
+#define NAME_GAP        8
 /* Longest line of text: the display's width in characters, and a NUL. */
-#define LINE_MAX       40
+#define LINE_MAX        40
 
 /* Colours, set by ui_init(). The UI runs on the main thread only. */
 static struct {
@@ -218,9 +230,11 @@ static void text_centred(int x, int y, int w, const char *text, uint16_t fg, uin
 
 /* Where the channel chart goes. */
 struct chart {
-	int top;    /* top of the plot (room for a count label above a bar) */
-	int bottom; /* bottom of the bars */
-	int col_w;  /* width of a channel's column */
+	int top;      /* top of the plot (room for a count label above a bar) */
+	int bottom;   /* bottom of the bars */
+	int col_w;    /* width of a channel's column */
+	int bar_gap;  /* space each side of a column's bars */
+	int signal_w; /* width of the bright bar in the middle */
 	int bar_max;
 };
 
@@ -236,7 +250,25 @@ static void chart_layout(struct chart *c)
 	c->top = BAR_H + PAD;
 	c->bottom = gfx_height() - BAR_H - FONT_H - (2 * PAD);
 	c->col_w = (gfx_width() - AXIS_W) / CHART_CHANNELS;
+	c->bar_gap = BAR_GAP;
+	c->signal_w = SIGNAL_W;
 	c->bar_max = c->bottom - c->top - FONT_H;
+}
+
+/**
+ * @brief Work out the 5 GHz chart's layout: as the 2.4 GHz chart's, with
+ *        narrower columns.
+ *
+ * @param[out] c Layout.
+ *
+ * @sideeffects None (writes only through @p c); errno unchanged.
+ */
+static void chart_layout_5g(struct chart *c)
+{
+	chart_layout(c);
+	c->col_w = COL_5G_W;
+	c->bar_gap = BAR_GAP_5G;
+	c->signal_w = SIGNAL_5G_W;
 }
 
 /**
@@ -326,6 +358,9 @@ static void draw_axis(const struct chart *c)
  * @brief Draw the space above a channel's bar, with the network count
  *        just above the bar if there are any networks on the channel.
  *
+ * A count too wide for the column (10 or more in a 5 GHz column) shows as
+ * "+".
+ *
  * @param c Layout.
  * @param x Left edge of the column.
  * @param bar_top Top of the taller of the channel's bars.
@@ -343,6 +378,9 @@ static void draw_count(const struct chart *c, int x, int bar_top, const struct c
 		return;
 	}
 	(void)snprintf(text, sizeof(text), "%u", (unsigned int)info->ap_count);
+	if ((int)strlen(text) * font->width > c->col_w) {
+		(void)snprintf(text, sizeof(text), "+");
+	}
 	fill_plot(c, x, c->col_w, c->top, label_y - c->top);
 	text_centred(x, label_y, c->col_w, text, gfx_fade(col.text, info->freshness), col.bg,
 		     false);
@@ -413,14 +451,14 @@ static void draw_strip(const struct chart *c, int x, int w, const struct bars *b
 static void draw_bars(const struct chart *c, int x, const struct bars *b)
 {
 	int top = c->bottom - MAX(b->signal, b->interference);
-	int side_w = (c->col_w - (2 * BAR_GAP) - SIGNAL_W) / 2;
-	int mid = x + BAR_GAP + side_w;
-	int right = mid + SIGNAL_W;
-	int end = x + c->col_w - BAR_GAP;
+	int side_w = (c->col_w - (2 * c->bar_gap) - c->signal_w) / 2;
+	int mid = x + c->bar_gap + side_w;
+	int right = mid + c->signal_w;
+	int end = x + c->col_w - c->bar_gap;
 
-	fill_plot(c, x, BAR_GAP, top, c->bottom - top);
-	draw_strip(c, x + BAR_GAP, side_w, b, false);
-	draw_strip(c, mid, SIGNAL_W, b, true);
+	fill_plot(c, x, c->bar_gap, top, c->bottom - top);
+	draw_strip(c, x + c->bar_gap, side_w, b, false);
+	draw_strip(c, mid, c->signal_w, b, true);
 	draw_strip(c, right, end - right, b, false);
 	fill_plot(c, end, x + c->col_w - end, top, c->bottom - top);
 }
@@ -446,7 +484,29 @@ static void draw_channel_number(const struct chart *c, int x, uint8_t channel, b
 }
 
 /**
- * @brief Draw one channel's column: count, bars and channel number.
+ * @brief Draw one channel's count and bars, from the top of the plot to
+ *        the bottom of the bars.
+ *
+ * Every pixel of that part of the column is drawn, so it needs no clearing
+ * first.
+ *
+ * @param c Layout.
+ * @param x Left edge of the column.
+ * @param info The channel's figures.
+ *
+ * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
+ */
+static void draw_plot_column(const struct chart *c, int x, const struct chan_info *info)
+{
+	struct bars b;
+
+	bars_for(c, info, &b);
+	draw_count(c, x, c->bottom - MAX(b.signal, b.interference), info);
+	draw_bars(c, x, &b);
+}
+
+/**
+ * @brief Draw one 2.4 GHz channel's column: count, bars and channel number.
  *
  * Every pixel of the column is drawn, so it needs no clearing first.
  *
@@ -459,11 +519,8 @@ static void draw_channel_number(const struct chart *c, int x, uint8_t channel, b
 static void draw_column(const struct chart *c, const struct chan_info *info, bool recommended)
 {
 	int x = AXIS_W + ((info->channel - CHAN_FIRST) * c->col_w);
-	struct bars b;
 
-	bars_for(c, info, &b);
-	draw_count(c, x, c->bottom - MAX(b.signal, b.interference), info);
-	draw_bars(c, x, &b);
+	draw_plot_column(c, x, info);
 	draw_channel_number(c, x, info->channel, recommended);
 }
 
@@ -489,6 +546,113 @@ static void show_channels(const struct chan_stats *s, bool full)
 
 		chan_stats_channel(s, ch, &info);
 		draw_column(&c, &info, ch == best);
+	}
+}
+
+/**
+ * @brief Say which 5 GHz blocks the recommendation may pick, from the
+ *        settings.
+ *
+ * @return chan_5g_blocks()'s mask.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint32_t allowed_blocks_5g(void)
+{
+	return chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
+			      IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER));
+}
+
+/**
+ * @brief Left edge of a 5 GHz block on the chart.
+ *
+ * @param block 0 (36-48) to CHART_5G_BLOCKS - 1 (149-161).
+ * @return x: the blocks are centred in the space beside the axis.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int block_x(int block)
+{
+	int block_w = CHAN_5G_BLOCK_CHANNELS * COL_5G_W;
+	int used = (CHART_5G_BLOCKS * block_w) + ((CHART_5G_BLOCKS - 1) * BLOCK_GAP);
+	int x0 = AXIS_W + ((gfx_width() - AXIS_W - used) / 2);
+
+	return x0 + (block * (block_w + BLOCK_GAP));
+}
+
+/**
+ * @brief Draw a 5 GHz block's label under its four columns: its first
+ *        channel, bold without DFS, highlighted if recommended.
+ *
+ * @param c Layout.
+ * @param block 0 to CHART_5G_BLOCKS - 1.
+ * @param recommended Highlight it.
+ *
+ * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
+ */
+static void draw_block_label(const struct chart *c, int block, bool recommended)
+{
+	uint8_t first = chan_5g_channel((size_t)block * CHAN_5G_BLOCK_CHANNELS);
+	char text[8];
+
+	(void)snprintf(text, sizeof(text), "%u", (unsigned int)first);
+	text_centred(block_x(block), c->bottom + PAD, CHAN_5G_BLOCK_CHANNELS * COL_5G_W, text,
+		     recommended ? col.bg : col.text, recommended ? col.highlight : col.bg,
+		     !chan_5g_dfs(first));
+}
+
+/**
+ * @brief Fill a stretch of the 5 GHz chart between or beside its blocks:
+ *        the grid above, background in the label row.
+ *
+ * @param c Layout.
+ * @param x Left edge.
+ * @param w Width; 0 or less draws nothing.
+ *
+ * @sideeffects Draws on the panel. errno unchanged.
+ */
+static void draw_block_gap(const struct chart *c, int x, int w)
+{
+	if (w <= 0) {
+		return;
+	}
+	fill_plot(c, x, w, c->top, c->bottom - c->top);
+	gfx_fill(x, c->bottom + PAD, w, FONT_H, col.bg);
+}
+
+/**
+ * @brief Draw the 5 GHz channels screen's chart: four columns to a block,
+ *        gaps between the blocks, a label under each.
+ *
+ * @param s Scan statistics.
+ * @param full Draw the axis as well (after a clear).
+ *
+ * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
+ */
+static void show_channels_5g(const struct chan_stats *s, bool full)
+{
+	struct chart c;
+	uint8_t best = chan_stats_recommend_5g(s, allowed_blocks_5g());
+	int block_w = CHAN_5G_BLOCK_CHANNELS * COL_5G_W;
+
+	chart_layout_5g(&c);
+	if (full) {
+		draw_axis(&c);
+	}
+	draw_block_gap(&c, AXIS_W, block_x(0) - AXIS_W);
+	for (int b = 0; b < CHART_5G_BLOCKS; b++) {
+		int x = block_x(b);
+		size_t first = (size_t)b * CHAN_5G_BLOCK_CHANNELS;
+
+		for (size_t k = 0; k < CHAN_5G_BLOCK_CHANNELS; k++) {
+			struct chan_info info;
+
+			chan_stats_channel_5g(s, chan_5g_channel(first + k), &info);
+			draw_plot_column(&c, x + ((int)k * COL_5G_W), &info);
+		}
+		draw_block_label(&c, b, chan_5g_channel(first) == best);
+		draw_block_gap(&c, x + block_w,
+			       b + 1 < CHART_5G_BLOCKS ? BLOCK_GAP : gfx_width() - (x + block_w));
 	}
 }
 
@@ -561,7 +725,10 @@ static void draw_network_text(int y, const struct chan_ap *ap)
 
 	chan_ap_name(ap, text, sizeof(text));
 	gfx_text(0, y, x_chan, font, text, gfx_fade(name_colour(ap), f), col.bg);
-	(void)snprintf(text, sizeof(text), "%*u", CHAN_CHARS - 1, (unsigned int)ap->channel);
+	/* Right-aligned: in two characters for 2.4 GHz's 1-14, three for 5 GHz's 36-177. */
+	(void)snprintf(text, sizeof(text), "%*u",
+		       ap->band == CHAN_BAND_5G ? CHAN_CHARS : CHAN_CHARS - 1,
+		       (unsigned int)ap->channel);
 	gfx_text(x_chan, y, x_rssi - x_chan, font, text, gfx_fade(col.dim, f), col.bg);
 	(void)snprintf(text, sizeof(text), "%*d", RSSI_CHARS, ap->rssi);
 	gfx_text(x_rssi, y, gfx_width() - x_rssi, font, text, gfx_fade(rssi_colour(ap->rssi), f),
@@ -605,16 +772,17 @@ size_t ui_list_rows(void)
  * @brief Draw a page of the network list.
  *
  * @param s Scan statistics.
+ * @param band The band to list (enum chan_band).
  * @param first First network to show, strongest first: the start of a page
  *        (paging_clamp()).
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-static void show_networks(const struct chan_stats *s, size_t first)
+static void show_networks(const struct chan_stats *s, enum chan_band band, size_t first)
 {
 	const struct chan_ap *list[CHAN_MAX_APS];
 	size_t rows = ui_list_rows();
-	size_t n = chan_stats_strongest(s, CHAN_BAND_2G4, list, ARRAY_SIZE(list));
+	size_t n = chan_stats_strongest(s, band, list, ARRAY_SIZE(list));
 
 	for (size_t i = 0; i < rows; i++) {
 		draw_network(BAR_H + PAD + ((int)i * ROW_H),
@@ -626,8 +794,13 @@ static void show_networks(const struct chan_stats *s, size_t first)
  * @brief Write the networks screen's footer text: how many networks, and
  *        which are showing when they don't all fit.
  *
- * The list is 2.4 GHz only, so "other" counts the 5 GHz networks too.
+ * "Other" counts results on no channel the meter knows, and those that
+ * didn't fit; the other band's networks are on its own list. (Without
+ * CONFIG_METER_BAND_5G, the scanner leaves 5 GHz results off any channel,
+ * so they count as other.)
+ *
  * @param s Scan statistics.
+ * @param band The band listed (enum chan_band).
  * @param first First network showing.
  * @param[out] buf The text.
  * @param size Size of @p buf.
@@ -635,12 +808,12 @@ static void show_networks(const struct chan_stats *s, size_t first)
  * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
  *              output error).
  */
-static void networks_footer(const struct chan_stats *s, size_t first, char *buf, size_t size)
+static void networks_footer(const struct chan_stats *s, enum chan_band band, size_t first,
+			    char *buf, size_t size)
 {
 	size_t rows = ui_list_rows();
-	size_t heard = chan_stats_band_count(s, CHAN_BAND_2G4);
-	unsigned int other =
-		(unsigned int)(s->ignored + s->dropped + chan_stats_band_count(s, CHAN_BAND_5G));
+	size_t heard = chan_stats_band_count(s, band);
+	unsigned int other = (unsigned int)(s->ignored + s->dropped);
 
 	if (heard <= rows) {
 		(void)snprintf(buf, size, "%u heard, %u other", (unsigned int)heard, other);
@@ -651,51 +824,64 @@ static void networks_footer(const struct chan_stats *s, size_t first, char *buf,
 }
 
 /**
- * @brief Say which channel to use and how busy it is, for the footer.
+ * @brief Say which channel, or on 5 GHz which 80 MHz block, to use and how
+ *        busy it is, for the footer: "Use ch 6: clear", "Use 52-64: clear".
  *
  * @param s Statistics.
+ * @param band The band (enum chan_band).
  * @param[out] buf The text.
  * @param size Size of @p buf.
  *
  * @sideeffects None (writes only through @p buf). errno may be set by snprintf() (only on an
  *              output error).
  */
-static void recommend_text(const struct chan_stats *s, char *buf, size_t size)
+static void recommend_text(const struct chan_stats *s, enum chan_band band, char *buf, size_t size)
 {
-	static const char *const level_names[] = {
-		[CHAN_LEVEL_CLEAR] = "clear",
-		[CHAN_LEVEL_MODERATE] = "moderate",
-		[CHAN_LEVEL_BUSY] = "busy",
-	};
 	struct chan_info best;
 
-	if (chan_stats_band_count(s, CHAN_BAND_2G4) == 0U) {
+	if (chan_stats_band_count(s, band) == 0U) {
 		(void)snprintf(buf, size, "Nothing heard");
+		return;
+	}
+	if (band == CHAN_BAND_5G) {
+		uint8_t first = chan_stats_recommend_5g(s, allowed_blocks_5g());
+
+		chan_stats_channel_5g(s, first, &best);
+		(void)snprintf(buf, size, "Use %u-%u: %s", (unsigned int)first,
+			       (unsigned int)first + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U)),
+			       chan_level_name(chan_stats_level(best.interference)));
 		return;
 	}
 	chan_stats_channel(s, chan_stats_recommend(s), &best);
 	(void)snprintf(buf, size, "Use ch %u: %s", (unsigned int)best.channel,
-		       level_names[chan_stats_level(best.interference)]);
+		       chan_level_name(chan_stats_level(best.interference)));
 }
 
 /**
  * @brief Draw the whole channels screen: header, chart and footer.
  *
  * @param s Scan statistics.
+ * @param band The band (enum chan_band).
  * @param scan_no Scans so far.
  * @param full Draw the axis as well (after a clear).
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-static void show_channels_screen(const struct chan_stats *s, unsigned int scan_no, bool full)
+static void show_channels_screen(const struct chan_stats *s, enum chan_band band,
+				 unsigned int scan_no, bool full)
 {
 	char text[LINE_MAX];
 
 	(void)snprintf(text, sizeof(text), "%u networks",
-		       (unsigned int)chan_stats_band_count(s, CHAN_BAND_2G4));
-	draw_bar(0, "Channels", text);
-	show_channels(s, full);
-	recommend_text(s, text, sizeof(text));
+		       (unsigned int)chan_stats_band_count(s, band));
+	if (band == CHAN_BAND_5G) {
+		draw_bar(0, "Channels 5 GHz", text);
+		show_channels_5g(s, full);
+	} else {
+		draw_bar(0, "Channels", text);
+		show_channels(s, full);
+	}
+	recommend_text(s, band, text, sizeof(text));
 	draw_footer(text, scan_no);
 }
 
@@ -704,19 +890,21 @@ static void show_channels_screen(const struct chan_stats *s, unsigned int scan_n
  *        footer.
  *
  * @param s Scan statistics.
+ * @param band The band listed (enum chan_band).
  * @param scan_no Scans so far.
  * @param first First network to show; kept within the list (paging_clamp()).
  *
  * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
  */
-static void show_networks_screen(const struct chan_stats *s, unsigned int scan_no, size_t first)
+static void show_networks_screen(const struct chan_stats *s, enum chan_band band,
+				 unsigned int scan_no, size_t first)
 {
 	char text[LINE_MAX];
 
-	first = paging_clamp(first, chan_stats_band_count(s, CHAN_BAND_2G4), ui_list_rows());
-	draw_bar(0, "Networks", "strongest first");
-	show_networks(s, first);
-	networks_footer(s, first, text, sizeof(text));
+	first = paging_clamp(first, chan_stats_band_count(s, band), ui_list_rows());
+	draw_bar(0, band == CHAN_BAND_5G ? "Networks 5 GHz" : "Networks", "strongest first");
+	show_networks(s, band, first);
+	networks_footer(s, band, first, text, sizeof(text));
 	draw_footer(text, scan_no);
 }
 
@@ -854,18 +1042,18 @@ static void show_events_screen(unsigned int scan_no, size_t first)
  * A full redraw clears the area between the header and footer first. Otherwise each element
  * draws every pixel it covers, so a redraw doesn't flicker.
  */
-void ui_show(enum ui_view view, const struct chan_stats *s, unsigned int scan_no, size_t first,
-	     bool full)
+void ui_show(enum ui_view view, enum chan_band band, const struct chan_stats *s,
+	     unsigned int scan_no, size_t first, bool full)
 {
 	if (full) {
 		gfx_fill(0, BAR_H, gfx_width(), gfx_height() - (2 * BAR_H), col.bg);
 	}
 	switch (view) {
 	case UI_VIEW_CHANNELS:
-		show_channels_screen(s, scan_no, full);
+		show_channels_screen(s, band, scan_no, full);
 		break;
 	case UI_VIEW_NETWORKS:
-		show_networks_screen(s, scan_no, first);
+		show_networks_screen(s, band, scan_no, first);
 		break;
 	default:
 		show_events_screen(scan_no, first);

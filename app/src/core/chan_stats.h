@@ -211,6 +211,21 @@ void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct c
 uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks);
 
 /**
+ * @brief Say which 80 MHz blocks the 5 GHz recommendation may pick.
+ *
+ * @param with_132 Include 132-144 (the US allows it; Europe and the UK stop
+ *        at 140, so not at 80 MHz there).
+ * @param with_upper Include 149-161 (full power in the US; low-power,
+ *        indoor short-range-device spectrum in the UK).
+ * @return A mask for chan_stats_recommend_5g(): 36-48, 52-64, 100-112 and
+ *         116-128 always, plus the two above if asked for. 165-177 is
+ *         never included.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+uint32_t chan_5g_blocks(bool with_132, bool with_upper);
+
+/**
  * @brief List one band's access points strongest first.
  *
  * @param s Statistics.
@@ -319,6 +334,17 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size);
  * @sideeffects None; errno unchanged.
  */
 enum chan_level chan_stats_level(int interference);
+
+/**
+ * @brief Name a level, as the screens and the console show it.
+ *
+ * @param level enum chan_level.
+ * @return "clear", "moderate" or "busy"; "?" for a value that isn't a
+ *         level.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+const char *chan_level_name(enum chan_level level);
 
 /**
  * @brief Convert a power in dBm to a linear power.

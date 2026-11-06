@@ -54,9 +54,10 @@ config METER_BAND_5G
 	help
 	  Keep the 5 GHz networks a scan hears, for a Wi-Fi chip that has the
 	  band: the XIAO ESP32-C5's board .conf turns it on; the Pico W's
-	  CYW43439 is 2.4 GHz only. Without it they count as "other". So far
-	  the console reports them, with the best 80 MHz block; the screens
-	  show 2.4 GHz only.
+	  CYW43439 is 2.4 GHz only. Without it they count as "other". With
+	  it, a Channels 5 GHz screen follows the 2.4 GHz one, the Networks
+	  screen and the LED follow the band of the last Channels screen
+	  shown, and the console reports both bands.
 
 config METER_RECOMMEND_5G_132
 	bool "Recommend the 5 GHz block 132-144"

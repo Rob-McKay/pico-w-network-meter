@@ -39,7 +39,7 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 
 # The UI test writes its screenshots into existing files only.
 mkdir -p "$here/out/screens"
-for f in channels networks networks-page2 events faded; do
+for f in channels networks networks-page2 events faded channels-5g networks-5g; do
 	: > "$here/out/screens/$f.ppm"
 done
 

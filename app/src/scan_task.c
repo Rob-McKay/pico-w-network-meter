@@ -65,28 +65,6 @@ static struct ap_history history;
 static struct scan_task_state progress;
 
 /**
- * @brief Say which 5 GHz 80 MHz blocks the recommendation may pick.
- *
- * @return A mask for chan_stats_recommend_5g(): 36-48, 52-64, 100-112 and
- *         116-128, plus 132-144 and 149-161 if the settings allow them.
- *
- * @sideeffects None; errno unchanged.
- */
-static uint32_t blocks_5g(void)
-{
-	uint32_t blocks = BIT(0) | BIT(1) | BIT(2) | BIT(3);
-
-	if (IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132)) {
-		blocks |= BIT(4);
-	}
-	if (IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER)) {
-		blocks |= BIT(5);
-	}
-
-	return blocks;
-}
-
-/**
  * @brief Log one channel's figures, if anything reaches it.
  *
  * @param info The channel's figures.
@@ -105,7 +83,8 @@ static void report_channel(const struct chan_info *info)
 
 /**
  * @brief Log a scan's 5 GHz results on the console: each channel reached,
- *        and the best 80 MHz block.
+ *        and the best 80 MHz block with how busy it is ("nothing heard"
+ *        rather than CHAN_RSSI_NONE's -127 dBm).
  *
  * @param s The scan.
  *
@@ -113,7 +92,9 @@ static void report_channel(const struct chan_info *info)
  */
 static void report_5g(const struct chan_stats *s)
 {
-	uint8_t best = chan_stats_recommend_5g(s, blocks_5g());
+	uint8_t best = chan_stats_recommend_5g(
+		s, chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
+				  IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER)));
 	struct chan_info info;
 
 	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
@@ -121,8 +102,16 @@ static void report_5g(const struct chan_stats *s)
 		report_channel(&info);
 	}
 	chan_stats_channel_5g(s, best, &info);
-	LOG_INF("  5 GHz: use %u-%u (80 MHz), interference %d dBm", (unsigned int)best,
-		(unsigned int)(best + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U))), info.interference);
+	unsigned int last = (unsigned int)best + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U));
+
+	if (info.interference == CHAN_RSSI_NONE) {
+		LOG_INF("  5 GHz: use %u-%u (80 MHz): clear, nothing heard", (unsigned int)best,
+			last);
+	} else {
+		LOG_INF("  5 GHz: use %u-%u (80 MHz): %s, interference %d dBm", (unsigned int)best,
+			last, chan_level_name(chan_stats_level(info.interference)),
+			info.interference);
+	}
 }
 
 /**

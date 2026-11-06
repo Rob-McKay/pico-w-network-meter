@@ -85,13 +85,13 @@ There's no case for it yet.
 ## Known issues and limits
 
 - **Only partly checked on hardware**: see the list below.
-- **5 GHz on the console only, for now.** The radio scans both bands,
-  and the meter keeps the 5 GHz networks (`CONFIG_METER_BAND_5G`, on in
-  the board's `.conf`). The console lists each 5 GHz channel a network
-  reaches and the quietest 80 MHz block ("5 GHz: use 36-48 (80 MHz)").
-  The screens still show 2.4 GHz only, and count 5 GHz networks in the
-  Networks footer's "other", until the 5 GHz screens (port study,
-  section 5).
+- **5 GHz.** The radio scans both bands, and the meter keeps the 5 GHz
+  networks (`CONFIG_METER_BAND_5G`, on in the board's `.conf`): a
+  Channels 5 GHz screen after the 2.4 GHz one, and the Networks list and
+  the LED follow the band of the last Channels screen viewed (USAGE). The
+  console lists each 5 GHz channel a network reaches and the quietest
+  80 MHz block ("5 GHz: use 52-64 (80 MHz): clear, nothing heard").
+  Channels 165-177 aren't charted, though their networks are listed.
 - **5 GHz widths are assumed.** Zephyr's scan results don't give a
   network's channel width, so every 5 GHz network is taken to use its
   whole 80 MHz block, as nearly every home router does. A 20 or 40 MHz
