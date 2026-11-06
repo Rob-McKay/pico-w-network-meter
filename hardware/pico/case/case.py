@@ -15,10 +15,12 @@ charger, hanging top towards the back so its PWR button and LEDs face out.
                   holes for the bolts. The display's active area is in the
                   middle of the front. Print face down.
     shelf.stl     a shelf between the Pico and the battery: posts on it hold
-                  the Pico into the Display Pack's sockets, and the battery
-                  and charger behind hold it in place. Print flat, posts up.
-    back.stl      the back cover: posts the charger hangs on, and holes for
-                  the PWR button's plunger and onto the charger's LEDs, and
+                  the Pico into the Display Pack's sockets, and the back
+                  cover's legs hold it in place; the power lead goes round
+                  it, through a notch in its edge. Print flat, posts up.
+    back.stl      the back cover: posts the charger hangs on and snap hooks
+                  that keep it there, legs up to the shelf, holes for the
+                  PWR button's plunger and onto the charger's LEDs, and
                   blocks with nut traps for the four side bolts. Print
                   outside face down.
     buttons.stl   four button caps for A, B, X and Y, and a plunger for the
@@ -113,7 +115,7 @@ PICO_Y = 7.0
 ## Which end its USB socket is at, looking from the front: the A/B end
 ## (left) or the X/Y end (right). The Pico fits the Display Pack only one
 ## way round, as the Display Pack's markings show; this places the shelf's
-## posts and wire slots. MEASURE.
+## posts. MEASURE.
 PICO_USB_LEFT = True
 ## Mounting holes, from its USB end and bottom edge (published).
 PICO_HOLES = [(2.0, 4.8), (2.0, 16.2), (49.0, 4.8), (49.0, 16.2)]
@@ -144,8 +146,12 @@ AMIGO_HOLE_D = 2.1
 ## USB-C socket: its centre across the board, and above it.
 AMIGO_USB_ACROSS = 11.0
 AMIGO_USB_H = 1.6
-## Opening for a USB-C plug's moulding.
-AMIGO_USB_OPENING = (13.0, 7.5)
+## Opening for a USB-C plug: just bigger than its metal shell, plus 1 mm on
+## the side towards button A (up the case), for where the socket may sit.
+AMIGO_USB_OPENING = (9.0, 3.5)
+AMIGO_USB_OPENING_EXTRA_A = 1.0
+## Its corners' radius.
+AMIGO_USB_OPENING_R = 1.5
 ## The PWR button (press to make), and the height of its top above the board:
 ## 2 mm more than first guessed, from a test print, which shortens the
 ## plunger by 2 mm.
@@ -215,10 +221,35 @@ BACK_CLEAR = 0.5
 SHELF_T = 1.5
 ## Its posts onto the Pico's mounting holes.
 SHELF_POST_D = 3.2
-## Slots in the shelf for the lead from the charger's DEVICE socket: in
-## the gap past the charger, beside the Pico on either side (whichever its
-## pins 38 and 39 are on), so the lead runs along the Pico's side to them.
-SHELF_SLOT = (6.0, 4.0)
+## Notches in the shelf's long edges for the lead from the charger's DEVICE
+## socket: just past the charger's far end, where its plugs are, on both
+## sides (whichever the Pico's pins 38 and 39 are on). The lead goes round
+## the shelf's edge, not through it, then along the Pico's side to the
+## pins. Along the case (x), and in from the wall (y).
+SHELF_NOTCH = (8.0, 4.0)
+## Legs from the back cover to the shelf: so the shelf is held between the
+## Pico and the cover whatever the battery is. Square, with a pin into a
+## hole in the shelf to locate it, and a gap so they don't push the Pico
+## into its sockets.
+LEG_SIZE = 3.0
+LEG_PIN_D = 1.8
+## The shelf's holes for those pins: 0.3 mm looser than FIT, from a test print.
+LEG_HOLE_D = LEG_PIN_D + FIT + 0.3
+LEG_PIN_H = 1.2
+LEG_GAP = 0.2
+## Snap hooks from the back cover that hold the charger on its posts, with or
+## without the battery: beside its long edges, each with a lip over the
+## front of its board, between the board's edge and the battery's side. The
+## lip's front is a ramp, so the board pushes the hooks apart as it goes on.
+## Their positions along the charger, from its USB-C end, clear of the
+## bolt blocks.
+HOOK_ALONG = [15.0, 27.0]
+HOOK_W = 4.0
+HOOK_T = 1.2
+HOOK_LIP = 0.6
+HOOK_LIP_H = 1.2
+## Between the lip and the board, so it holds the board without pressing it.
+HOOK_GAP = 0.1
 ## Keep the charger clear of the screw blocks.
 BLOCK_CLEAR = SCREW_BLOCK_T + 1.0
 
@@ -312,19 +343,26 @@ def rounded_slab(inset, z0, z1, radius=CORNER_R):
     return Manifold.extrude(outline, z1 - z0).translate([0, 0, z0])
 
 
-## @brief Make an opening through an end wall, centred on a point.
+## @brief Make an opening with rounded corners through an end wall,
+#         centred on a point.
 #
 # @param left The left wall if true, the right one if false.
 # @param y Centre y.
 # @param z Centre z.
 # @param size Width (y) and height (z).
+# @param radius The corners' radius, at most half the smaller side.
 # @return The cutting solid: through the wall and a little inside it.
 #
 # @sideeffects None.
-def end_wall_opening(left, y, z, size):
+def end_wall_opening(left, y, z, size, radius):
     w, h = size
-    x0, x1 = (-1, WALL + 1) if left else (LENGTH - WALL - 1, LENGTH + 1)
-    return box(x0, y - w / 2, z - h / 2, x1, y + w / 2, z + h / 2)
+    r = min(radius, w / 2 - 0.01, h / 2 - 0.01)
+    x0 = -1 if left else LENGTH - WALL - 1
+    # Drawn in (u, v) = (-z, y), extruded along x by the rotation below.
+    outline = CrossSection.square([h - 2 * r, w - 2 * r])
+    outline = outline.translate([-z - h / 2 + r, y - w / 2 + r])
+    outline = outline.offset(r, circular_segments=SEGMENTS)
+    return Manifold.extrude(outline, WALL + 2).rotate([0, 90, 0]).translate([x0, 0, 0])
 
 
 ## @brief Find a point on the Pico, given from its USB end.
@@ -367,7 +405,10 @@ def amigo_point(along, across):
 # @sideeffects None.
 def usb_openings():
     _, y = amigo_point(0.0, AMIGO_USB_ACROSS)
-    return end_wall_opening(True, y, Z_AMIGO_TOP + AMIGO_USB_H, AMIGO_USB_OPENING)
+    w, h = AMIGO_USB_OPENING
+    extra = AMIGO_USB_OPENING_EXTRA_A
+    return end_wall_opening(True, y + extra / 2, Z_AMIGO_TOP + AMIGO_USB_H, (w + extra, h),
+                            AMIGO_USB_OPENING_R)
 
 
 ## @brief Make a screw hole through a long wall, along y.
@@ -460,8 +501,9 @@ def back_lip():
 ## @brief Model the back cover.
 #
 # @return The cover: plate, lip, blocks with nut traps for the side bolts, posts the
-#         charger hangs on (pins in its mounting holes), and holes for the
-#         charger's PWR button plunger and onto its LEDs.
+#         charger hangs on (pins in its mounting holes), snap hooks that hold
+#         it there, legs that hold the shelf, and holes for the charger's PWR
+#         button plunger and onto its LEDs.
 #
 # @sideeffects None.
 def back_cover():
@@ -479,6 +521,7 @@ def back_cover():
                          x + SCREW_BLOCK_W / 2, y1, Z_SPLIT)
             cover -= screw_hole(x, y0 - 1, y1 + 1, SCREW_CLEAR_D)
             cover -= nut_slot(x, wall_y + inward * NUT_IN)
+    cover += legs() + hooks()
     x, y = amigo_point(*AMIGO_PWR)
     cover -= cylinder(x, y, Z_SPLIT - 1, DEPTH + 1, BUTTON_STEM_D + FIT)
     for led in AMIGO_LEDS:
@@ -488,14 +531,32 @@ def back_cover():
     return cover - usb_openings()
 
 
+## @brief Find where the back cover's legs meet the shelf.
+#
+# Two in the corners at the charger's USB-C end, beside the charger and the
+# battery, clear of the bolt blocks and the lip; two past the charger's
+# plugs at the other end.
+#
+# @return Their centres, (x, y).
+#
+# @sideeffects None.
+def leg_points():
+    i0 = WALL + FIT / 2
+    left = i0 + LIP_T + LEG_SIZE / 2
+    edge = i0 + LIP_T + 0.4 + LEG_SIZE / 2
+    right = AMIGO_X + AMIGO_L + AMIGO_PLUG_CLEAR + 1.0 + LEG_SIZE / 2
+    mid = HEIGHT / 2
+    return [(left, edge), (left, HEIGHT - edge),
+            (right, mid - 7.5), (right, mid + 7.5)]
+
+
 ## @brief Model the shelf between the Pico and the battery layer.
 #
-# A plate filling the inside, with posts whose
-# pins go into the Pico's mounting holes. Two slots, in the gap past the
-# charger and just beside the Pico on either side, let the lead from the
-# charger's DEVICE socket through, to run along the Pico's side to its pins
-# 38 and 39. The charger and battery behind keep the shelf pressed onto the
-# Pico.
+# A plate filling the inside, with posts whose pins go into the Pico's
+# mounting holes, and holes for the pins of the back cover's legs, which
+# hold it against the Pico. Notches in its long edges, past the charger's
+# far end, let the lead from the charger's DEVICE socket round it, to run
+# along the Pico's side to its pins 38 and 39.
 #
 # @return The shelf.
 #
@@ -507,12 +568,73 @@ def shelf():
         x, y = pico_point(hx, hy)
         plate += cylinder(x, y, Z_PICO_TOP, Z_SHELF, SHELF_POST_D)
         plate += cylinder(x, y, Z_PICO_TOP - 1.0, Z_PICO_TOP, PICO_HOLE_D - 0.3)
-    w, h = SHELF_SLOT
-    x0 = AMIGO_X + AMIGO_L + (AMIGO_PLUG_CLEAR - w) / 2
-    pico_y0 = BOARD_Y + PICO_Y
-    for y in (pico_y0 - h / 2 - 1.0, pico_y0 + PICO_W + h / 2 + 1.0):
-        plate -= box(x0, y - h / 2, Z_SHELF - 1, x0 + w, y + h / 2, Z_LAYER + 1)
+    nx, ny = SHELF_NOTCH
+    x0 = AMIGO_X + AMIGO_L
+    plate -= box(x0, i0 - 1, Z_SHELF - 1, x0 + nx, i0 + ny, Z_LAYER + 1)
+    plate -= box(x0, HEIGHT - i0 - ny, Z_SHELF - 1, x0 + nx, HEIGHT - i0 + 1, Z_LAYER + 1)
+    for x, y in leg_points():
+        plate -= cylinder(x, y, Z_SHELF - 1, Z_LAYER + 1, LEG_HOLE_D)
     return plate - usb_openings()
+
+
+## @brief Model the back cover's legs, which hold the shelf.
+#
+# Each runs from the cover to just behind the shelf, with a pin into its
+# hole in the shelf.
+#
+# @return The legs.
+#
+# @sideeffects None.
+def legs():
+    parts = None
+    h = LEG_SIZE / 2
+    for x, y in leg_points():
+        leg = box(x - h, y - h, Z_LAYER + LEG_GAP, x + h, y + h, Z_SPLIT)
+        leg += cylinder(x, y, Z_LAYER + LEG_GAP - LEG_PIN_H, Z_LAYER + LEG_GAP, LEG_PIN_D)
+        parts = leg if parts is None else parts + leg
+    return parts
+
+
+## @brief Model one snap hook that holds the charger's board.
+#
+# An arm from the back cover beside the board's edge, and at its end a lip
+# over the front of the board: flat on the board's side, a ramp in front.
+#
+# @param x The hook's middle, along the case.
+# @param edge_y The board's edge.
+# @param inward +1 if the board is on the hook's +y side, -1 if on its -y side.
+# @return The hook.
+#
+# @sideeffects None.
+def hook(x, edge_y, inward):
+    z_back = Z_AMIGO_BOTTOM - HOOK_GAP
+    z_front = z_back - HOOK_LIP_H
+    face = edge_y - inward * FIT / 2
+    outer = face - inward * HOOK_T
+    y0, y1 = sorted([outer, face])
+    arm = box(x - HOOK_W / 2, y0, z_front, x + HOOK_W / 2, y1, Z_SPLIT)
+    tip = face + inward * HOOK_LIP
+    # The lip: as deep as the arm at its front, reaching over the board at its back.
+    front = box(x - HOOK_W / 2, min(outer, face), z_front, x + HOOK_W / 2, max(outer, face),
+                z_front + 0.01)
+    lb0, lb1 = sorted([outer, tip])
+    back = box(x - HOOK_W / 2, lb0, z_back - 0.01, x + HOOK_W / 2, lb1, z_back)
+    return arm + Manifold.batch_hull([front, back])
+
+
+## @brief Model the snap hooks that hold the charger, two by each long edge.
+#
+# @return The hooks.
+#
+# @sideeffects None.
+def hooks():
+    parts = None
+    for along in HOOK_ALONG:
+        x = AMIGO_X + along
+        for edge_y, inward in ((AMIGO_Y, 1), (AMIGO_Y + AMIGO_W, -1)):
+            piece = hook(x, edge_y, inward)
+            parts = piece if parts is None else parts + piece
+    return parts
 
 
 ## @brief Model one button cap, standing on its tab, its stem's centre at

@@ -32,13 +32,19 @@ PWR button.
   - clearance holes for four M2 bolts through the long walls
 - **Shelf** (`shelf.stl`): a plate between the Pico and the battery. Its
   four posts have pins into the Pico's mounting holes, holding it into the
-  Display Pack's sockets. The battery and charger behind keep the shelf
-  pressed onto the Pico. Two slots, past the charger's far end and beside
-  the Pico on either side, let the power lead through.
+  Display Pack's sockets. The back cover's four legs hold it there, with or
+  without the battery. A notch in each long edge, past the charger's far
+  end, lets the power lead round the shelf, not through it.
 - **Back cover** (`back.stl`):
   - three posts with pins into the charger's mounting holes: the charger
     hangs on them **top towards the back**, so its PWR button and its ON and
     CHG LEDs face out
+  - four snap hooks beside the charger's long edges, whose lips catch the
+    front of its board, so it stays on its posts with the battery missing
+    or thinner than 7.3 mm. The lips fit between the board's edges and the
+    battery's sides
+  - four legs up to the shelf, with pins into its holes: two in the
+    corners at the USB-C end, two past the charger's plugs
   - a hole for the PWR button's plunger, and two small holes onto the LEDs
   - a lip along three sides that lines it up with the shell. There's none
     on the left, so the charger's USB-C end goes right against the wall
@@ -51,8 +57,8 @@ PWR button.
   and stops the cap falling out. The fifth piece is the plunger for the
   charger's PWR button, through the back cover.
 
-The battery lies in front of the charger, against the left wall; foam tape
-holds it to the back of the shelf. Past the
+The battery lies in front of the charger, against the left wall, between
+the hooks' lips; foam tape holds it to the back of the shelf. Past the
 charger's far end there's room for the BAT and DEVICE plugs and their
 leads.
 
@@ -77,7 +83,7 @@ before printing:
 | `ACTIVE_X`, `ACTIVE_Y` | The display's picture (40.8 × 30.6 mm), which the bezel's window frames. Taken to be in the middle of the board: check with the display lit | 7.2–48.0, 2.0–32.6 mm |
 | `PACK_SOCKET_H` | Height of the header sockets on its back | 7.0 mm |
 | `BUTTON_TOP_H` | Height of a button's top above the board | 1.5 mm |
-| `PICO_USB_LEFT` | Whether the Pico's USB socket is at the A/B end (left, looking at the display) or the X/Y end. This places the shelf's posts and wire slots | A/B end |
+| `PICO_USB_LEFT` | Whether the Pico's USB socket is at the A/B end (left, looking at the display) or the X/Y end. This places the shelf's posts | A/B end |
 | `PICO_X`, `PICO_Y` | Where the Pico sits on the Display Pack's back | 2.5, 7.0 mm |
 | `AMIGO_HOLES` | The charger's three mounting holes. Positions on the charger are measured looking at its top with the USB-C on the right: from its USB-C end, and from its bottom edge | (3.1, 2.4), (3.1, 20.8), (33.6, 20.6) mm |
 | `AMIGO_HOLE_D` | Its mounting holes' size. The cover's pins are 0.3 mm thinner | 2.1 mm (from a test print) |
@@ -108,7 +114,8 @@ needed:
 
 - **Front shell:** face down. The window and holes print as bridges.
 - **Shelf:** flat, posts up.
-- **Back cover:** outside face down.
+- **Back cover:** outside face down. The hooks' lips overhang their arms
+  by 0.8 mm, which prints without support.
 - **Button caps:** tab down. Finer layers (0.1–0.15 mm) give cleaner stems.
   Clean any stringing off the stems, so they slide freely in the bezel.
 
@@ -133,20 +140,23 @@ needed:
    Buttons A and B go at the left-hand end, the end with the USB-C
    opening.
 5. **Fit the shelf**, posts first, so their pins go into the Pico's
-   mounting holes. Thread the power lead out through the slot on the side
-   where the Pico's pins 38 and 39 are.
+   mounting holes. Bring the power lead round the shelf's edge through the
+   notch on the side where the Pico's pins 38 and 39 are.
 6. **Stick the battery to the back of the shelf** with foam tape, against
    the left wall, its lead towards the right-hand end.
 7. **Fit the charger to the back cover.**
    - Push the PWR plunger into its hole from the inside, tab inwards.
-   - Hang the charger on the three posts, **its top towards the cover**,
-     so that the pins go into its mounting holes, the plunger's tab rests
-     on its PWR button, and its USB-C socket is at the open end.
+   - Press the charger onto the three posts, **its top towards the
+     cover**, so that the pins go into its mounting holes, the plunger's tab
+     rests on its PWR button, and its USB-C socket is at the open end. The
+     four hooks spring apart as the board goes past their lips, then click
+     over its front.
    - Check the battery's polarity, then plug it into the charger's **BAT**
      socket, and the Pico's lead into **DEVICE**.
 8. **Close the case.** Lay the cover on its back and drop an M2 nut into
    the slot in each of its four blocks. Turn the shell over onto the
-   cover, so the lip goes inside the walls, and fit the four M2 × 6 mm
+   cover, so the lip goes inside the walls and the legs' pins go into the
+   shelf's holes, and fit the four M2 × 6 mm
    bolts through the long walls into the nuts. Don't overtighten: the
    slots hold the nuts, but PLA is soft.
 9. **Switch on** by pressing the PWR plunger in the back. The charger's ON
@@ -157,5 +167,6 @@ a cable is plugged in.
 
 To flash new firmware:
 1. Take out the bolts and lift off the back cover.
-2. Unplug the Pico's lead from DEVICE and lift out the shelf.
+2. Unplug the Pico's lead from DEVICE and lift out the shelf. The charger
+   stays on the cover; to take it off, ease the hooks apart.
 3. Hold the Pico's BOOTSEL button while plugging in its micro-USB cable.
