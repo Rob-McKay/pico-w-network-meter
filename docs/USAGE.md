@@ -25,7 +25,7 @@ are beside the screen, A and B on the left, X and Y on the right.
 
 | Button | What it does |
 |---|---|
-| **A** | Next screen: Channels, Channels 5 GHz (XIAO only), Networks, Events |
+| **A** | Next screen: Channels, Networks, then on the XIAO Channels 5 GHz and Networks 5 GHz, then Events |
 | **B** | Previous screen |
 | **X** | Channels screens: scan now, without waiting for the next scan. Networks and Events screens: previous page |
 | **Y** | Networks and Events screens: next page |
@@ -64,7 +64,7 @@ are beside the screen, A and B on the left, X and Y on the right.
 
 ![5 GHz channels screen](screens/channels-5g.png)
 
-The same idea for 5 GHz, after the 2.4 GHz screen. 5 GHz channels don't
+The same idea for 5 GHz, after the 2.4 GHz Channels and Networks screens. 5 GHz channels don't
 overlap each other the way 2.4 GHz ones do; instead a router joins
 neighbouring channels into one wider channel. Most home routers use
 **80 MHz**, four channels, so the chart groups the channels in fours:
@@ -117,9 +117,9 @@ such as "10-13 of 13".
 
 ![Second page of the networks screen](screens/networks-page2.png)
 
-**One band at a time.** On the XIAO, the list shows the band of the last
-Channels screen you looked at: after Channels 5 GHz it is titled
-"Networks 5 GHz" and lists only 5 GHz networks.
+**One band at a time.** The Networks screen lists the 2.4 GHz networks.
+On the XIAO, a second list, **Networks 5 GHz**, follows the Channels
+5 GHz screen and lists only the 5 GHz networks.
 
 ![5 GHz networks screen](screens/networks-5g.png)
 
@@ -207,9 +207,9 @@ The RGB LED is to the right of the screen on the Pico W's Display Pack.
 | **Magenta** | The last scan failed; it is retried after 2 seconds. After 5 failures in a row the meter restarts itself |
 | Off | Starting up |
 
-On the XIAO, the LED follows the band of the last Channels screen you
-looked at: after Channels 5 GHz it shows how busy the recommended 5 GHz
-block is.
+On the XIAO, the LED follows the band of the screen you last looked at:
+on Channels 5 GHz and Networks 5 GHz (and on Events after them) it shows
+how busy the recommended 5 GHz block is.
 
 ## Tips
 
@@ -260,6 +260,6 @@ target's guide ([Pico W](targets/pico.md),
 | **Flashing** | Hold BOOTSEL while plugging it in, copy `network-meter.uf2` to the `RPI-RP2` drive | `esptool --chip esp32c5 write-flash 0x2000 network-meter.bin` over USB-C (hold BOOT while plugging in if it won't connect), or the merged image with a browser flasher |
 | **Battery** | A separate charger (LiPo Amigo Pro) in the printed case; its USB-C socket charges and powers the meter | The XIAO charges a LiPo on its BAT pads from its own USB-C socket, and runs from it when unplugged |
 | **Console** | The Pico's USB socket (inside the case) | The XIAO's USB-C socket |
-| **Bands** | 2.4 GHz only | 2.4 and 5 GHz: a Channels 5 GHz screen, and the Networks list and the LED follow the last Channels screen viewed |
+| **Bands** | 2.4 GHz only | 2.4 and 5 GHz: Channels 5 GHz and Networks 5 GHz screens, and the LED follows the band of the screen last viewed |
 | **Unexplained restarts** | All shown as "restart after …" | Named where the chip says why: "HW watchdog", "brown-out", "CPU fault" |
 | **Tested on hardware** | Yes | On a breadboard: scans, screens, buttons ([details](targets/xiao-esp32c5.md#checked-on-hardware)) |
