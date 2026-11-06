@@ -1,0 +1,28 @@
+diff --git a/whd-expansion/WHD/COMMON/src/whd_bus_common.c b/whd-expansion/WHD/COMMON/src/whd_bus_common.c
+index 424b0037a200..3134c22f02bc 100644
+--- a/whd-expansion/WHD/COMMON/src/whd_bus_common.c
++++ b/whd-expansion/WHD/COMMON/src/whd_bus_common.c
+@@ -234,6 +234,23 @@ void whd_bus_init_backplane_window(whd_driver_t whd_driver)
+     whd_driver->bus_common_info->backplane_window_current_base_address = 0;
+ }
+ 
++void whd_bus_sdio_wlan_set_delayed_bus_powersave_milliseconds(whd_driver_t whd_driver, uint32_t time_ms)
++{
++    struct whd_bus_common_info *bus_common;
++    uint32_t flags;
++
++    if ( (whd_driver == NULL) || (whd_driver->bus_common_info == NULL) )
++    {
++        return;
++    }
++    bus_common = whd_driver->bus_common_info;
++
++    /* Taken up by whd_bus_handle_delayed_release() the next time the WHD thread waits */
++    WHD_SAVE_INTERRUPTS(flags);
++    bus_common->delayed_bus_release_timeout_ms_request = time_ms;
++    WHD_RESTORE_INTERRUPTS(flags);
++}
++
+ whd_result_t whd_bus_write_wifi_firmware_image(whd_driver_t whd_driver)
+ {
+     whd_result_t result = WHD_SUCCESS;

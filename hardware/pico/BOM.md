@@ -48,7 +48,11 @@ About 30 g of filament in all.
   datasheet first.
 - **Running time.** The Pico W scanning Wi-Fi with the display lit draws
   roughly 80–100 mA, so 350 mAh lasts about 3½–4 hours (150 mAh about
-  1½). The meter runs as long as you like on USB-C.
+  1½). The meter runs as long as you like on USB-C. Keeping the Wi-Fi
+  chip out of its deep sleep (`CONFIG_METER_WIFI_KEEP_AWAKE`, on by
+  default, so it doesn't hang) adds to that, by an amount not yet
+  measured; building with it off saves that power, at the cost of a Wi-Fi
+  restart every few hours.
 - **A different cell.** Set `BATTERY_L`, `BATTERY_W` and `BATTERY_T` at
   the top of `case/case.py` to its size and regenerate. The case grows to
   fit, and the script reports any clash.

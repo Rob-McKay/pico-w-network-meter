@@ -46,3 +46,21 @@ patches:
     date: 2026-11-04
     upstreamable: true
     merge-status: false
+  # Pico W. Between requests the WHD library lets the CYW43439's bus sleep,
+  # which on this chip clears its keep-SDIO-on bit and puts it in its
+  # save/restore deep sleep; every few hours it fails to wake properly: its
+  # gSPI side answers but its backplane and firmware don't, and every request
+  # times out until the meter restarts. WHD can keep the bus up for a while
+  # after each transfer, but its setter for that,
+  # whd_bus_sdio_wlan_set_delayed_bus_powersave_milliseconds(), is declared in
+  # whd_bus_common.h and never defined. This defines it, so the meter can
+  # keep the chip out of deep sleep (CONFIG_METER_WIFI_KEEP_AWAKE). Not yet
+  # sent upstream.
+  - path: hal_infineon/whd-delayed-bus-release-setter.patch
+    sha256sum: 95e84d16b8cd6d00fa3fd3fa88441e3f9dfbec22079a868bf9cb782693ad7c5b
+    module: hal_infineon
+    author: Claude
+    email: noreply@anthropic.com
+    date: 2026-11-06
+    upstreamable: true
+    merge-status: false
