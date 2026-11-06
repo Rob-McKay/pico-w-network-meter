@@ -81,8 +81,10 @@ move the meter away from USB 3 equipment, or power it from a USB charger.
 
 **It restarts itself if the Wi-Fi driver gives up.** After 5 failed scans
 in a row (`CONFIG_METER_RECOVER_AFTER`), the meter restarts, which takes a
-few seconds. On the Pico W this recovers the AIROC driver, which leaks its
-packet buffers after about 12 hours of scans
+few seconds. On the Pico W this recovers the Wi-Fi chip if it fails to
+wake from its deep sleep, which it did every few hours; the meter now keeps
+it out of that sleep (`CONFIG_METER_WIFI_KEEP_AWAKE`), so the restart is a
+safety net
 ([docs/targets/pico.md](docs/targets/pico.md#known-issues-and-limits)).
 
 **It logs every start in flash.** A 64 KB partition at the end of the
@@ -236,6 +238,7 @@ Details, debugging and the console in each target's guide.
 | `app/boards/rpi_pico_rp2040_w.overlay`, `.conf` | The Pico W's own parts, which Zephyr adds by board name: the Display Pack 2.0 devicetree, the console on the USB port, the CYW43439's country |
 | `app/boards/xiao_esp32c5_esp32c5_hpcore.overlay`, `.conf` | The XIAO ESP32-C5's own parts: the TFT, buttons and RGB LED devicetree, a 64 KB event log partition, flash size, Wi-Fi country, scan dwell time, reset cause |
 | `app/src/target/pico/usb_console.c` | Flow control for the console on the Pico's USB port, while a terminal has it open (`CONFIG_METER_USB_CONSOLE_FLOW`) |
+| `app/src/target/pico/wifi_awake.c` | Keeps the Pico W's Wi-Fi chip out of its deep sleep, which it sometimes failed to wake from (`CONFIG_METER_WIFI_KEEP_AWAKE`; needs the carried hal_infineon patch) |
 | `tests/meter_units` | Unit tests: channel statistics, network history and fading, text rendering (native_sim, AddressSanitizer) |
 | `tests/ui_render` | The screens drawn on a fake 320x240 panel: pixel checks and screenshots |
 | `cmake/toolchain.cmake` | Compiler choice: ATfE for the Pico, host clang for native_sim, the Zephyr SDK's GCC for the XIAO ESP32-C5 |

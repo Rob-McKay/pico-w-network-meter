@@ -77,13 +77,24 @@ case: the Pico's own USB socket is inside.
 ## Known issues and limits
 
 - **2.4 GHz only.** The CYW43439 can't hear 5 GHz networks.
-- **The AIROC driver leaks.** After about 12 hours of scans, the AIROC
-  Wi-Fi driver ran out of packet buffers for good (the console showed
-  `failed to allocate a packet buffer for IOVAR` and `Failed to start scan`
-  every 2 seconds). They leak somewhere in the driver or its WHD library,
-  and only a restart gets them back. So after 5 failed scans in a row
-  (`CONFIG_METER_RECOVER_AFTER`), the meter restarts itself, which takes a
-  few seconds, and logs a "Wi-Fi restart".
+- **The Wi-Fi chip can fail to wake from its deep sleep.** Between
+  requests the WHD library lets the CYW43439 go into its save/restore deep
+  sleep, and wakes it for the next one. Every few hours (from 16 minutes
+  to 2 days apart) it failed to wake properly: its gSPI side still
+  answered, but its backplane and firmware didn't, so every request timed
+  out after 5 s (`send event_msgs(iovar) failed`, `Failed to start scan`).
+  Debug builds (branch `debug-wifi-whd`) found the Pico side working
+  throughout: requests sent, credits to spare, no buffers lost. So the
+  meter keeps the chip out of deep sleep (`CONFIG_METER_WIFI_KEEP_AWAKE`,
+  on by default), with a carried patch to the library
+  (`whd-delayed-bus-release-setter.patch`): a debug build doing the same
+  scanned for over 24 hours without a failure. It uses more power, which
+  matters on the battery (turn it off to stretch one). If the Wi-Fi still
+  stops, after 5 failed scans in a row (`CONFIG_METER_RECOVER_AFTER`) the
+  meter restarts itself, which takes a few seconds, and logs a "Wi-Fi
+  restart". An early build once ran out of the driver's packet buffers
+  instead (`failed to allocate a packet buffer for IOVAR`); the restart
+  recovers that too.
 - **Hidden networks** need a carried Zephyr patch
   (`airoc-hidden-network-results.patch`): without it the driver reports
   their channel and signal as zero.

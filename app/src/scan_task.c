@@ -218,11 +218,11 @@ static unsigned int publish(int ret)
  * @brief Restart the meter, to recover a Wi-Fi driver that has stopped
  *        working.
  *
- * A Wi-Fi driver can stop working for good: the Pico W's AIROC driver runs
- * out of packet buffers (a leak in it or its WHD library), after which every
- * scan fails to start. Only a restart
- * gets them back; it takes a few seconds. The next start logs it
- * (reset_note_restart()).
+ * A Wi-Fi driver can stop working for good: on the Pico W, the CYW43439 can
+ * fail to wake from its deep sleep, after which every request to it times
+ * out (CONFIG_METER_WIFI_KEEP_AWAKE keeps it out of that sleep). Only a
+ * restart, which powers the chip off and on again, recovers it; it takes a
+ * few seconds. The next start logs it (reset_note_restart()).
  *
  * @param ret The last scan's error.
  *

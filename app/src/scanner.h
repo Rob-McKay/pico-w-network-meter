@@ -20,14 +20,16 @@
  *
  * Call once, before scanner_run(). With CONFIG_METER_WIFI_REG_DOMAIN, also
  * sets the Wi-Fi country (wifi_country_apply()); a driver that refuses it
- * keeps its own, and scans still run.
+ * keeps its own, and scans still run. With CONFIG_METER_WIFI_KEEP_AWAKE,
+ * keeps the Wi-Fi chip out of its deep sleep (wifi_awake_apply()).
  *
  * @retval 0 Ready.
  * @retval -ENODEV No Wi-Fi interface.
  *
  * @sideeffects Sets @c wifi_iface and registers the scan event callback with net_mgmt; logs a
  *              missing interface; those of wifi_country_apply() with
- *              CONFIG_METER_WIFI_REG_DOMAIN. errno unchanged.
+ *              CONFIG_METER_WIFI_REG_DOMAIN, and of wifi_awake_apply() with
+ *              CONFIG_METER_WIFI_KEEP_AWAKE. errno unchanged.
  */
 int scanner_init(void);
 

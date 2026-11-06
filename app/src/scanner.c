@@ -20,6 +20,7 @@
 #include <zephyr/toolchain.h>
 
 #include "scanner.h"
+#include "wifi_awake.h"
 #include "wifi_country.h"
 #include "chan_stats.h"
 
@@ -196,6 +197,9 @@ int scanner_init(void)
 
 	if (IS_ENABLED(CONFIG_METER_WIFI_REG_DOMAIN)) {
 		(void)wifi_country_apply(wifi_iface);
+	}
+	if (IS_ENABLED(CONFIG_METER_WIFI_KEEP_AWAKE)) {
+		(void)wifi_awake_apply();
 	}
 	net_mgmt_init_event_callback(&scan_cb, on_scan_event, SCAN_EVENTS);
 	net_mgmt_add_event_callback(&scan_cb);
