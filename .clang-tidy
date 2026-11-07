@@ -7,9 +7,15 @@
 #
 # Disabled, as style preferences or impractical with Zephyr:
 #   readability-identifier-length     i, n, c, ... are idiomatic in C
-#   readability-magic-numbers         register bits and protocol constants
 #   readability-function-size         counts Zephyr's macro expansions
 #   bugprone-easily-swappable-parameters  flags most two-int functions
+#
+# readability-magic-numbers: no number but 0 to 4 (counting, halving,
+# doubling: the check's default) appears in the code; every other is a named
+# constant (a #define, enum or const) that says what it means: a field's
+# offset, a register's bits, a colour, a buffer's size (docs/CODING.md).
+# Character literals ('?', ' ') name themselves. The tests are exempt
+# (tests/.clang-tidy): their numbers are their inputs and expected results.
 #
 # misc-include-cleaner: every file includes the headers that declare what it
 # uses, not relying on another header to include them (docs/CODING.md). Only
@@ -39,7 +45,7 @@
 # Each entry is "regex,alternative,reason"; it needs clang-tidy 20 or later.
 Checks: >
   bugprone-*, cert-*, clang-analyzer-*, misc-*, performance-*, portability-*, readability-*,
-  -readability-identifier-length, -readability-magic-numbers,
+  -readability-identifier-length,
   -readability-function-size, -bugprone-easily-swappable-parameters,
   -cert-msc24-c, -cert-msc33-c,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,

@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #include "chan_stats.h"
 
@@ -27,6 +28,16 @@
 #define MANTISSA_DIGITS    4U
 /* Steps of 1 dB in a decade (10 dB). */
 #define DB_PER_DECADE      10
+/* Powers are found by their decimal decade. */
+#define DECIMAL_BASE       10U
+/* 2.4 GHz channel centres: channel n at CHAN_BASE_MHZ + n * CHAN_SPACING_MHZ, except channel
+ * 14 (CHAN_LAST, Japan only), which is set apart at CHAN_14_MHZ.
+ */
+#define CHAN_BASE_MHZ      2407
+#define CHAN_SPACING_MHZ   5
+#define CHAN_14_MHZ        2484
+/* A hidden network's name: this, then its BSSID, "hidden 02:1f:3c:12:34:56". */
+#define HIDDEN_PREFIX      "hidden "
 /* Smallest buffer a name is shortened in the middle for: "ab..yz". */
 #define MIDDLE_CUT_MIN     7U
 /* Interference thresholds of chan_stats_level(), dBm. */
@@ -41,6 +52,19 @@ static const uint8_t channels_5g[CHAN_5G_COUNT] = {
 	36,  40,  44,  48,  52,  56,  60,  64,  100, 104, 108, 112, 116, 120,
 	124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165, 169, 173, 177,
 };
+
+/* The 80 MHz blocks, by their place in channels_5g[]: bits of chan_5g_blocks()'s mask. */
+enum block_5g {
+	BLOCK_36_48,
+	BLOCK_52_64,
+	BLOCK_100_112,
+	BLOCK_116_128,
+	BLOCK_132_144,
+	BLOCK_149_161,
+	BLOCK_165_177,
+	BLOCK_5G_COUNT,
+};
+BUILD_ASSERT(BLOCK_5G_COUNT == CHAN_5G_BLOCKS, "a name for every 80 MHz block");
 
 /* The DFS (radar detection) 5 GHz channels: 52-64 and 100-144. */
 #define DFS_LOW_FIRST  52
@@ -73,7 +97,7 @@ static uint64_t pow10_u64(unsigned int exp)
 	uint64_t v = 1;
 
 	for (unsigned int i = 0; i < exp; i++) {
-		v *= 10U;
+		v *= DECIMAL_BASE;
 	}
 
 	return v;
@@ -90,7 +114,7 @@ static uint64_t pow10_u64(unsigned int exp)
  */
 static int centre_mhz(int channel)
 {
-	return channel == 14 ? 2484 : 2407 + (5 * channel);
+	return channel == CHAN_LAST ? CHAN_14_MHZ : CHAN_BASE_MHZ + (CHAN_SPACING_MHZ * channel);
 }
 
 
@@ -152,7 +176,7 @@ int chan_power_to_dbm(uint64_t power)
 
 	unsigned int decade = 0;
 
-	while (power / pow10_u64(decade) >= 10U) {
+	while (power / pow10_u64(decade) >= DECIMAL_BASE) {
 		decade++;
 	}
 
@@ -513,13 +537,14 @@ uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks)
  */
 uint32_t chan_5g_blocks(bool with_132, bool with_upper)
 {
-	uint32_t blocks = BIT(0) | BIT(1) | BIT(2) | BIT(3);
+	uint32_t blocks =
+		BIT(BLOCK_36_48) | BIT(BLOCK_52_64) | BIT(BLOCK_100_112) | BIT(BLOCK_116_128);
 
 	if (with_132) {
-		blocks |= BIT(4);
+		blocks |= BIT(BLOCK_132_144);
 	}
 	if (with_upper) {
-		blocks |= BIT(5);
+		blocks |= BIT(BLOCK_149_161);
 	}
 
 	return blocks;
@@ -732,6 +757,28 @@ static void copy_middle_cut(const char *name, char *buf, size_t size)
 /*
  * Public interface: documented in chan_stats.h.
  */
+void chan_bssid_text(const uint8_t *bssid, const char *prefix, char *buf, size_t size)
+{
+	int n = snprintf(buf, size, "%s", prefix);
+
+	for (size_t i = 0; i < CHAN_BSSID_LEN; i++) {
+		if (n < 0 || (size_t)n >= size) {
+			return;
+		}
+		int w = snprintf(&buf[n], size - (size_t)n, i == 0U ? "%02x" : ":%02x",
+				 (unsigned int)bssid[i]);
+
+		if (w < 0) {
+			return;
+		}
+		n += w;
+	}
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
 void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size)
 {
 	if (size == 0U) {
@@ -741,10 +788,7 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size)
 		copy_middle_cut(ap->ssid, buf, size);
 		return;
 	}
-	(void)snprintf(buf, size, "hidden %02x:%02x:%02x:%02x:%02x:%02x",
-		       (unsigned int)ap->bssid[0], (unsigned int)ap->bssid[1],
-		       (unsigned int)ap->bssid[2], (unsigned int)ap->bssid[3],
-		       (unsigned int)ap->bssid[4], (unsigned int)ap->bssid[5]);
+	chan_bssid_text(ap->bssid, HIDDEN_PREFIX, buf, size);
 }
 
 
@@ -760,7 +804,7 @@ void chan_ssid_printable(const char *ssid, char *buf, size_t size)
 	}
 	for (const unsigned char *p = (const unsigned char *)ssid; *p != '\0' && n + 1U < size;
 	     p++) {
-		buf[n++] = (*p >= 0x20U && *p < 0x7fU) ? (char)*p : '?';
+		buf[n++] = (*p >= (unsigned char)' ' && *p <= (unsigned char)'~') ? (char)*p : '?';
 	}
 	buf[n] = '\0';
 }

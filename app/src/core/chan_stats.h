@@ -353,6 +353,19 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size);
 void chan_ssid_printable(const char *ssid, char *buf, size_t size);
 
 /**
+ * @brief Write a BSSID as text after a prefix: "hidden 02:1f:3c:12:34:56".
+ *
+ * @param bssid The BSSID, CHAN_BSSID_LEN bytes.
+ * @param prefix Text before it; "" for none.
+ * @param[out] buf The text, cut to fit and always terminated.
+ * @param size Size of @p buf, at least 1.
+ *
+ * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
+ *              output error).
+ */
+void chan_bssid_text(const uint8_t *bssid, const char *prefix, char *buf, size_t size);
+
+/**
  * @brief Classify an interference level.
  *
  * @param interference dBm, or CHAN_RSSI_NONE.

@@ -13,6 +13,7 @@ repository's own C and Python. `make test` enforces what a tool can check:
 | 3. No unbounded string functions; buffer overflows trapped | clang-tidy, and `_FORTIFY_SOURCE=2` in the firmware |
 | 4. Zephyr's driver models first | review |
 | 5. Every file includes the headers it uses itself | clang-tidy's `misc-include-cleaner` (sources), `scripts/check-header-includes.py` (headers) |
+| 6. No magic numbers: named constants that say what they mean | clang-tidy's `readability-magic-numbers` |
 
 Pull requests are reviewed against these rules with the checklist in
 [.github/pull_request_template.md](../.github/pull_request_template.md),
@@ -204,3 +205,30 @@ from a public header instead (`IgnoreHeaders`), and why. Only missing
 includes are reported: an include that looks unused may be in use through
 a devicetree or Kconfig macro the check can't follow, so removing one is
 left to review.
+
+## 6. No magic numbers
+
+A number in the code says what it is through its name. Every number except
+0 to 4 (counting, halving and doubling, as in `2 * PAD`) is a named
+constant, a `#define`, an `enum` or a `const`, whose name gives its
+meaning, with a comment for its units or where it comes from:
+
+- a field's offset in a stored format: `REC_UPTIME`, not `8`
+  (`boot_record.c`)
+- a register's or a pixel's bits: `RGB565_R_SHIFT`, not `11` (`rgb565.h`)
+- a colour: `RGB_HIGHLIGHT`, not `0, 210, 255` (`ui.c`)
+- a buffer's size: `SCAN_TEXT_MAX`, with what it holds
+- a radio fact: `CHAN_SPACING_MHZ`, `CHAN_14_MHZ` (`chan_stats.c`)
+
+Use a constant the platform already names, such as Zephyr's
+`BITS_PER_BYTE` or `MSEC_PER_SEC`, rather than defining another. A
+character literal (`'?'`, `' '`) names itself. Where a number is tied to
+another, write the relationship (`NOTE_AT_CAUSE + 1U`), and check it with
+`BUILD_ASSERT` when it must hold (`REC_ARG + sizeof(uint32_t) ==
+BOOT_RECORD_SIZE`). Settings a user might change are Kconfig options
+(`CONFIG_METER_*`), not constants.
+
+clang-tidy's `readability-magic-numbers` checks it on every build. The
+tests are exempt (`tests/.clang-tidy`): their numbers are the inputs they
+give and the results they expect, and read best as they are.
+

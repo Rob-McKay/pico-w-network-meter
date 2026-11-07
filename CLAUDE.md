@@ -48,6 +48,11 @@ short:
   Zephyr driver models and APIs, negative errno return codes, `LOG_*`,
   `ARRAY_SIZE`/`MIN`/`BUILD_ASSERT`, Kconfig options prefixed `METER_`.
   Warnings are errors and clang-tidy runs on every file.
+- No magic numbers: every number but 0 to 4 is a named constant (`#define`,
+  `enum` or `const`) whose name says what it means, such as a field's
+  offset, a register's bits, a colour or a buffer's size; use Zephyr's own
+  names (`BITS_PER_BYTE`, `MSEC_PER_SEC`) where they exist. clang-tidy's
+  `readability-magic-numbers` checks it; the tests are exempt.
 - No unbounded string functions (`strcpy`, `sprintf`, ...).
 - Include what you use: every file, header or source, directly includes the
   public header of each symbol it uses (`<stdint.h>`, `"chan_stats.h"`,

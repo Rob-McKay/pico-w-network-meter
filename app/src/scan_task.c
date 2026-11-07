@@ -27,13 +27,17 @@
 
 LOG_MODULE_REGISTER(scan_task, CONFIG_METER_LOG_LEVEL);
 
-/* The scan thread's watchdog deadline: the longest scan and wait, and a
- * margin for the driver's own waits.
+/* A margin on the scan thread's watchdog for the Wi-Fi driver's own waits, s: it waits up to
+ * 30 s for its lock before giving up on a request.
  */
+#define DRIVER_MARGIN_S 30U
+/* The scan thread's watchdog deadline: the longest scan and wait, and the driver's margin. */
 #define SCAN_DEADLINE_MS                                                                           \
 	((CONFIG_METER_SCAN_TIMEOUT_S + MAX(CONFIG_METER_SCAN_INTERVAL_S, CONFIG_METER_RETRY_S) +  \
-	  30U) *                                                                                   \
+	  DRIVER_MARGIN_S) *                                                                       \
 	 MSEC_PER_SEC)
+/* CONFIG_METER_FADE_MIN_PERCENT's whole. */
+#define PERCENT 100
 
 BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 	     "CONFIG_METER_FADE_END_S must be more than CONFIG_METER_FADE_START_S");
@@ -41,7 +45,7 @@ BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 static const struct ap_fade fade = {
 	.start_ms = (int64_t)CONFIG_METER_FADE_START_S * MSEC_PER_SEC,
 	.end_ms = (int64_t)CONFIG_METER_FADE_END_S * MSEC_PER_SEC,
-	.min_level = (uint8_t)((CONFIG_METER_FADE_MIN_PERCENT * CHAN_FRESH) / 100),
+	.min_level = (uint8_t)((CONFIG_METER_FADE_MIN_PERCENT * CHAN_FRESH) / PERCENT),
 };
 
 /* Zephyr's definition macros can end in an empty statement: ISO C -Wpedantic

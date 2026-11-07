@@ -21,7 +21,26 @@
 #include "chan_stats.h"
 
 /* Header and footer bars, pixels. */
-#define BAR_H           20
+#define BAR_H          20
+/* The UI's colours, as 8-bit red, green and blue for gfx_rgb(). */
+#define RGB_BG         0, 0, 0    /* black */
+#define RGB_BAR_BG     0, 50, 110 /* dark blue: header and footer */
+#define RGB_TEXT       255, 255, 255
+#define RGB_DIM        150, 150, 150
+#define RGB_GRID       40, 40, 40
+#define RGB_GRID_LABEL 80, 80, 80
+#define RGB_HIGHLIGHT  0, 210, 255 /* cyan: the recommended channel */
+#define RGB_CLEAR      0, 200, 80  /* green */
+#define RGB_MODERATE   255, 170, 0 /* amber */
+#define RGB_BUSY       230, 40, 40 /* red */
+
+/* The footer's scan count, "scan 4294967295", with its terminator. */
+#define SCAN_TEXT_MAX   16U
+/* A short number on the chart (a dBm label, a count of networks, a channel), with its
+ * terminator and room to spare.
+ */
+#define NUMBER_TEXT_MAX 8U
+
 /* Height of the text font, pixels. */
 #define FONT_H          16
 /* Space between text and the edge of its bar, pixels. */
@@ -100,16 +119,16 @@ static ui_event_get_fn events_get;
  */
 static void init_colours(void)
 {
-	col.bg = gfx_rgb(0, 0, 0);
-	col.bar_bg = gfx_rgb(0, 50, 110);
-	col.text = gfx_rgb(255, 255, 255);
-	col.dim = gfx_rgb(150, 150, 150);
-	col.grid = gfx_rgb(40, 40, 40);
-	col.grid_label = gfx_rgb(80, 80, 80);
-	col.highlight = gfx_rgb(0, 210, 255);
-	col.clear = gfx_rgb(0, 200, 80);
-	col.moderate = gfx_rgb(255, 170, 0);
-	col.busy = gfx_rgb(230, 40, 40);
+	col.bg = gfx_rgb(RGB_BG);
+	col.bar_bg = gfx_rgb(RGB_BAR_BG);
+	col.text = gfx_rgb(RGB_TEXT);
+	col.dim = gfx_rgb(RGB_DIM);
+	col.grid = gfx_rgb(RGB_GRID);
+	col.grid_label = gfx_rgb(RGB_GRID_LABEL);
+	col.highlight = gfx_rgb(RGB_HIGHLIGHT);
+	col.clear = gfx_rgb(RGB_CLEAR);
+	col.moderate = gfx_rgb(RGB_MODERATE);
+	col.busy = gfx_rgb(RGB_BUSY);
 }
 
 
@@ -211,7 +230,7 @@ static void draw_bar(int y, const char *left, const char *right)
  */
 static void draw_footer(const char *left, unsigned int scan_no)
 {
-	char right[16] = "";
+	char right[SCAN_TEXT_MAX] = "";
 
 	if (scan_no > 0U) {
 		(void)snprintf(right, sizeof(right), "scan %u", scan_no);
@@ -368,7 +387,7 @@ static void draw_axis(const struct chart *c)
 	int top = dbm_row(c, DBM_MAX);
 
 	for (int dbm = DBM_MIN + LABEL_STEP_DB; dbm < DBM_MAX; dbm += LABEL_STEP_DB) {
-		char label[8];
+		char label[NUMBER_TEXT_MAX];
 
 		(void)snprintf(label, sizeof(label), "%d", dbm);
 		gfx_text(0, dbm_row(c, dbm) - (FONT_H / 2), AXIS_W - PAD, font, label, col.dim,
@@ -395,7 +414,7 @@ static void draw_axis(const struct chart *c)
 static void draw_count(const struct chart *c, int x, int bar_top, const struct chan_info *info)
 {
 	int label_y = bar_top - FONT_H;
-	char text[8];
+	char text[NUMBER_TEXT_MAX];
 
 	if (info->ap_count == 0U) {
 		fill_plot(c, x, c->col_w, c->top, bar_top - c->top);
@@ -504,7 +523,7 @@ static void draw_bars(const struct chart *c, int x, const struct bars *b)
  */
 static void draw_channel_number(const struct chart *c, int x, uint8_t channel, bool recommended)
 {
-	char text[8];
+	char text[NUMBER_TEXT_MAX];
 
 	(void)snprintf(text, sizeof(text), "%u", (unsigned int)channel);
 	text_centred(x, c->bottom + PAD, c->col_w, text, recommended ? col.bg : col.text,
@@ -612,7 +631,7 @@ static int block_x(int block)
 static void draw_block_label(const struct chart *c, int block, bool recommended)
 {
 	uint8_t first = chan_5g_channel((size_t)block * CHAN_5G_BLOCK_CHANNELS);
-	char text[8];
+	char text[NUMBER_TEXT_MAX];
 
 	(void)snprintf(text, sizeof(text), "%u", (unsigned int)first);
 	text_centred(block_x(block), c->bottom + PAD, CHAN_5G_BLOCK_CHANNELS * COL_5G_W, text,

@@ -39,6 +39,10 @@ not met is explained in a review comment.
 - [ ] Hardware-independent logic stays out of driver/UI code, so it can be unit
       tested on native_sim
 
+### Magic numbers
+- [ ] No number but 0 to 4 in the code: each is a named constant whose name says what it
+      means (clang-tidy's `readability-magic-numbers`)
+
 ### Undefined and implementation-defined behaviour
 - [ ] No signed overflow, shifts by negative or oversized amounts, or shifts of
       negative values; worst-case values checked for arithmetic
