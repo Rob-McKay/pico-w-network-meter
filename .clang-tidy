@@ -50,7 +50,7 @@ CheckOptions:
   misc-include-cleaner.UnusedIncludes: false
   misc-include-cleaner.IgnoreHeaders: >-
     autoconf\.h;sys/errno\.h;asm-generic/errno.*\.h;zephyr/sleep\.h;zephyr/kernel/.*;zephyr/sys/util_macro\.h;zephyr/arch/.*;zephyr/ztest_.*;zephyr/syscalls/.*
-  readability-function-cognitive-complexity.Threshold: 25
+  readability-function-cognitive-complexity.Threshold: 20
   readability-function-cognitive-complexity.IgnoreMacros: true
   # In C (before C23) !, && and || yield int: they are not conversions to fix.
   readability-implicit-bool-conversion.AllowLogicalOperatorConversion: true
