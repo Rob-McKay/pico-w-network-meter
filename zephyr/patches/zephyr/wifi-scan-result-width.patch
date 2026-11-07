@@ -1,8 +1,8 @@
 diff --git a/drivers/wifi/esp32/src/esp_wifi_drv.c b/drivers/wifi/esp32/src/esp_wifi_drv.c
-index 708816506..fd43ba446 100644
+index 708816506..ea291465d 100644
 --- a/drivers/wifi/esp32/src/esp_wifi_drv.c
 +++ b/drivers/wifi/esp32/src/esp_wifi_drv.c
-@@ -507,6 +507,34 @@ static void scan_done_handler(const wifi_event_sta_scan_done_t *evt)
+@@ -507,6 +507,45 @@ static void scan_done_handler(const wifi_event_sta_scan_done_t *evt)
  		res.channel = ap_record.primary;
  		res.band = wifi_utils_chan_to_band(res.channel);
  
@@ -27,8 +27,19 @@ index 708816506..fd43ba446 100644
 +			res.center_channel = ap_record.vht_ch_freq1;
 +			break;
 +		case WIFI_BW160:
++			/* As the beacon's VHT Operation element gives it: with the
++			 * current signalling, freq1 is the centre of the primary
++			 * 80 MHz and freq2, 8 channel numbers away, the centre of the
++			 * whole 160 MHz; with the old, freq1 is the 160 MHz centre and
++			 * freq2 is 0 (IEEE 802.11-2020, Table 9-314).
++			 */
 +			res.bandwidth = WIFI_FREQ_BANDWIDTH_160MHZ;
-+			res.center_channel = ap_record.vht_ch_freq1;
++			if (ap_record.vht_ch_freq2 == ap_record.vht_ch_freq1 + 8 ||
++			    ap_record.vht_ch_freq2 + 8 == ap_record.vht_ch_freq1) {
++				res.center_channel = ap_record.vht_ch_freq2;
++			} else {
++				res.center_channel = ap_record.vht_ch_freq1;
++			}
 +			break;
 +		default:
 +			break;

@@ -70,10 +70,11 @@ patches:
   # the channel width and its centre channel (0 where a driver doesn't
   # say), enum wifi_frequency_bandwidths gains 160 MHz, and the ESP32
   # driver fills them in from Espressif's scan record (bandwidth, second,
-  # vht_ch_freq1). Applies after esp32-wifi-scan-params.patch. Not yet
-  # sent upstream.
+  # vht_ch_freq1 and, for 160 MHz under the current VHT signalling, where
+  # freq1 is only the primary 80 MHz's centre, vht_ch_freq2). Applies
+  # after esp32-wifi-scan-params.patch. Not yet sent upstream.
   - path: zephyr/wifi-scan-result-width.patch
-    sha256sum: 59b2e50f465a3822aaad02f9780255ff68a28425e1ce9c4a548820b8ead995a7
+    sha256sum: 6e19981170e30ada6b0ac29dfeaeec7a9d39636d2ce9d19f1ccea0d2ee26e2eb
     module: zephyr
     author: Claude
     email: noreply@anthropic.com
