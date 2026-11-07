@@ -42,6 +42,7 @@
 #include "event_log.h"
 #include "keys.h"
 #include "paging.h"
+#include "recommend.h"
 #include "reset_cause.h"
 #include "reset_note.h"
 #include "scan_task.h"
@@ -116,12 +117,7 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 		return STATUS_ERROR;
 	}
 	if (band == CHAN_BAND_5G) {
-		chan_stats_channel_5g(
-			s,
-			chan_stats_recommend_5g(
-				s, chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
-						  IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER))),
-			&best);
+		chan_stats_channel_5g(s, recommend_5g(s), &best);
 	} else {
 		chan_stats_channel(s, chan_stats_recommend(s), &best);
 	}
@@ -410,40 +406,73 @@ static void start_io(void)
 
 
 /**
- * @brief Log this start in flash, with why it happened, and show the log
- *        on the console and the events screen.
+ * @brief Record this start in the flash log, with why it happened.
  *
  * Takes the note the run before left (reset_note_take()) first, before
  * anything else can restart the meter. With CONFIG_METER_RESET_CAUSE_HWINFO,
  * the record also keeps the hardware's reset cause (reset_cause_take()).
  *
+ * @retval 0 Recorded, or the log is open but the record couldn't be added.
+ * @retval <0 Negative errno from event_log_init(): there is no log.
+ *
  * @sideeffects Those of reset_note_take(), reset_cause_take() (with
  *              CONFIG_METER_RESET_CAUSE_HWINFO), event_log_init() and event_log_add(): starts
  *              this run's note, reads and clears the hardware's reset cause, reads and writes
- *              the flash log; logs the newest starts; gives the UI its event source
- *              (ui_set_events()). errno may be set by snprintf() (only on an output error).
+ *              the flash log. errno unchanged.
  */
-static void log_start(void)
+static int record_start(void)
 {
 	struct boot_note note;
 	struct boot_record r;
-	char text[START_TEXT_MAX];
+	int ret;
 
 	reset_note_take(&note);
-	if (event_log_init() != 0) {
-		return;
+	ret = event_log_init();
+	if (ret != 0) {
+		return ret;
 	}
 	boot_record_from_note(&note, event_log_last_boot() + 1U, &r);
 	if (IS_ENABLED(CONFIG_METER_RESET_CAUSE_HWINFO)) {
 		r.hw_reset = reset_cause_take();
 	}
 	(void)event_log_add(&r);
+
+	return 0;
+}
+
+
+/**
+ * @brief Print the newest starts on the console.
+ *
+ * @sideeffects Logs up to STARTS_ON_CONSOLE lines. errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void print_starts(void)
+{
+	char text[START_TEXT_MAX];
+
 	for (size_t i = 0; i < MIN(event_log_count(), (size_t)STARTS_ON_CONSOLE); i++) {
 		const struct boot_record *e = event_log_get(i);
 
 		boot_record_describe(e, text, sizeof(text));
 		LOG_INF("Start %s (detail %d, 0x%08x)", text, (int)e->detail, (unsigned int)e->arg);
 	}
+}
+
+
+/**
+ * @brief Bring the event log up for this run: record this start, print the
+ *        newest, hand them to the events screen.
+ *
+ * @sideeffects Those of record_start() and print_starts(); gives the UI its event source
+ *              (ui_set_events()). errno may be set by snprintf() (only on an output error).
+ */
+static void log_start(void)
+{
+	if (record_start() != 0) {
+		return;
+	}
+	print_starts();
 	ui_set_events(event_log_count(), event_log_get);
 }
 

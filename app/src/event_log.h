@@ -27,7 +27,8 @@
  * @brief Open the log and read the newest records into RAM.
  *
  * Flash holding something other than a log (or a log with an unknown
- * format) is erased and started afresh. Opening it again reads it again.
+ * format) is erased and started afresh; a flash that can't be read is left
+ * alone. Opening it again reads it again.
  * A storage partition with more sectors than
  * CONFIG_METER_EVENT_LOG_MAX_SECTORS is left untouched.
  *

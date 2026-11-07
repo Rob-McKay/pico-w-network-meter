@@ -5,6 +5,7 @@
  */
 
 #include <limits.h>
+#include <stdbool.h>
 
 #include "scan_health.h"
 

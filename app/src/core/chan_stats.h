@@ -227,6 +227,16 @@ uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks);
 uint32_t chan_5g_blocks(bool with_132, bool with_upper);
 
 /**
+ * @brief Find the last channel of an 80 MHz block: 48 for 36-48.
+ *
+ * @param first The block's first channel, as chan_stats_recommend_5g() gives.
+ * @return Its last channel; 0 if @p first doesn't start a block.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+uint8_t chan_5g_block_last(uint8_t first);
+
+/**
  * @brief List one band's access points strongest first.
  *
  * @param s Statistics.
@@ -325,6 +335,22 @@ bool chan_ap_hidden(const struct chan_ap *ap);
  *              output error).
  */
 void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size);
+
+/**
+ * @brief Copy an SSID for the console, with anything that isn't printable
+ *        ASCII replaced by '?'.
+ *
+ * An SSID is whatever bytes a nearby access point sends: control characters
+ * in it could move the cursor or rewrite lines on a terminal showing the
+ * log. The screen draws such bytes as '?' too (text_raster.c).
+ *
+ * @param ssid The SSID, NUL-terminated.
+ * @param[out] buf The copy, cut to fit and always terminated.
+ * @param size Size of @p buf; 0 writes nothing.
+ *
+ * @sideeffects None (writes only through @p buf); errno unchanged.
+ */
+void chan_ssid_printable(const char *ssid, char *buf, size_t size);
 
 /**
  * @brief Classify an interference level.

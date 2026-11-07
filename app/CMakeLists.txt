@@ -21,6 +21,7 @@ target_sources(app PRIVATE
   src/reset_note.c
   src/watchdog.c
   src/scanner.c
+  src/recommend.c
   src/ui.c
   src/gfx.c
   src/controls.c

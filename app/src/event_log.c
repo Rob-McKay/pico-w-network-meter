@@ -206,6 +206,36 @@ static int erase_partition(void)
 }
 
 
+/**
+ * @brief Open the log, or start a new one where the flash holds something
+ *        else.
+ *
+ * Only foreign data starts a new log: fcb_init() gives -ENOMSG for a sector whose magic
+ * number isn't the log's (the partition used for something else). Any other failure, such as
+ * a flash read error, leaves the flash alone, so the log isn't lost to a passing fault.
+ * Records in an unknown format are skipped as they are read (boot_record_decode()).
+ *
+ * @retval 0 Open.
+ * @retval <0 Negative errno from fcb_init() or the erase.
+ *
+ * @sideeffects Reads the storage partition and fills the module's FCB state (open_fcb()); on
+ *              foreign data, erases the partition (erase_partition()) and logs it. errno
+ *              unchanged.
+ */
+static int open_or_start(void)
+{
+	int ret = open_fcb();
+
+	if (ret != -ENOMSG) {
+		return ret;
+	}
+	LOG_WRN("No event log in flash: starting one");
+	ret = erase_partition();
+
+	return ret == 0 ? open_fcb() : ret;
+}
+
+
 /*
  * Public interface: documented in event_log.h.
  *
@@ -233,15 +263,7 @@ int event_log_init(void)
 		LOG_ERR("Event log off: no storage_partition layout (%d)", ret);
 		return ret;
 	}
-	ret = open_fcb();
-
-	if (ret != 0) {
-		LOG_WRN("No event log in flash (%d): starting one", ret);
-		ret = erase_partition();
-		if (ret == 0) {
-			ret = open_fcb();
-		}
-	}
+	ret = open_or_start();
 	if (ret != 0) {
 		LOG_ERR("Event log unavailable: %d", ret);
 		return ret;

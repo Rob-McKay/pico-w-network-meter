@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -79,8 +80,8 @@ int gfx_init(uint16_t bg)
 	}
 	display_get_capabilities(display, &caps);
 	if (caps.current_pixel_format != PIXEL_FORMAT_RGB_565X || caps.x_resolution > MAX_WIDTH) {
-		LOG_ERR("Unsupported display: %ux%u, format %d", caps.x_resolution,
-			caps.y_resolution, (int)caps.current_pixel_format);
+		LOG_ERR("Unsupported display: %ux%u, format %d", (unsigned int)caps.x_resolution,
+			(unsigned int)caps.y_resolution, (int)caps.current_pixel_format);
 		return -ENOTSUP;
 	}
 	disp_w = caps.x_resolution;
