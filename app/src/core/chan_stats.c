@@ -78,6 +78,7 @@ static uint64_t pow10_u64(unsigned int exp)
 	return v;
 }
 
+
 /**
  * @brief Centre frequency of a 2.4 GHz channel.
  *
@@ -90,6 +91,7 @@ static int centre_mhz(int channel)
 {
 	return channel == 14 ? 2484 : 2407 + (5 * channel);
 }
+
 
 /**
  * @brief How much of a network's channel overlaps another channel.
@@ -111,6 +113,7 @@ static int overlap_mhz(int a, int b)
 	return df >= CHAN_WIDTH_MHZ ? 0 : CHAN_WIDTH_MHZ - df;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -131,6 +134,7 @@ uint64_t chan_dbm_to_power(int dbm)
 
 	return (scaled + (MANTISSA_ONE / 2U)) / MANTISSA_ONE;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -165,6 +169,7 @@ int chan_power_to_dbm(uint64_t power)
 	return POWER_FLOOR_DBM + (int)((decade * DB_PER_DECADE) + step);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -179,6 +184,7 @@ int chan_5g_index(uint8_t channel)
 	return -1;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -186,6 +192,7 @@ uint8_t chan_5g_channel(size_t index)
 {
 	return index < ARRAY_SIZE(channels_5g) ? channels_5g[index] : 0U;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -195,6 +202,7 @@ bool chan_5g_dfs(uint8_t channel)
 	return (channel >= DFS_LOW_FIRST && channel <= DFS_LOW_LAST) ||
 	       (channel >= DFS_HIGH_FIRST && channel <= DFS_HIGH_LAST);
 }
+
 
 /**
  * @brief Find the 80 MHz block a 5 GHz channel belongs to.
@@ -212,6 +220,7 @@ static int block_5g(uint8_t channel)
 	return i < 0 ? -1 : i / CHAN_5G_BLOCK_CHANNELS;
 }
 
+
 /**
  * @brief Give an 80 MHz block's first channel.
  *
@@ -224,6 +233,7 @@ static uint8_t block_first(int block)
 {
 	return channels_5g[(size_t)block * CHAN_5G_BLOCK_CHANNELS];
 }
+
 
 /**
  * @brief Tell whether an access point's channel is one of its band's.
@@ -246,6 +256,7 @@ static bool on_known_channel(const struct chan_ap *ap)
 	}
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -253,6 +264,7 @@ void chan_stats_reset(struct chan_stats *s)
 {
 	memset(s, 0, sizeof(*s));
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -283,6 +295,7 @@ int chan_stats_add(struct chan_stats *s, const struct chan_ap *ap)
 
 	return 0;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -329,6 +342,7 @@ void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan
 	out->others = (int16_t)chan_power_to_dbm(power - best_power);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -344,6 +358,7 @@ size_t chan_stats_band_count(const struct chan_stats *s, enum chan_band band)
 
 	return n;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -386,6 +401,7 @@ void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct c
 	out->others = (int16_t)chan_power_to_dbm(power - best_power);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -410,6 +426,7 @@ uint8_t chan_stats_recommend(const struct chan_stats *s)
 	return best.channel;
 }
 
+
 /**
  * @brief Count the 5 GHz networks in an 80 MHz block.
  *
@@ -431,6 +448,7 @@ static size_t block_networks(const struct chan_stats *s, int block)
 
 	return n;
 }
+
 
 /**
  * @brief Tell whether one 80 MHz block is a better choice than another.
@@ -465,6 +483,7 @@ static bool block_better(const struct chan_stats *s, int a, int b)
 	return !chan_5g_dfs(first_a) && chan_5g_dfs(first_b);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -487,6 +506,7 @@ uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks)
 	return best < 0 ? 0U : block_first(best);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -503,6 +523,7 @@ uint32_t chan_5g_blocks(bool with_132, bool with_upper)
 
 	return blocks;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -542,6 +563,7 @@ size_t chan_stats_strongest(const struct chan_stats *s, enum chan_band band,
 	return n;
 }
 
+
 /**
  * @brief Compare two access point records field by field.
  *
@@ -559,6 +581,7 @@ static bool chan_ap_equal(const struct chan_ap *a, const struct chan_ap *b)
 	       a->channel == b->channel && a->band == b->band && a->rssi == b->rssi &&
 	       a->secured == b->secured && a->freshness == b->freshness;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -579,6 +602,7 @@ bool chan_stats_equal(const struct chan_stats *a, const struct chan_stats *b)
 	return true;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -594,6 +618,7 @@ enum chan_level chan_stats_level(int interference)
 	return CHAN_LEVEL_CLEAR;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -607,6 +632,7 @@ const char *chan_level_name(enum chan_level level)
 
 	return (size_t)level < ARRAY_SIZE(names) ? names[level] : "?";
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -622,6 +648,7 @@ bool chan_is_standard(uint8_t channel)
 	return false;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -631,6 +658,7 @@ bool chan_ap_hidden(const struct chan_ap *ap)
 {
 	return ap->ssid[0] == '\0';
 }
+
 
 /**
  * @brief Copy a name, shortened in the middle if it is too long.
@@ -665,6 +693,7 @@ static void copy_middle_cut(const char *name, char *buf, size_t size)
 	memcpy(&buf[head + 2U], &name[len - tail], tail);
 	buf[room] = '\0';
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.

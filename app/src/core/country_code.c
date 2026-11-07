@@ -24,6 +24,7 @@ static bool upper_letter(char c)
 	return c >= 'A' && c <= 'Z';
 }
 
+
 /*
  * Public interface: documented in country_code.h.
  */

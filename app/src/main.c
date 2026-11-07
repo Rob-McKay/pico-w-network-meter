@@ -91,6 +91,7 @@ static enum status level_status(enum chan_level level)
 	}
 }
 
+
 /**
  * @brief Pick the LED status: scanning (or no scan finished yet), failed,
  *        or how busy the recommended channel (on 5 GHz, 80 MHz block) is.
@@ -127,6 +128,7 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 
 	return level_status(chan_stats_level(best.interference));
 }
+
 
 /* A screen A and B step through: a view, and for a channels or networks
  * screen its band.
@@ -186,6 +188,7 @@ static void change_view(struct screen *scr, int step)
 	scr->first = 0;
 }
 
+
 /**
  * @brief Count the rows of the list on screen.
  *
@@ -206,6 +209,7 @@ static size_t list_length(const struct screen *scr)
 	}
 }
 
+
 /**
  * @brief Page the list on screen up or down.
  *
@@ -223,6 +227,7 @@ static bool page_list(struct screen *scr, bool down)
 
 	return scr->first != was;
 }
+
 
 /**
  * @brief Wait for the console to take what has been logged, feeding the
@@ -249,6 +254,7 @@ static bool wait_for_console(void)
 
 	return !log_data_pending();
 }
+
 
 /**
  * @brief Log one start with all its details (event_log_dump() function).
@@ -282,6 +288,7 @@ static void log_one_start(const struct boot_record *r, void *arg)
 	*stalled = !wait_for_console();
 }
 
+
 /**
  * @brief Log the whole event log from flash, oldest first, with all the
  *        details, a line at a time as the console takes them.
@@ -307,6 +314,7 @@ static void dump_log(void)
 	}
 	ui_message("Event log sent to the console");
 }
+
 
 /**
  * @brief Act on a button: A and B change the screen; X and Y page the
@@ -351,6 +359,7 @@ static bool handle_key(int key, struct screen *scr)
 	}
 }
 
+
 /**
  * @brief Redraw the screen if the networks, their fading, the scan count
  *        or the view have changed.
@@ -376,6 +385,7 @@ static void update_screen(struct screen *scr, const struct chan_stats *next, uns
 	scr->full = false;
 }
 
+
 /**
  * @brief Start the display, LEDs and buttons.
  *
@@ -397,6 +407,7 @@ static void start_io(void)
 	}
 	ui_message("Scanning...");
 }
+
 
 /**
  * @brief Log this start in flash, with why it happened, and show the log
@@ -435,6 +446,7 @@ static void log_start(void)
 	}
 	ui_set_events(event_log_count(), event_log_get);
 }
+
 
 /**
  * @brief Entry point: start the display and Wi-Fi, then redraw for ever.

@@ -104,6 +104,7 @@ enum chan_level {
 	CHAN_LEVEL_CLEAR,    /**< below -85 dBm, or nothing heard */
 	CHAN_LEVEL_MODERATE, /**< -85 to -71 dBm */
 	CHAN_LEVEL_BUSY,     /**< -70 dBm and above */
+	CHAN_LEVEL_COUNT,    /**< not a level: how many there are */
 };
 
 /**

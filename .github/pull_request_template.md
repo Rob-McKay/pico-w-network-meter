@@ -62,7 +62,8 @@ not met is explained in a review comment.
 - [ ] Code that must run on one thread (display, LED) says so
 
 ### Zephyr standards
-- [ ] `scripts/check-style.sh` clean (Zephyr's `.clang-format` and `checkpatch.pl`)
+- [ ] `scripts/check-style.sh` clean (Zephyr's `.clang-format`, `checkpatch.pl`, two
+      blank lines after every function)
 - [ ] Zephyr's driver models and APIs used (devicetree, LED, input, display,
       net_mgmt) rather than direct register access; Kconfig options prefixed
       `METER_`

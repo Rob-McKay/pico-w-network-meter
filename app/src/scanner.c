@@ -79,6 +79,7 @@ static void to_chan_ap(const struct wifi_scan_result *r, struct chan_ap *ap)
 	ap->freshness = CHAN_FRESH;
 }
 
+
 /**
  * @brief Tell whether a scan result is an empty record.
  *
@@ -97,6 +98,7 @@ static bool is_empty_record(const struct chan_ap *ap)
 
 	return memcmp(ap->bssid, zero, sizeof(zero)) == 0;
 }
+
 
 /**
  * @brief Add a scan result to the scan in progress (net_mgmt event thread).
@@ -128,6 +130,7 @@ static void on_result(const struct wifi_scan_result *r)
 	k_mutex_unlock(&scan_lock);
 }
 
+
 /**
  * @brief End the scan in progress (net_mgmt event thread).
  *
@@ -158,6 +161,7 @@ static void on_done(const struct wifi_status *st)
 	}
 }
 
+
 /**
  * @brief Dispatch a Wi-Fi scan event (net_mgmt event thread).
  *
@@ -178,6 +182,7 @@ static void on_scan_event(struct net_mgmt_event_callback *cb, uint64_t mgmt_even
 		on_done((const struct wifi_status *)cb->info);
 	}
 }
+
 
 /*
  * Public interface: documented in scanner.h.
@@ -207,6 +212,7 @@ int scanner_init(void)
 	return 0;
 }
 
+
 /**
  * @brief Point incoming results at @p out, emptied, for a new scan.
  *
@@ -225,6 +231,7 @@ static void arm(struct chan_stats *out)
 	k_sem_reset(&scan_done);
 	k_mutex_unlock(&scan_lock);
 }
+
 
 /**
  * @brief Stop taking results, and log how the scan went.
@@ -248,6 +255,7 @@ static int disarm(int ret)
 
 	return ret;
 }
+
 
 /**
  * @brief Ask the driver to scan every channel.
@@ -273,6 +281,7 @@ static int request_scan(void)
 
 	return ret;
 }
+
 
 /*
  * Public interface: documented in scanner.h.

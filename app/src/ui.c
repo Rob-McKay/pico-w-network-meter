@@ -107,6 +107,7 @@ static void init_colours(void)
 	col.busy = gfx_rgb(230, 40, 40);
 }
 
+
 /*
  * Public interface: documented in ui.h.
  *
@@ -123,6 +124,7 @@ int ui_init(void)
 
 	return gfx_init(col.bg);
 }
+
 
 /**
  * @brief Pick the colour of a level.
@@ -144,6 +146,7 @@ static uint16_t level_colour(enum chan_level level)
 	}
 }
 
+
 /**
  * @brief Scale a dBm value to a length.
  *
@@ -160,6 +163,7 @@ static int dbm_length(int dbm, int full)
 
 	return (v * full) / (DBM_MAX - DBM_MIN);
 }
+
 
 /**
  * @brief Draw a header or footer bar: text on the left and the right.
@@ -185,6 +189,7 @@ static void draw_bar(int y, const char *left, const char *right)
 	gfx_fill(0, y + PAD + FONT_H, gfx_width(), BAR_H - PAD - FONT_H, col.bar_bg);
 }
 
+
 /**
  * @brief Draw the footer: a message and the scan count.
  *
@@ -202,6 +207,7 @@ static void draw_footer(const char *left, unsigned int scan_no)
 	}
 	draw_bar(gfx_height() - BAR_H, left, right);
 }
+
 
 /**
  * @brief Draw text centred in a column, filling the rest of it.
@@ -227,6 +233,7 @@ static void text_centred(int x, int y, int w, const char *text, uint16_t fg, uin
 		gfx_text(x + off, y, w - off, font, text, fg, bg);
 	}
 }
+
 
 /* Where the channel chart goes. */
 struct chart {
@@ -255,6 +262,7 @@ static void chart_layout(struct chart *c)
 	c->bar_max = c->bottom - c->top - FONT_H;
 }
 
+
 /**
  * @brief Work out the 5 GHz chart's layout: as the 2.4 GHz chart's, with
  *        narrower columns.
@@ -271,6 +279,7 @@ static void chart_layout_5g(struct chart *c)
 	c->signal_w = SIGNAL_5G_W;
 }
 
+
 /**
  * @brief Work out the row of a dBm value on the chart.
  *
@@ -285,6 +294,7 @@ static int dbm_row(const struct chart *c, int dbm)
 	return c->bottom - dbm_length(dbm, c->bar_max);
 }
 
+
 /**
  * @brief Pick the colour of a grid line: brighter where it is labelled.
  *
@@ -297,6 +307,7 @@ static uint16_t grid_colour(int dbm)
 {
 	return ((dbm - DBM_MIN) % LABEL_STEP_DB) == 0 ? col.grid_label : col.grid;
 }
+
 
 /**
  * @brief Fill part of a column of the chart with its background: black,
@@ -329,6 +340,7 @@ static void fill_plot(const struct chart *c, int x, int w, int y, int h)
 	gfx_fill(x, y, w, end - y, col.bg);
 }
 
+
 /**
  * @brief Draw the chart's dBm axis: a vertical line, labelled every
  *        LABEL_STEP_DB.
@@ -353,6 +365,7 @@ static void draw_axis(const struct chart *c)
 	}
 	gfx_fill(AXIS_W - 1, top, 1, c->bottom - top, col.dim);
 }
+
 
 /**
  * @brief Draw the space above a channel's bar, with the network count
@@ -386,6 +399,7 @@ static void draw_count(const struct chart *c, int x, int bar_top, const struct c
 		     false);
 }
 
+
 /* A channel's two bars: their heights in pixels, and colours. */
 struct bars {
 	int signal;       /* the strongest network on the channel: bright */
@@ -414,6 +428,7 @@ static void bars_for(const struct chart *c, const struct chan_info *info, struct
 	b->dim = gfx_fade(b->bright, DIM_LEVEL);
 }
 
+
 /**
  * @brief Draw a vertical strip of a channel's bars, from the top of the
  *        taller one down: the grid, then the dim bar, then the bright one.
@@ -437,6 +452,7 @@ static void draw_strip(const struct chart *c, int x, int w, const struct bars *b
 	gfx_fill(x, dim_top, w, bright_top - dim_top, b->dim);
 	gfx_fill(x, bright_top, w, signal, b->bright);
 }
+
 
 /**
  * @brief Draw a channel's bars: a bright signal bar in the middle of a dim
@@ -463,6 +479,7 @@ static void draw_bars(const struct chart *c, int x, const struct bars *b)
 	fill_plot(c, end, x + c->col_w - end, top, c->bottom - top);
 }
 
+
 /**
  * @brief Draw a channel's number under its bar: bold for the standard
  *        channels 1, 6 and 11, highlighted for the recommended one.
@@ -482,6 +499,7 @@ static void draw_channel_number(const struct chart *c, int x, uint8_t channel, b
 	text_centred(x, c->bottom + PAD, c->col_w, text, recommended ? col.bg : col.text,
 		     recommended ? col.highlight : col.bg, chan_is_standard(channel));
 }
+
 
 /**
  * @brief Draw one channel's count and bars, from the top of the plot to
@@ -505,6 +523,7 @@ static void draw_plot_column(const struct chart *c, int x, const struct chan_inf
 	draw_bars(c, x, &b);
 }
 
+
 /**
  * @brief Draw one 2.4 GHz channel's column: count, bars and channel number.
  *
@@ -523,6 +542,7 @@ static void draw_column(const struct chart *c, const struct chan_info *info, boo
 	draw_plot_column(c, x, info);
 	draw_channel_number(c, x, info->channel, recommended);
 }
+
 
 /**
  * @brief Draw the channels screen.
@@ -549,6 +569,7 @@ static void show_channels(const struct chan_stats *s, bool full)
 	}
 }
 
+
 /**
  * @brief Say which 5 GHz blocks the recommendation may pick, from the
  *        settings.
@@ -562,6 +583,7 @@ static uint32_t allowed_blocks_5g(void)
 	return chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
 			      IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER));
 }
+
 
 /**
  * @brief Left edge of a 5 GHz block on the chart.
@@ -579,6 +601,7 @@ static int block_x(int block)
 
 	return x0 + (block * (block_w + BLOCK_GAP));
 }
+
 
 /**
  * @brief Draw a 5 GHz block's label under its four columns: its first
@@ -601,6 +624,7 @@ static void draw_block_label(const struct chart *c, int block, bool recommended)
 		     !chan_5g_dfs(first));
 }
 
+
 /**
  * @brief Fill a stretch of the 5 GHz chart between or beside its blocks:
  *        the grid above, background in the label row.
@@ -619,6 +643,7 @@ static void draw_block_gap(const struct chart *c, int x, int w)
 	fill_plot(c, x, w, c->top, c->bottom - c->top);
 	gfx_fill(x, c->bottom + PAD, w, FONT_H, col.bg);
 }
+
 
 /**
  * @brief Draw the 5 GHz channels screen's chart: four columns to a block,
@@ -656,6 +681,7 @@ static void show_channels_5g(const struct chan_stats *s, bool full)
 	}
 }
 
+
 /**
  * @brief Pick the colour of a signal strength.
  *
@@ -673,6 +699,7 @@ static uint16_t rssi_colour(int rssi)
 	return rssi >= RSSI_FAIR ? col.moderate : col.busy;
 }
 
+
 /**
  * @brief Left edge of the channel column in a network list row: after the
  *        name column and a gap, so a full-length name doesn't run into a
@@ -686,6 +713,7 @@ static int list_chan_x(void)
 {
 	return (SSID_CHARS * font->width) + NAME_GAP;
 }
+
 
 /**
  * @brief Pick the colour of a network's name.
@@ -703,6 +731,7 @@ static uint16_t name_colour(const struct chan_ap *ap)
 
 	return chan_ap_hidden(ap) ? col.dim : col.text;
 }
+
 
 /**
  * @brief Draw a network's name, channel and signal strength as text,
@@ -735,6 +764,7 @@ static void draw_network_text(int y, const struct chan_ap *ap)
 		 col.bg);
 }
 
+
 /**
  * @brief Draw one row of the network list.
  *
@@ -758,6 +788,7 @@ static void draw_network(int y, const struct chan_ap *ap)
 	gfx_fill(0, y + PAD + FONT_H, w, ROW_H - PAD - FONT_H, col.bg);
 }
 
+
 /*
  * Public interface: documented in ui.h.
  */
@@ -767,6 +798,7 @@ size_t ui_list_rows(void)
 
 	return rows > 0 ? (size_t)rows : 0U;
 }
+
 
 /**
  * @brief Draw a page of the network list.
@@ -789,6 +821,7 @@ static void show_networks(const struct chan_stats *s, enum chan_band band, size_
 			     first + i < n ? list[first + i] : NULL);
 	}
 }
+
 
 /**
  * @brief Write the networks screen's footer text: how many networks, and
@@ -822,6 +855,7 @@ static void networks_footer(const struct chan_stats *s, enum chan_band band, siz
 	(void)snprintf(buf, size, "%u-%u of %u, %u other", (unsigned int)first + 1U,
 		       (unsigned int)MIN(first + rows, heard), (unsigned int)heard, other);
 }
+
 
 /**
  * @brief Say which channel, or on 5 GHz which 80 MHz block, to use and how
@@ -857,6 +891,7 @@ static void recommend_text(const struct chan_stats *s, enum chan_band band, char
 		       chan_level_name(chan_stats_level(best.interference)));
 }
 
+
 /**
  * @brief Draw the whole channels screen: header, chart and footer.
  *
@@ -885,6 +920,7 @@ static void show_channels_screen(const struct chan_stats *s, enum chan_band band
 	draw_footer(text, scan_no);
 }
 
+
 /**
  * @brief Draw the whole networks screen: header, a page of the list, and
  *        footer.
@@ -908,6 +944,7 @@ static void show_networks_screen(const struct chan_stats *s, enum chan_band band
 	draw_footer(text, scan_no);
 }
 
+
 /*
  * Public interface: documented in ui.h.
  */
@@ -916,6 +953,7 @@ void ui_set_events(size_t count, ui_event_get_fn get)
 	events_count = get != NULL ? count : 0U;
 	events_get = get;
 }
+
 
 /**
  * @brief Pick the colour of an event: how much it matters.
@@ -937,6 +975,7 @@ static uint16_t event_colour(const struct boot_record *r)
 		return col.busy;
 	}
 }
+
 
 /**
  * @brief Draw one row of a list as a line of text.
@@ -962,6 +1001,7 @@ static void draw_text_row(int y, const char *text, uint16_t fg)
 	gfx_fill(0, y + PAD + FONT_H, w, ROW_H - PAD - FONT_H, col.bg);
 }
 
+
 /**
  * @brief Draw one row of the event list.
  *
@@ -982,6 +1022,7 @@ static void draw_event(int y, const struct boot_record *r)
 	boot_record_describe(r, text, sizeof(text));
 	draw_text_row(y, text, event_colour(r));
 }
+
 
 /**
  * @brief Draw a page of the event list, newest first.
@@ -1008,6 +1049,7 @@ static void show_events(size_t first)
 		}
 	}
 }
+
 
 /**
  * @brief Draw the whole events screen: header, a page of the list, and
@@ -1036,6 +1078,7 @@ static void show_events_screen(unsigned int scan_no, size_t first)
 	draw_footer(text, scan_no);
 }
 
+
 /*
  * Public interface: documented in ui.h.
  *
@@ -1060,6 +1103,7 @@ void ui_show(enum ui_view view, enum chan_band band, const struct chan_stats *s,
 		break;
 	}
 }
+
 
 /*
  * Public interface: documented in ui.h.

@@ -81,6 +81,7 @@ static void report_channel(const struct chan_info *info)
 	}
 }
 
+
 /**
  * @brief Log a scan's 5 GHz results on the console: each channel reached,
  *        and the best 80 MHz block with how busy it is ("nothing heard"
@@ -113,6 +114,7 @@ static void report_5g(const struct chan_stats *s)
 			info.interference);
 	}
 }
+
 
 /**
  * @brief Log a scan's results on the console.
@@ -148,6 +150,7 @@ static void report(const struct chan_stats *s, unsigned int scan_no)
 	}
 }
 
+
 /**
  * @brief Mark a scan as running, for the LED.
  *
@@ -159,6 +162,7 @@ static void set_busy(void)
 	progress.busy = true;
 	k_mutex_unlock(&lock);
 }
+
 
 /**
  * @brief Run one scan into the scan thread's buffer.
@@ -182,6 +186,7 @@ static int run_scan(void)
 
 	return ret;
 }
+
 
 /**
  * @brief Make a finished scan visible to the display thread.
@@ -214,6 +219,7 @@ static unsigned int publish(int ret)
 	return scan_no;
 }
 
+
 /**
  * @brief Restart the meter, to recover a Wi-Fi driver that has stopped
  *        working.
@@ -235,6 +241,7 @@ static FUNC_NORETURN void recover(int ret)
 	LOG_ERR("%u scans in a row failed: restarting", health.failures);
 	reset_note_restart(BOOT_WIFI_RESTART, ret, health.failures);
 }
+
 
 /**
  * @brief Run one scan, publish it and log it.
@@ -264,6 +271,7 @@ static bool scan_once(void)
 	return ret == 0 && scanning.ap_count > 0U;
 }
 
+
 /**
  * @brief Scan for ever: every CONFIG_METER_SCAN_INTERVAL_S seconds, sooner
  *        after a scan that heard nothing, or at once on request.
@@ -291,6 +299,7 @@ static void scan_loop(void *p1, void *p2, void *p3)
 	}
 }
 
+
 /*
  * Public interface: documented in scan_task.h.
  *
@@ -306,6 +315,7 @@ void scan_task_start(void)
 	k_thread_name_set(&scan_thread, "scan");
 }
 
+
 /*
  * Public interface: documented in scan_task.h.
  */
@@ -313,6 +323,7 @@ void scan_task_request(void)
 {
 	k_sem_give(&scan_now);
 }
+
 
 /*
  * Public interface: documented in scan_task.h.

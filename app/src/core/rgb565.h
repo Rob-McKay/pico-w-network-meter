@@ -31,6 +31,7 @@ static inline uint16_t rgb565x(uint8_t r, uint8_t g, uint8_t b)
 	return sys_cpu_to_be16(px);
 }
 
+
 /**
  * @brief Darken an RGB565 pixel (high byte first) towards black.
  *

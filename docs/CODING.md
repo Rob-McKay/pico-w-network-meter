@@ -7,7 +7,7 @@ repository's own C and Python. `make test` enforces what a tool can check:
 | Rule | Checked by |
 |---|---|
 | 0. No compiler warnings, clean clang-tidy | the build itself (`cmake/strict.cmake`) |
-| 0. Zephyr's coding style | `scripts/check-style.sh`: Zephyr's `.clang-format` and `checkpatch.pl` |
+| 0. Zephyr's coding style | `scripts/check-style.sh`: the repository's `.clang-format` (Zephyr's, plus two blank lines kept), `checkpatch.pl`, and `scripts/check-blank-lines.py` |
 | 1. Doxygen comment on every function: parameters, return values, side effects (errno included) | `scripts/check-docs.py` |
 | 2. Single responsibility | review |
 | 3. No unbounded string functions; buffer overflows trapped | clang-tidy, and `_FORTIFY_SOURCE=2` in the firmware |
@@ -62,10 +62,19 @@ such a case: their expansion can end in an empty statement, which
 `-Wpedantic` reports.
 
 Formatting is Zephyr's: tabs, 100 columns, kernel brace style, as its
-`.clang-format` lays out. `scripts/check-style.sh --fix` (in `make shell`)
-reformats. Where clang-format would wrap a line that must stay whole, such
-as a `NOLINTNEXTLINE`, fence it with `/* clang-format off */` and
-`/* clang-format on */`.
+`.clang-format` lays out. The repository's `.clang-format` is Zephyr's,
+copied unchanged between two marker lines, plus one addition: up to two
+blank lines are kept, not one. Every function is followed by two blank
+lines, before whatever comes next (an `#else`, `#elif` or `#endif` that
+closes the function's conditional doesn't count, and the end of the file
+needs none). clang-format can't require that, so
+`scripts/check-blank-lines.py` checks it. `scripts/check-style.sh` also
+checks that the copy still matches the pinned Zephyr's, so a Zephyr update
+that changes its `.clang-format` fails the check until the copy is
+refreshed. `scripts/check-style.sh --fix` (in `make shell`) reformats and
+adds missing blank lines. Where clang-format would wrap a line that must
+stay whole, such as a `NOLINTNEXTLINE`, fence it with
+`/* clang-format off */` and `/* clang-format on */`.
 
 ## Concurrency
 

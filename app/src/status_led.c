@@ -50,6 +50,7 @@ static void rgb_set(uint32_t led, bool on)
 	(void)led_set_brightness(rgb, led, on ? CONFIG_METER_LED_BRIGHTNESS : 0U);
 }
 
+
 /*
  * Public interface: documented in status_led.h.
  */
@@ -63,6 +64,7 @@ int status_init(void)
 
 	return 0;
 }
+
 
 /*
  * Public interface: documented in status_led.h.

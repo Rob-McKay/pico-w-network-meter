@@ -42,6 +42,7 @@ static uint32_t seconds(int64_t uptime_ms)
 	return (uint32_t)CLAMP(uptime_ms / MSEC_PER_SEC, 0, (int64_t)UINT32_MAX);
 }
 
+
 /**
  * @brief Rewrite the note.
  *
@@ -64,6 +65,7 @@ static void write_note(enum boot_cause cause, int32_t detail, uint32_t arg, int6
 	irq_unlock(key);
 }
 
+
 /*
  * Public interface: documented in reset_note.h.
  */
@@ -72,6 +74,7 @@ void reset_note_take(struct boot_note *out)
 	*out = note;
 	write_note(BOOT_NONE, 0, 0, 0);
 }
+
 
 /*
  * Public interface: documented in reset_note.h.
@@ -90,6 +93,7 @@ void reset_note_alive(int64_t uptime_ms)
 	irq_unlock(key);
 }
 
+
 /*
  * Public interface: documented in reset_note.h.
  */
@@ -102,6 +106,7 @@ FUNC_NORETURN void reset_note_restart(enum boot_cause cause, int32_t detail, uin
 	watchdog_stop();
 	sys_reboot(SYS_REBOOT_COLD);
 }
+
 
 /**
  * @brief Restart after a fatal error, noting it, instead of halting
