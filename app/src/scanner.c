@@ -31,6 +31,11 @@ LOG_MODULE_REGISTER(scanner, CONFIG_METER_LOG_LEVEL);
 static struct net_if *wifi_iface;
 static struct net_mgmt_event_callback scan_cb;
 
+/* A BSSID as text, "02:1f:3c:12:34:56": two hex digits and a ':' (or, last, the
+ * terminator) for each byte.
+ */
+#define BSSID_TEXT_MAX (CHAN_BSSID_LEN * 3U)
+
 /* The scan in progress: results go to *target while it is set. The mutex
  * covers target, scan_status and raw_results against the net_mgmt event
  * thread, and is only ever held for a few assignments, so the event
@@ -115,12 +120,12 @@ static bool is_empty_record(const struct chan_ap *ap)
 static void log_result(const struct chan_ap *ap)
 {
 	char ssid[CHAN_SSID_MAX + 1];
+	char bssid[BSSID_TEXT_MAX];
 
 	chan_ssid_printable(ap->ssid, ssid, sizeof(ssid));
-	LOG_DBG("Result: %02x:%02x:%02x:%02x:%02x:%02x ch %u %d dBm \"%s\"",
-		(unsigned int)ap->bssid[0], (unsigned int)ap->bssid[1], (unsigned int)ap->bssid[2],
-		(unsigned int)ap->bssid[3], (unsigned int)ap->bssid[4], (unsigned int)ap->bssid[5],
-		(unsigned int)ap->channel, (int)ap->rssi, ssid);
+	chan_bssid_text(ap->bssid, "", bssid, sizeof(bssid));
+	LOG_DBG("Result: %s ch %u %d dBm \"%s\"", bssid, (unsigned int)ap->channel, (int)ap->rssi,
+		ssid);
 }
 
 

@@ -650,6 +650,29 @@ ZTEST(meter_chan, test_ssid_printable)
 
 
 /**
+ * @brief A BSSID is written as six colon-separated hex bytes after its
+ *        prefix, and cut to fit a small buffer.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_bssid_text)
+{
+	const uint8_t bssid[CHAN_BSSID_LEN] = {0x02, 0x1f, 0x3c, 0x12, 0x34, 0x56};
+	char buf[32];
+	char small[6];
+
+	chan_bssid_text(bssid, "", buf, sizeof(buf));
+	zassert_str_equal(buf, "02:1f:3c:12:34:56");
+	chan_bssid_text(bssid, "hidden ", buf, sizeof(buf));
+	zassert_str_equal(buf, "hidden 02:1f:3c:12:34:56");
+	chan_bssid_text(bssid, "", small, sizeof(small));
+	zassert_str_equal(small, "02:1f");
+	chan_bssid_text(bssid, "hidden ", small, sizeof(small));
+	zassert_str_equal(small, "hidde");
+}
+
+
+/**
  * @brief A block's last channel comes from the channel table; a channel
  *        that doesn't start a block has none.
  *
