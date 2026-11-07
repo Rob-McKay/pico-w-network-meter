@@ -8,6 +8,7 @@
  * out/screens/ when scripts/test.sh runs the test.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 

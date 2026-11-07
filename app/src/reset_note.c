@@ -117,8 +117,9 @@ FUNC_NORETURN void reset_note_restart(enum boot_cause cause, int32_t detail, uin
  * @param reason The error (K_ERR_*).
  * @param esf The exception's saved registers, or NULL.
  *
- * @sideeffects Those of reset_note_restart(): notes the crash with the program counter, flushes
- *              the log, restarts; does not return. errno unchanged.
+ * @sideeffects Those of reset_note_restart(): notes the crash with the program counter (on
+ *              Cortex-M and 32-bit RISC-V; 0 elsewhere), flushes the log, restarts; does not
+ *              return. errno unchanged.
  */
 void k_sys_fatal_error_handler(unsigned int reason, const struct arch_esf *esf)
 {
@@ -127,6 +128,12 @@ void k_sys_fatal_error_handler(unsigned int reason, const struct arch_esf *esf)
 #ifdef CONFIG_CPU_CORTEX_M
 	if (esf != NULL) {
 		pc = esf->basic.pc;
+	}
+#elif defined(CONFIG_RISCV) && !defined(CONFIG_64BIT)
+	/* RV32: mepc, an unsigned long, is 32 bits, so it fits. */
+	BUILD_ASSERT(sizeof(esf->mepc) == sizeof(pc), "mepc is 32 bits on RV32");
+	if (esf != NULL) {
+		pc = (uint32_t)esf->mepc;
 	}
 #else
 	ARG_UNUSED(esf);

@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -18,6 +19,7 @@
 #include "reset_note.h"
 #include "scan_health.h"
 #include "scan_task.h"
+#include "recommend.h"
 #include "scanner.h"
 #include "watchdog.h"
 #include "boot_record.h"
@@ -93,9 +95,7 @@ static void report_channel(const struct chan_info *info)
  */
 static void report_5g(const struct chan_stats *s)
 {
-	uint8_t best = chan_stats_recommend_5g(
-		s, chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
-				  IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER)));
+	uint8_t best = recommend_5g(s);
 	struct chan_info info;
 
 	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
@@ -103,7 +103,7 @@ static void report_5g(const struct chan_stats *s)
 		report_channel(&info);
 	}
 	chan_stats_channel_5g(s, best, &info);
-	unsigned int last = (unsigned int)best + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U));
+	unsigned int last = chan_5g_block_last(best);
 
 	if (info.interference == CHAN_RSSI_NONE) {
 		LOG_INF("  5 GHz: use %u-%u (80 MHz): clear, nothing heard", (unsigned int)best,
@@ -112,6 +112,28 @@ static void report_5g(const struct chan_stats *s)
 		LOG_INF("  5 GHz: use %u-%u (80 MHz): %s, interference %d dBm", (unsigned int)best,
 			last, chan_level_name(chan_stats_level(info.interference)),
 			info.interference);
+	}
+}
+
+
+/**
+ * @brief Log every network a scan kept, at debug level.
+ *
+ * SSIDs are printed through chan_ssid_printable(): they are whatever nearby access points
+ * send, and control characters in them could rewrite the terminal.
+ *
+ * @param s The scan.
+ *
+ * @sideeffects Writes debug log messages. errno unchanged.
+ */
+static void report_networks(const struct chan_stats *s)
+{
+	char ssid[CHAN_SSID_MAX + 1];
+
+	for (size_t i = 0; i < s->ap_count; i++) {
+		chan_ssid_printable(s->aps[i].ssid, ssid, sizeof(ssid));
+		LOG_DBG("  %-32s ch %2u %4d dBm", ssid, (unsigned int)s->aps[i].channel,
+			(int)s->aps[i].rssi);
 	}
 }
 
@@ -144,9 +166,8 @@ static void report(const struct chan_stats *s, unsigned int scan_no)
 	if (IS_ENABLED(CONFIG_METER_BAND_5G)) {
 		report_5g(s);
 	}
-	for (size_t i = 0; i < s->ap_count; i++) {
-		LOG_DBG("  %-32s ch %2u %4d dBm", s->aps[i].ssid, (unsigned int)s->aps[i].channel,
-			s->aps[i].rssi);
+	if (IS_ENABLED(CONFIG_METER_LOG_LEVEL_DBG)) {
+		report_networks(s);
 	}
 }
 

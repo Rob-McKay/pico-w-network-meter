@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -14,6 +15,7 @@
 
 #include "gfx.h"
 #include "paging.h"
+#include "recommend.h"
 #include "ui.h"
 #include "boot_record.h"
 #include "chan_stats.h"
@@ -84,6 +86,9 @@ static struct {
 
 static const struct cfb_font *font;
 
+/* Whether ui_init() succeeded: until it has, the ui_ functions draw nothing (main thread). */
+static bool ready;
+
 /* The events screen's records, from ui_set_events(). */
 static size_t events_count;
 static ui_event_get_fn events_get;
@@ -112,17 +117,23 @@ static void init_colours(void)
  * Public interface: documented in ui.h.
  *
  * The font is looked up before the panel is started, so a missing font fails without touching
- * the display.
+ * the display. gfx_font() falls back to the smallest font, which the layout, built for FONT_H,
+ * can't use, so the height is checked here.
  */
 int ui_init(void)
 {
+	int ret;
+
+	ready = false;
 	init_colours();
 	font = gfx_font(FONT_H);
-	if (font == NULL) {
+	if (font == NULL || font->height != FONT_H) {
 		return -ENOENT;
 	}
+	ret = gfx_init(col.bg);
+	ready = ret == 0;
 
-	return gfx_init(col.bg);
+	return ret;
 }
 
 
@@ -571,21 +582,6 @@ static void show_channels(const struct chan_stats *s, bool full)
 
 
 /**
- * @brief Say which 5 GHz blocks the recommendation may pick, from the
- *        settings.
- *
- * @return chan_5g_blocks()'s mask.
- *
- * @sideeffects None; errno unchanged.
- */
-static uint32_t allowed_blocks_5g(void)
-{
-	return chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
-			      IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER));
-}
-
-
-/**
  * @brief Left edge of a 5 GHz block on the chart.
  *
  * @param block 0 (36-48) to CHART_5G_BLOCKS - 1 (149-161).
@@ -657,7 +653,7 @@ static void draw_block_gap(const struct chart *c, int x, int w)
 static void show_channels_5g(const struct chan_stats *s, bool full)
 {
 	struct chart c;
-	uint8_t best = chan_stats_recommend_5g(s, allowed_blocks_5g());
+	uint8_t best = recommend_5g(s);
 	int block_w = CHAN_5G_BLOCK_CHANNELS * COL_5G_W;
 
 	chart_layout_5g(&c);
@@ -878,11 +874,11 @@ static void recommend_text(const struct chan_stats *s, enum chan_band band, char
 		return;
 	}
 	if (band == CHAN_BAND_5G) {
-		uint8_t first = chan_stats_recommend_5g(s, allowed_blocks_5g());
+		uint8_t first = recommend_5g(s);
 
 		chan_stats_channel_5g(s, first, &best);
 		(void)snprintf(buf, size, "Use %u-%u: %s", (unsigned int)first,
-			       (unsigned int)first + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U)),
+			       (unsigned int)chan_5g_block_last(first),
 			       chan_level_name(chan_stats_level(best.interference)));
 		return;
 	}
@@ -1088,6 +1084,9 @@ static void show_events_screen(unsigned int scan_no, size_t first)
 void ui_show(enum ui_view view, enum chan_band band, const struct chan_stats *s,
 	     unsigned int scan_no, size_t first, bool full)
 {
+	if (!ready) {
+		return;
+	}
 	if (full) {
 		gfx_fill(0, BAR_H, gfx_width(), gfx_height() - (2 * BAR_H), col.bg);
 	}
@@ -1110,5 +1109,7 @@ void ui_show(enum ui_view view, enum chan_band band, const struct chan_stats *s,
  */
 void ui_message(const char *text)
 {
-	draw_footer(text, 0);
+	if (ready) {
+		draw_footer(text, 0);
+	}
 }

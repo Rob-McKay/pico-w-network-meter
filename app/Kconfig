@@ -151,10 +151,12 @@ config METER_FADE_MIN_PERCENT
 config METER_REDRAW_MS
 	int "Milliseconds between screen updates"
 	default 500
-	range 50 10000
+	range 50 1250
 	help
 	  How often the screen is checked for changes (new results or
-	  fading), and redrawn if anything changed.
+	  fading), and redrawn if anything changed. At most 1250: the main
+	  thread's 5 s watchdog deadline must allow several redraws
+	  (main.c).
 
 config METER_LED_BRIGHTNESS
 	int "RGB LED brightness, percent"

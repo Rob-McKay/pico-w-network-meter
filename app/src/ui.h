@@ -49,12 +49,15 @@ enum ui_view {
  * The UI is not thread-safe: call it, and the other ui_ functions, from
  * one thread (main).
  *
+ * If it fails, ui_show() and ui_message() draw nothing, so the meter can
+ * run on its console alone.
+ *
  * @retval 0 Ready.
- * @retval -ENOENT No font of the size the UI uses.
+ * @retval -ENOENT No font of the height the UI is laid out for.
  * @retval <0 Negative errno from gfx_init().
  *
- * @sideeffects Sets the colour table and the font, clears the panel and turns it on
- *              (gfx_init()). errno unchanged.
+ * @sideeffects Sets the colour table, the font and whether the UI is ready, clears the panel
+ *              and turns it on (gfx_init()). errno unchanged.
  */
 int ui_init(void);
 
@@ -79,7 +82,8 @@ int ui_init(void);
  *        the list (paging_clamp()). Unused by the channels screen.
  * @param full Redraw the whole screen.
  *
- * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
+ * @sideeffects Draws on the panel, unless ui_init() failed. errno may be set by snprintf() (only
+ *              on an output error).
  */
 void ui_show(enum ui_view view, enum chan_band band, const struct chan_stats *s,
 	     unsigned int scan_no, size_t first, bool full);
@@ -111,7 +115,8 @@ size_t ui_list_rows(void);
  *
  * @param text Message.
  *
- * @sideeffects Draws on the panel. errno may be set by snprintf() (only on an output error).
+ * @sideeffects Draws on the panel, unless ui_init() failed. errno may be set by snprintf() (only
+ *              on an output error).
  */
 void ui_message(const char *text);
 

@@ -11,6 +11,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -620,6 +621,49 @@ ZTEST(meter_chan, test_strongest_band)
 	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_5G, list, ARRAY_SIZE(list)), 2);
 	zassert_equal(list[0]->channel, 36);
 	zassert_equal(list[1]->channel, 149);
+}
+
+
+/**
+ * @brief Printable ASCII passes through; control characters, DEL and
+ *        bytes above 0x7f become '?'; the copy is cut to fit.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_ssid_printable)
+{
+	char buf[CHAN_SSID_MAX + 1];
+	char small[4];
+
+	chan_ssid_printable("Home Wi-Fi 5G", buf, sizeof(buf));
+	zassert_str_equal(buf, "Home Wi-Fi 5G");
+	chan_ssid_printable("a\x1b[2Jb\r\n\x7f\xc3\xa9", buf, sizeof(buf));
+	zassert_str_equal(buf, "a?[2Jb?????");
+	chan_ssid_printable("abcdef", small, sizeof(small));
+	zassert_str_equal(small, "abc");
+	chan_ssid_printable("", buf, sizeof(buf));
+	zassert_str_equal(buf, "");
+	small[0] = 'x';
+	chan_ssid_printable("abc", small, 0);
+	zassert_equal(small[0], 'x', "size 0 writes nothing");
+}
+
+
+/**
+ * @brief A block's last channel comes from the channel table; a channel
+ *        that doesn't start a block has none.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_5g_block_last)
+{
+	zassert_equal(chan_5g_block_last(36), 48);
+	zassert_equal(chan_5g_block_last(52), 64);
+	zassert_equal(chan_5g_block_last(149), 161);
+	zassert_equal(chan_5g_block_last(165), 177);
+	zassert_equal(chan_5g_block_last(40), 0, "not a block's first channel");
+	zassert_equal(chan_5g_block_last(6), 0, "a 2.4 GHz channel");
+	zassert_equal(chan_5g_block_last(0), 0);
 }
 
 

@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -528,6 +529,57 @@ uint32_t chan_5g_blocks(bool with_132, bool with_upper)
 /*
  * Public interface: documented in chan_stats.h.
  *
+ * Read from the channel table, so it follows the channel numbering rather than repeating it.
+ */
+uint8_t chan_5g_block_last(uint8_t first)
+{
+	int i = chan_5g_index(first);
+
+	if (i < 0 || (i % CHAN_5G_BLOCK_CHANNELS) != 0) {
+		return 0;
+	}
+
+	return chan_5g_channel((size_t)i + CHAN_5G_BLOCK_CHANNELS - 1U);
+}
+
+
+/**
+ * @brief Insert an access point into a list kept strongest first, dropping
+ *        the weakest if the list is full.
+ *
+ * An insertion sort: a scan has at most CHAN_MAX_APS.
+ *
+ * @param[in,out] out The list, strongest first.
+ * @param n How many it holds.
+ * @param max How many it can hold.
+ * @param ap The access point.
+ * @return How many it holds now: @p n + 1, at most @p max.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+static size_t insert_by_rssi(const struct chan_ap **out, size_t n, size_t max,
+			     const struct chan_ap *ap)
+{
+	size_t pos = n;
+
+	while (pos > 0U && out[pos - 1U]->rssi < ap->rssi) {
+		pos--;
+	}
+	if (pos >= max) {
+		return n;
+	}
+	for (size_t j = (n < max ? n : max - 1U); j > pos; j--) {
+		out[j] = out[j - 1U];
+	}
+	out[pos] = ap;
+
+	return n < max ? n + 1U : n;
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ *
  * An insertion sort straight into the output array, keeping only as many entries as it
  * has room for: a scan holds at most CHAN_MAX_APS access points.
  */
@@ -536,27 +588,9 @@ size_t chan_stats_strongest(const struct chan_stats *s, enum chan_band band,
 {
 	size_t n = 0;
 
-	/* Insertion sort into out[]: a scan has at most CHAN_MAX_APS. */
 	for (size_t i = 0; i < s->ap_count; i++) {
-		const struct chan_ap *ap = &s->aps[i];
-
-		if (ap->band != (uint8_t)band) {
-			continue;
-		}
-		size_t pos = n;
-
-		while (pos > 0 && out[pos - 1]->rssi < ap->rssi) {
-			pos--;
-		}
-		if (pos >= max) {
-			continue;
-		}
-		for (size_t j = (n < max ? n : max - 1); j > pos; j--) {
-			out[j] = out[j - 1];
-		}
-		out[pos] = ap;
-		if (n < max) {
-			n++;
+		if (s->aps[i].band == (uint8_t)band) {
+			n = insert_by_rssi(out, n, max, &s->aps[i]);
 		}
 	}
 
@@ -711,4 +745,22 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size)
 		       (unsigned int)ap->bssid[0], (unsigned int)ap->bssid[1],
 		       (unsigned int)ap->bssid[2], (unsigned int)ap->bssid[3],
 		       (unsigned int)ap->bssid[4], (unsigned int)ap->bssid[5]);
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+void chan_ssid_printable(const char *ssid, char *buf, size_t size)
+{
+	size_t n = 0;
+
+	if (size == 0U) {
+		return;
+	}
+	for (const unsigned char *p = (const unsigned char *)ssid; *p != '\0' && n + 1U < size;
+	     p++) {
+		buf[n++] = (*p >= 0x20U && *p < 0x7fU) ? (char)*p : '?';
+	}
+	buf[n] = '\0';
 }
