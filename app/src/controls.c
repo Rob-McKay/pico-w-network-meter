@@ -56,6 +56,7 @@ static void on_input(struct input_event *evt, void *user_data)
 	(void)k_msgq_put(&presses, &code, K_NO_WAIT);
 }
 
+
 INPUT_CALLBACK_DEFINE(NULL, on_input, NULL);
 
 /*
@@ -69,6 +70,7 @@ void controls_init(void)
 	k_msgq_init(&presses, (char *)press_buf, sizeof(press_buf[0]), QUEUED_PRESSES);
 	atomic_set(&ready, 1);
 }
+
 
 /*
  * Public interface: documented in controls.h.

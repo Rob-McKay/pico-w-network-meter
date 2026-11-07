@@ -14,6 +14,10 @@
 #include "rgb565.h"
 #include "text_raster.h"
 
+/* A UTF-8 continuation byte: 10xxxxxx. Its character was drawn at its first byte. */
+#define UTF8_CONT_MASK 0xc0U
+#define UTF8_CONT      0x80U
+
 /*
  * Public interface: documented in text_raster.h.
  */
@@ -21,6 +25,7 @@ uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
 	return rgb565x(r, g, b);
 }
+
 
 /**
  * @brief Tell whether a glyph pixel is set.
@@ -37,13 +42,15 @@ uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b)
 static bool glyph_pixel(const struct cfb_font *font, const uint8_t *glyph, unsigned int x,
 			unsigned int y)
 {
-	unsigned int bytes_per_col = DIV_ROUND_UP(font->height, 8U);
-	uint8_t byte = glyph[(x * bytes_per_col) + (y / 8U)];
+	unsigned int bytes_per_col = DIV_ROUND_UP(font->height, BITS_PER_BYTE);
+	uint8_t byte = glyph[(x * bytes_per_col) + (y / BITS_PER_BYTE)];
 	bool msb_first = ((uint32_t)font->caps & (uint32_t)CFB_FONT_MSB_FIRST) != 0;
-	unsigned int bit = msb_first ? 7U - (y % 8U) : y % 8U;
+	unsigned int in_byte = y % BITS_PER_BYTE;
+	unsigned int bit = msb_first ? (BITS_PER_BYTE - 1U) - in_byte : in_byte;
 
 	return (((unsigned int)byte >> bit) & 1U) != 0;
 }
+
 
 /**
  * @brief Find a character's glyph.
@@ -57,7 +64,7 @@ static bool glyph_pixel(const struct cfb_font *font, const uint8_t *glyph, unsig
  */
 static const uint8_t *glyph_of(const struct cfb_font *font, unsigned char c)
 {
-	size_t glyph_size = (size_t)font->width * DIV_ROUND_UP(font->height, 8U);
+	size_t glyph_size = (size_t)font->width * DIV_ROUND_UP(font->height, BITS_PER_BYTE);
 
 	if (c < font->first_char || c > font->last_char) {
 		c = ('?' >= font->first_char && '?' <= font->last_char) ? '?' : font->first_char;
@@ -65,6 +72,7 @@ static const uint8_t *glyph_of(const struct cfb_font *font, unsigned char c)
 
 	return (const uint8_t *)font->data + ((size_t)(c - font->first_char) * glyph_size);
 }
+
 
 /**
  * @brief Draw one glyph into the band, clipped to its width.
@@ -94,6 +102,7 @@ static void draw_glyph(const struct cfb_font *font, unsigned char c, uint16_t *b
 	}
 }
 
+
 /**
  * @brief Draw a line of text across a band of pixels, plain or bold.
  *
@@ -116,13 +125,14 @@ static void draw_line(const struct cfb_font *font, const char *text, uint16_t *b
 		band[i] = bg;
 	}
 	for (const unsigned char *p = (const unsigned char *)text; *p != '\0' && x < width; p++) {
-		if ((*p & 0xc0U) == 0x80U) {
+		if ((*p & UTF8_CONT_MASK) == UTF8_CONT) {
 			continue; /* UTF-8 continuation: its character is already drawn */
 		}
 		draw_glyph(font, *p, band, width, x, fg, bold);
 		x += font->width;
 	}
 }
+
 
 /*
  * Public interface: documented in text_raster.h.
@@ -132,6 +142,7 @@ void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, 
 {
 	draw_line(font, text, band, width, fg, bg, false);
 }
+
 
 /*
  * Public interface: documented in text_raster.h.

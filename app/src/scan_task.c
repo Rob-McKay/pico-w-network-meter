@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -18,6 +19,7 @@
 #include "reset_note.h"
 #include "scan_health.h"
 #include "scan_task.h"
+#include "recommend.h"
 #include "scanner.h"
 #include "watchdog.h"
 #include "boot_record.h"
@@ -25,13 +27,17 @@
 
 LOG_MODULE_REGISTER(scan_task, CONFIG_METER_LOG_LEVEL);
 
-/* The scan thread's watchdog deadline: the longest scan and wait, and a
- * margin for the driver's own waits.
+/* A margin on the scan thread's watchdog for the Wi-Fi driver's own waits, s: it waits up to
+ * 30 s for its lock before giving up on a request.
  */
+#define DRIVER_MARGIN_S 30U
+/* The scan thread's watchdog deadline: the longest scan and wait, and the driver's margin. */
 #define SCAN_DEADLINE_MS                                                                           \
 	((CONFIG_METER_SCAN_TIMEOUT_S + MAX(CONFIG_METER_SCAN_INTERVAL_S, CONFIG_METER_RETRY_S) +  \
-	  30U) *                                                                                   \
+	  DRIVER_MARGIN_S) *                                                                       \
 	 MSEC_PER_SEC)
+/* CONFIG_METER_FADE_MIN_PERCENT's whole. */
+#define PERCENT 100
 
 BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 	     "CONFIG_METER_FADE_END_S must be more than CONFIG_METER_FADE_START_S");
@@ -39,7 +45,7 @@ BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 static const struct ap_fade fade = {
 	.start_ms = (int64_t)CONFIG_METER_FADE_START_S * MSEC_PER_SEC,
 	.end_ms = (int64_t)CONFIG_METER_FADE_END_S * MSEC_PER_SEC,
-	.min_level = (uint8_t)((CONFIG_METER_FADE_MIN_PERCENT * CHAN_FRESH) / 100),
+	.min_level = (uint8_t)((CONFIG_METER_FADE_MIN_PERCENT * CHAN_FRESH) / PERCENT),
 };
 
 /* Zephyr's definition macros can end in an empty statement: ISO C -Wpedantic
@@ -81,6 +87,7 @@ static void report_channel(const struct chan_info *info)
 	}
 }
 
+
 /**
  * @brief Log a scan's 5 GHz results on the console: each channel reached,
  *        and the best 80 MHz block with how busy it is ("nothing heard"
@@ -92,9 +99,7 @@ static void report_channel(const struct chan_info *info)
  */
 static void report_5g(const struct chan_stats *s)
 {
-	uint8_t best = chan_stats_recommend_5g(
-		s, chan_5g_blocks(IS_ENABLED(CONFIG_METER_RECOMMEND_5G_132),
-				  IS_ENABLED(CONFIG_METER_RECOMMEND_5G_UPPER)));
+	uint8_t best = recommend_5g(s);
 	struct chan_info info;
 
 	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
@@ -102,7 +107,7 @@ static void report_5g(const struct chan_stats *s)
 		report_channel(&info);
 	}
 	chan_stats_channel_5g(s, best, &info);
-	unsigned int last = (unsigned int)best + (4U * (CHAN_5G_BLOCK_CHANNELS - 1U));
+	unsigned int last = chan_5g_block_last(best);
 
 	if (info.interference == CHAN_RSSI_NONE) {
 		LOG_INF("  5 GHz: use %u-%u (80 MHz): clear, nothing heard", (unsigned int)best,
@@ -113,6 +118,29 @@ static void report_5g(const struct chan_stats *s)
 			info.interference);
 	}
 }
+
+
+/**
+ * @brief Log every network a scan kept, at debug level.
+ *
+ * SSIDs are printed through chan_ssid_printable(): they are whatever nearby access points
+ * send, and control characters in them could rewrite the terminal.
+ *
+ * @param s The scan.
+ *
+ * @sideeffects Writes debug log messages. errno unchanged.
+ */
+static void report_networks(const struct chan_stats *s)
+{
+	char ssid[CHAN_SSID_MAX + 1];
+
+	for (size_t i = 0; i < s->ap_count; i++) {
+		chan_ssid_printable(s->aps[i].ssid, ssid, sizeof(ssid));
+		LOG_DBG("  %-32s ch %2u %4d dBm", ssid, (unsigned int)s->aps[i].channel,
+			(int)s->aps[i].rssi);
+	}
+}
+
 
 /**
  * @brief Log a scan's results on the console.
@@ -142,11 +170,11 @@ static void report(const struct chan_stats *s, unsigned int scan_no)
 	if (IS_ENABLED(CONFIG_METER_BAND_5G)) {
 		report_5g(s);
 	}
-	for (size_t i = 0; i < s->ap_count; i++) {
-		LOG_DBG("  %-32s ch %2u %4d dBm", s->aps[i].ssid, (unsigned int)s->aps[i].channel,
-			s->aps[i].rssi);
+	if (IS_ENABLED(CONFIG_METER_LOG_LEVEL_DBG)) {
+		report_networks(s);
 	}
 }
+
 
 /**
  * @brief Mark a scan as running, for the LED.
@@ -159,6 +187,7 @@ static void set_busy(void)
 	progress.busy = true;
 	k_mutex_unlock(&lock);
 }
+
 
 /**
  * @brief Run one scan into the scan thread's buffer.
@@ -182,6 +211,7 @@ static int run_scan(void)
 
 	return ret;
 }
+
 
 /**
  * @brief Make a finished scan visible to the display thread.
@@ -214,6 +244,7 @@ static unsigned int publish(int ret)
 	return scan_no;
 }
 
+
 /**
  * @brief Restart the meter, to recover a Wi-Fi driver that has stopped
  *        working.
@@ -235,6 +266,7 @@ static FUNC_NORETURN void recover(int ret)
 	LOG_ERR("%u scans in a row failed: restarting", health.failures);
 	reset_note_restart(BOOT_WIFI_RESTART, ret, health.failures);
 }
+
 
 /**
  * @brief Run one scan, publish it and log it.
@@ -264,6 +296,7 @@ static bool scan_once(void)
 	return ret == 0 && scanning.ap_count > 0U;
 }
 
+
 /**
  * @brief Scan for ever: every CONFIG_METER_SCAN_INTERVAL_S seconds, sooner
  *        after a scan that heard nothing, or at once on request.
@@ -291,6 +324,7 @@ static void scan_loop(void *p1, void *p2, void *p3)
 	}
 }
 
+
 /*
  * Public interface: documented in scan_task.h.
  *
@@ -306,6 +340,7 @@ void scan_task_start(void)
 	k_thread_name_set(&scan_thread, "scan");
 }
 
+
 /*
  * Public interface: documented in scan_task.h.
  */
@@ -313,6 +348,7 @@ void scan_task_request(void)
 {
 	k_sem_give(&scan_now);
 }
+
 
 /*
  * Public interface: documented in scan_task.h.

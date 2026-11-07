@@ -58,6 +58,7 @@ static void set_flow(bool on)
 	}
 }
 
+
 /**
  * @brief Match flow control to DTR, then check again in CHECK_MS.
  *
@@ -81,6 +82,7 @@ static void watch_dtr(struct k_work *work)
 	(void)k_work_reschedule(&watch, K_MSEC(CHECK_MS));
 }
 
+
 /**
  * @brief Start watching DTR.
  *
@@ -97,6 +99,7 @@ static int usb_console_init(void)
 
 	return 0;
 }
+
 
 /* Zephyr's definition macro can end in an empty statement: ISO C -Wpedantic
  * flags the ';' as extra. Nothing else is exempted.

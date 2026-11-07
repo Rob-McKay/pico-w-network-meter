@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -53,6 +54,7 @@ uint16_t gfx_rgb(uint8_t r, uint8_t g, uint8_t b)
 	return raster_rgb(r, g, b);
 }
 
+
 /*
  * Public interface: documented in gfx.h.
  */
@@ -60,6 +62,7 @@ uint16_t gfx_fade(uint16_t color, uint8_t level)
 {
 	return rgb565x_fade(color, level);
 }
+
 
 /*
  * Public interface: documented in gfx.h.
@@ -77,8 +80,8 @@ int gfx_init(uint16_t bg)
 	}
 	display_get_capabilities(display, &caps);
 	if (caps.current_pixel_format != PIXEL_FORMAT_RGB_565X || caps.x_resolution > MAX_WIDTH) {
-		LOG_ERR("Unsupported display: %ux%u, format %d", caps.x_resolution,
-			caps.y_resolution, (int)caps.current_pixel_format);
+		LOG_ERR("Unsupported display: %ux%u, format %d", (unsigned int)caps.x_resolution,
+			(unsigned int)caps.y_resolution, (int)caps.current_pixel_format);
 		return -ENOTSUP;
 	}
 	disp_w = caps.x_resolution;
@@ -89,6 +92,7 @@ int gfx_init(uint16_t bg)
 	return display_blanking_off(display);
 }
 
+
 /*
  * Public interface: documented in gfx.h.
  */
@@ -97,6 +101,7 @@ int gfx_width(void)
 	return disp_w;
 }
 
+
 /*
  * Public interface: documented in gfx.h.
  */
@@ -104,6 +109,7 @@ int gfx_height(void)
 {
 	return disp_h;
 }
+
 
 /*
  * Public interface: documented in gfx.h.
@@ -123,6 +129,7 @@ const struct cfb_font *gfx_font(int height)
 
 	return smallest;
 }
+
 
 /**
  * @brief Send a block of the band to the display.
@@ -149,6 +156,7 @@ static void write_band(int x, int y, int w, int h)
 		LOG_WRN("Display write failed: %d", ret);
 	}
 }
+
 
 /**
  * @brief Clip a rectangle to the display.
@@ -177,6 +185,7 @@ static bool clip(int *x, int *y, int *w, int *h)
 	return *w > 0 && *h > 0;
 }
 
+
 /*
  * Public interface: documented in gfx.h.
  *
@@ -198,6 +207,7 @@ void gfx_fill(int x, int y, int w, int h, uint16_t color)
 		write_band(x, y + row, w, MIN(rows, h - row));
 	}
 }
+
 
 /**
  * @brief Draw a line of text in a box one font height tall, plain or bold.
@@ -233,6 +243,7 @@ static void text_box(int x, int y, int w, const struct cfb_font *font, const cha
 	write_band(x, y, w, h);
 }
 
+
 /*
  * Public interface: documented in gfx.h.
  */
@@ -241,6 +252,7 @@ void gfx_text(int x, int y, int w, const struct cfb_font *font, const char *text
 {
 	text_box(x, y, w, font, text, fg, bg, false);
 }
+
 
 /*
  * Public interface: documented in gfx.h.

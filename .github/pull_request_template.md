@@ -39,6 +39,10 @@ not met is explained in a review comment.
 - [ ] Hardware-independent logic stays out of driver/UI code, so it can be unit
       tested on native_sim
 
+### Magic numbers
+- [ ] No number but 0 to 4 in the code: each is a named constant whose name says what it
+      means (clang-tidy's `readability-magic-numbers`)
+
 ### Undefined and implementation-defined behaviour
 - [ ] No signed overflow, shifts by negative or oversized amounts, or shifts of
       negative values; worst-case values checked for arithmetic
@@ -62,7 +66,8 @@ not met is explained in a review comment.
 - [ ] Code that must run on one thread (display, LED) says so
 
 ### Zephyr standards
-- [ ] `scripts/check-style.sh` clean (Zephyr's `.clang-format` and `checkpatch.pl`)
+- [ ] `scripts/check-style.sh` clean (Zephyr's `.clang-format`, `checkpatch.pl`, two
+      blank lines after every function)
 - [ ] Zephyr's driver models and APIs used (devicetree, LED, input, display,
       net_mgmt) rather than direct register access; Kconfig options prefixed
       `METER_`

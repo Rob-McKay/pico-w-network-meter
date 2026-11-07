@@ -1,0 +1,10 @@
+# Copyright (c) 2026 Rob McKay
+# SPDX-License-Identifier: Apache-2.0
+#
+# clang-tidy for the tests: the repository's configuration (../.clang-tidy),
+# less readability-magic-numbers. A test's numbers are its inputs and the
+# results it expects, read best as they are; the meter's own code, which the
+# tests also compile, keeps the check.
+InheritParentConfig: true
+Checks: >
+  -readability-magic-numbers

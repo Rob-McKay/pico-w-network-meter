@@ -5,11 +5,13 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 
 #include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #include "chan_stats.h"
 
@@ -26,6 +28,16 @@
 #define MANTISSA_DIGITS    4U
 /* Steps of 1 dB in a decade (10 dB). */
 #define DB_PER_DECADE      10
+/* Powers are found by their decimal decade. */
+#define DECIMAL_BASE       10U
+/* 2.4 GHz channel centres: channel n at CHAN_BASE_MHZ + n * CHAN_SPACING_MHZ, except channel
+ * 14 (CHAN_LAST, Japan only), which is set apart at CHAN_14_MHZ.
+ */
+#define CHAN_BASE_MHZ      2407
+#define CHAN_SPACING_MHZ   5
+#define CHAN_14_MHZ        2484
+/* A hidden network's name: this, then its BSSID, "hidden 02:1f:3c:12:34:56". */
+#define HIDDEN_PREFIX      "hidden "
 /* Smallest buffer a name is shortened in the middle for: "ab..yz". */
 #define MIDDLE_CUT_MIN     7U
 /* Interference thresholds of chan_stats_level(), dBm. */
@@ -40,6 +52,19 @@ static const uint8_t channels_5g[CHAN_5G_COUNT] = {
 	36,  40,  44,  48,  52,  56,  60,  64,  100, 104, 108, 112, 116, 120,
 	124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165, 169, 173, 177,
 };
+
+/* The 80 MHz blocks, by their place in channels_5g[]: bits of chan_5g_blocks()'s mask. */
+enum block_5g {
+	BLOCK_36_48,
+	BLOCK_52_64,
+	BLOCK_100_112,
+	BLOCK_116_128,
+	BLOCK_132_144,
+	BLOCK_149_161,
+	BLOCK_165_177,
+	BLOCK_5G_COUNT,
+};
+BUILD_ASSERT(BLOCK_5G_COUNT == CHAN_5G_BLOCKS, "a name for every 80 MHz block");
 
 /* The DFS (radar detection) 5 GHz channels: 52-64 and 100-144. */
 #define DFS_LOW_FIRST  52
@@ -72,11 +97,12 @@ static uint64_t pow10_u64(unsigned int exp)
 	uint64_t v = 1;
 
 	for (unsigned int i = 0; i < exp; i++) {
-		v *= 10U;
+		v *= DECIMAL_BASE;
 	}
 
 	return v;
 }
+
 
 /**
  * @brief Centre frequency of a 2.4 GHz channel.
@@ -88,8 +114,9 @@ static uint64_t pow10_u64(unsigned int exp)
  */
 static int centre_mhz(int channel)
 {
-	return channel == 14 ? 2484 : 2407 + (5 * channel);
+	return channel == CHAN_LAST ? CHAN_14_MHZ : CHAN_BASE_MHZ + (CHAN_SPACING_MHZ * channel);
 }
+
 
 /**
  * @brief How much of a network's channel overlaps another channel.
@@ -110,6 +137,7 @@ static int overlap_mhz(int a, int b)
 
 	return df >= CHAN_WIDTH_MHZ ? 0 : CHAN_WIDTH_MHZ - df;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -132,6 +160,7 @@ uint64_t chan_dbm_to_power(int dbm)
 	return (scaled + (MANTISSA_ONE / 2U)) / MANTISSA_ONE;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -147,7 +176,7 @@ int chan_power_to_dbm(uint64_t power)
 
 	unsigned int decade = 0;
 
-	while (power / pow10_u64(decade) >= 10U) {
+	while (power / pow10_u64(decade) >= DECIMAL_BASE) {
 		decade++;
 	}
 
@@ -165,6 +194,7 @@ int chan_power_to_dbm(uint64_t power)
 	return POWER_FLOOR_DBM + (int)((decade * DB_PER_DECADE) + step);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -179,6 +209,7 @@ int chan_5g_index(uint8_t channel)
 	return -1;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -186,6 +217,7 @@ uint8_t chan_5g_channel(size_t index)
 {
 	return index < ARRAY_SIZE(channels_5g) ? channels_5g[index] : 0U;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -195,6 +227,7 @@ bool chan_5g_dfs(uint8_t channel)
 	return (channel >= DFS_LOW_FIRST && channel <= DFS_LOW_LAST) ||
 	       (channel >= DFS_HIGH_FIRST && channel <= DFS_HIGH_LAST);
 }
+
 
 /**
  * @brief Find the 80 MHz block a 5 GHz channel belongs to.
@@ -212,6 +245,7 @@ static int block_5g(uint8_t channel)
 	return i < 0 ? -1 : i / CHAN_5G_BLOCK_CHANNELS;
 }
 
+
 /**
  * @brief Give an 80 MHz block's first channel.
  *
@@ -224,6 +258,7 @@ static uint8_t block_first(int block)
 {
 	return channels_5g[(size_t)block * CHAN_5G_BLOCK_CHANNELS];
 }
+
 
 /**
  * @brief Tell whether an access point's channel is one of its band's.
@@ -246,6 +281,7 @@ static bool on_known_channel(const struct chan_ap *ap)
 	}
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -253,6 +289,7 @@ void chan_stats_reset(struct chan_stats *s)
 {
 	memset(s, 0, sizeof(*s));
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -283,6 +320,7 @@ int chan_stats_add(struct chan_stats *s, const struct chan_ap *ap)
 
 	return 0;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -329,6 +367,7 @@ void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan
 	out->others = (int16_t)chan_power_to_dbm(power - best_power);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -344,6 +383,7 @@ size_t chan_stats_band_count(const struct chan_stats *s, enum chan_band band)
 
 	return n;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -386,6 +426,7 @@ void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct c
 	out->others = (int16_t)chan_power_to_dbm(power - best_power);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -410,6 +451,7 @@ uint8_t chan_stats_recommend(const struct chan_stats *s)
 	return best.channel;
 }
 
+
 /**
  * @brief Count the 5 GHz networks in an 80 MHz block.
  *
@@ -431,6 +473,7 @@ static size_t block_networks(const struct chan_stats *s, int block)
 
 	return n;
 }
+
 
 /**
  * @brief Tell whether one 80 MHz block is a better choice than another.
@@ -465,6 +508,7 @@ static bool block_better(const struct chan_stats *s, int a, int b)
 	return !chan_5g_dfs(first_a) && chan_5g_dfs(first_b);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -487,22 +531,76 @@ uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks)
 	return best < 0 ? 0U : block_first(best);
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
 uint32_t chan_5g_blocks(bool with_132, bool with_upper)
 {
-	uint32_t blocks = BIT(0) | BIT(1) | BIT(2) | BIT(3);
+	uint32_t blocks =
+		BIT(BLOCK_36_48) | BIT(BLOCK_52_64) | BIT(BLOCK_100_112) | BIT(BLOCK_116_128);
 
 	if (with_132) {
-		blocks |= BIT(4);
+		blocks |= BIT(BLOCK_132_144);
 	}
 	if (with_upper) {
-		blocks |= BIT(5);
+		blocks |= BIT(BLOCK_149_161);
 	}
 
 	return blocks;
 }
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ *
+ * Read from the channel table, so it follows the channel numbering rather than repeating it.
+ */
+uint8_t chan_5g_block_last(uint8_t first)
+{
+	int i = chan_5g_index(first);
+
+	if (i < 0 || (i % CHAN_5G_BLOCK_CHANNELS) != 0) {
+		return 0;
+	}
+
+	return chan_5g_channel((size_t)i + CHAN_5G_BLOCK_CHANNELS - 1U);
+}
+
+
+/**
+ * @brief Insert an access point into a list kept strongest first, dropping
+ *        the weakest if the list is full.
+ *
+ * An insertion sort: a scan has at most CHAN_MAX_APS.
+ *
+ * @param[in,out] out The list, strongest first.
+ * @param n How many it holds.
+ * @param max How many it can hold.
+ * @param ap The access point.
+ * @return How many it holds now: @p n + 1, at most @p max.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+static size_t insert_by_rssi(const struct chan_ap **out, size_t n, size_t max,
+			     const struct chan_ap *ap)
+{
+	size_t pos = n;
+
+	while (pos > 0U && out[pos - 1U]->rssi < ap->rssi) {
+		pos--;
+	}
+	if (pos >= max) {
+		return n;
+	}
+	for (size_t j = (n < max ? n : max - 1U); j > pos; j--) {
+		out[j] = out[j - 1U];
+	}
+	out[pos] = ap;
+
+	return n < max ? n + 1U : n;
+}
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -515,32 +613,15 @@ size_t chan_stats_strongest(const struct chan_stats *s, enum chan_band band,
 {
 	size_t n = 0;
 
-	/* Insertion sort into out[]: a scan has at most CHAN_MAX_APS. */
 	for (size_t i = 0; i < s->ap_count; i++) {
-		const struct chan_ap *ap = &s->aps[i];
-
-		if (ap->band != (uint8_t)band) {
-			continue;
-		}
-		size_t pos = n;
-
-		while (pos > 0 && out[pos - 1]->rssi < ap->rssi) {
-			pos--;
-		}
-		if (pos >= max) {
-			continue;
-		}
-		for (size_t j = (n < max ? n : max - 1); j > pos; j--) {
-			out[j] = out[j - 1];
-		}
-		out[pos] = ap;
-		if (n < max) {
-			n++;
+		if (s->aps[i].band == (uint8_t)band) {
+			n = insert_by_rssi(out, n, max, &s->aps[i]);
 		}
 	}
 
 	return n;
 }
+
 
 /**
  * @brief Compare two access point records field by field.
@@ -559,6 +640,7 @@ static bool chan_ap_equal(const struct chan_ap *a, const struct chan_ap *b)
 	       a->channel == b->channel && a->band == b->band && a->rssi == b->rssi &&
 	       a->secured == b->secured && a->freshness == b->freshness;
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -579,6 +661,7 @@ bool chan_stats_equal(const struct chan_stats *a, const struct chan_stats *b)
 	return true;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -594,6 +677,7 @@ enum chan_level chan_stats_level(int interference)
 	return CHAN_LEVEL_CLEAR;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -607,6 +691,7 @@ const char *chan_level_name(enum chan_level level)
 
 	return (size_t)level < ARRAY_SIZE(names) ? names[level] : "?";
 }
+
 
 /*
  * Public interface: documented in chan_stats.h.
@@ -622,6 +707,7 @@ bool chan_is_standard(uint8_t channel)
 	return false;
 }
 
+
 /*
  * Public interface: documented in chan_stats.h.
  *
@@ -631,6 +717,7 @@ bool chan_ap_hidden(const struct chan_ap *ap)
 {
 	return ap->ssid[0] == '\0';
 }
+
 
 /**
  * @brief Copy a name, shortened in the middle if it is too long.
@@ -666,6 +753,29 @@ static void copy_middle_cut(const char *name, char *buf, size_t size)
 	buf[room] = '\0';
 }
 
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+void chan_bssid_text(const uint8_t *bssid, const char *prefix, char *buf, size_t size)
+{
+	int n = snprintf(buf, size, "%s", prefix);
+
+	for (size_t i = 0; i < CHAN_BSSID_LEN; i++) {
+		if (n < 0 || (size_t)n >= size) {
+			return;
+		}
+		int w = snprintf(&buf[n], size - (size_t)n, i == 0U ? "%02x" : ":%02x",
+				 (unsigned int)bssid[i]);
+
+		if (w < 0) {
+			return;
+		}
+		n += w;
+	}
+}
+
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -678,8 +788,23 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size)
 		copy_middle_cut(ap->ssid, buf, size);
 		return;
 	}
-	(void)snprintf(buf, size, "hidden %02x:%02x:%02x:%02x:%02x:%02x",
-		       (unsigned int)ap->bssid[0], (unsigned int)ap->bssid[1],
-		       (unsigned int)ap->bssid[2], (unsigned int)ap->bssid[3],
-		       (unsigned int)ap->bssid[4], (unsigned int)ap->bssid[5]);
+	chan_bssid_text(ap->bssid, HIDDEN_PREFIX, buf, size);
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+void chan_ssid_printable(const char *ssid, char *buf, size_t size)
+{
+	size_t n = 0;
+
+	if (size == 0U) {
+		return;
+	}
+	for (const unsigned char *p = (const unsigned char *)ssid; *p != '\0' && n + 1U < size;
+	     p++) {
+		buf[n++] = (*p >= (unsigned char)' ' && *p <= (unsigned char)'~') ? (char)*p : '?';
+	}
+	buf[n] = '\0';
 }

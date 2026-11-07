@@ -11,6 +11,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -59,6 +60,7 @@ static struct chan_ap make_ap(uint8_t id, uint8_t channel, int8_t rssi)
 	return ap;
 }
 
+
 /**
  * @brief Add an access point, failing the test if it is refused.
  *
@@ -77,6 +79,7 @@ static void add_ap(struct chan_stats *s, uint8_t id, uint8_t channel, int8_t rss
 	zassert_ok(chan_stats_add(s, &ap));
 }
 
+
 /**
  * @brief dBm to linear power and back gives the same whole dBm, -130 to 0.
  *
@@ -94,6 +97,7 @@ ZTEST(meter_chan, test_power_round_trip)
 	zassert_equal(chan_power_to_dbm(0), CHAN_RSSI_NONE);
 }
 
+
 /**
  * @brief Twice the power is 3 dB more; ten times is 10 dB.
  *
@@ -106,6 +110,7 @@ ZTEST(meter_chan, test_power_sums)
 	zassert_equal(chan_power_to_dbm(p * 2U), -57);
 	zassert_equal(chan_power_to_dbm(p * 10U), -50);
 }
+
 
 /**
  * @brief Every network at 0 dBm on one channel: a large sum still converts.
@@ -125,6 +130,7 @@ ZTEST(meter_chan, test_power_large)
 	chan_stats_channel(&s, 6, &info);
 	zassert_equal(info.interference, 18, "64 x 1 mW is 18 dBm");
 }
+
 
 /**
  * @brief A BSSID heard twice is kept once, at its stronger signal.
@@ -146,6 +152,7 @@ ZTEST(meter_chan, test_add_dedupes)
 	zassert_equal(s.aps[1].rssi, -75);
 }
 
+
 /**
  * @brief Results off the 2.4 GHz channels are counted, not kept.
  *
@@ -164,6 +171,7 @@ ZTEST(meter_chan, test_add_ignores_other_channels)
 	zassert_equal(s.ap_count, 0);
 	zassert_equal(s.ignored, 2);
 }
+
 
 /**
  * @brief Past CHAN_MAX_APS access points, the rest are counted as dropped.
@@ -186,6 +194,7 @@ ZTEST(meter_chan, test_add_full)
 	add_ap(&s, 0, 1, -40); /* a known BSSID still updates */
 	zassert_equal(s.aps[0].rssi, -40);
 }
+
 
 /**
  * @brief A network counts on its own channel and interferes, less and less,
@@ -218,6 +227,7 @@ ZTEST(meter_chan, test_channel_overlap)
 	zassert_equal(info.ap_count, 0, "neighbours don't count it");
 	zassert_equal(info.best_rssi, CHAN_RSSI_NONE);
 }
+
 
 /**
  * @brief The others figure counts every network but the channel's
@@ -256,6 +266,7 @@ ZTEST(meter_chan, test_channel_others)
 	zassert_equal(info.others, -51, "-60 on 6, and -50 spilling from 7 at 3/4");
 }
 
+
 /**
  * @brief Channel 14 sits 12 MHz above 13, not 5.
  *
@@ -277,6 +288,7 @@ ZTEST(meter_chan, test_channel_14)
 	zassert_equal(info.interference, CHAN_RSSI_NONE, "22 MHz apart");
 }
 
+
 /**
  * @brief Signals on one channel add up; the strongest is reported.
  *
@@ -297,6 +309,7 @@ ZTEST(meter_chan, test_channel_sum)
 	zassert_equal(info.best_rssi, -60);
 	zassert_equal(info.interference, -57);
 }
+
 
 /**
  * @brief The quietest of 1, 6 and 11 is recommended; ties go to fewer networks, then 1.
@@ -329,6 +342,7 @@ ZTEST(meter_chan, test_recommend)
 	zassert_equal(chan_stats_recommend(&s), 11);
 }
 
+
 /**
  * @brief Networks are listed strongest first, cut to the room given.
  *
@@ -358,6 +372,7 @@ ZTEST(meter_chan, test_strongest)
 	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_2G4, list, ARRAY_SIZE(list)), 0);
 }
 
+
 /* ---- 5 GHz ---------------------------------------------------------------- */
 
 /**
@@ -378,6 +393,7 @@ static void add_ap_5g(struct chan_stats *s, uint8_t id, uint8_t channel, int8_t 
 	ap.band = CHAN_BAND_5G;
 	zassert_ok(chan_stats_add(s, &ap));
 }
+
 
 /**
  * @brief The 5 GHz channel list: 36 to 177 in 80 MHz blocks, and which
@@ -413,6 +429,7 @@ ZTEST(meter_chan, test_5g_channels)
 	zassert_false(chan_5g_dfs(165));
 }
 
+
 /**
  * @brief 5 GHz results are kept on a 5 GHz channel and ignored off one; a
  *        2.4 GHz record can't carry a 5 GHz channel.
@@ -445,6 +462,7 @@ ZTEST(meter_chan, test_add_5g)
 	zassert_equal(chan_stats_band_count(&s, CHAN_BAND_2G4), 1);
 	zassert_equal(chan_stats_band_count(&s, CHAN_BAND_5G), 1);
 }
+
 
 /**
  * @brief A 5 GHz network counts in full on every channel of its 80 MHz
@@ -496,6 +514,7 @@ ZTEST(meter_chan, test_channel_5g_block)
 	zassert_equal(c.others, -50, "the other network on 40");
 }
 
+
 /**
  * @brief 2.4 GHz networks don't count on 5 GHz channels.
  *
@@ -515,6 +534,7 @@ ZTEST(meter_chan, test_channel_5g_ignores_2g4)
 		zassert_equal(c.ap_count, 0);
 	}
 }
+
 
 /**
  * @brief The quietest allowed 80 MHz block is recommended; ties go to
@@ -562,6 +582,7 @@ ZTEST(meter_chan, test_recommend_5g)
 	zassert_equal(chan_stats_recommend_5g(&s, BIT(5) | BIT(6)), 149);
 }
 
+
 /**
  * @brief The allowed blocks: always 36-48 to 116-128; 132-144 and 149-161
  *        when asked for; never 165-177.
@@ -575,6 +596,7 @@ ZTEST(meter_chan, test_5g_blocks)
 	zassert_equal(chan_5g_blocks(false, true), chan_5g_blocks(false, false) | BIT(5));
 	zassert_equal(chan_5g_blocks(true, true) & BIT(6), 0U, "165-177 never");
 }
+
 
 /**
  * @brief The strongest-first list keeps to the band asked for.
@@ -601,6 +623,73 @@ ZTEST(meter_chan, test_strongest_band)
 	zassert_equal(list[1]->channel, 149);
 }
 
+
+/**
+ * @brief Printable ASCII passes through; control characters, DEL and
+ *        bytes above 0x7f become '?'; the copy is cut to fit.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_ssid_printable)
+{
+	char buf[CHAN_SSID_MAX + 1];
+	char small[4];
+
+	chan_ssid_printable("Home Wi-Fi 5G", buf, sizeof(buf));
+	zassert_str_equal(buf, "Home Wi-Fi 5G");
+	chan_ssid_printable("a\x1b[2Jb\r\n\x7f\xc3\xa9", buf, sizeof(buf));
+	zassert_str_equal(buf, "a?[2Jb?????");
+	chan_ssid_printable("abcdef", small, sizeof(small));
+	zassert_str_equal(small, "abc");
+	chan_ssid_printable("", buf, sizeof(buf));
+	zassert_str_equal(buf, "");
+	small[0] = 'x';
+	chan_ssid_printable("abc", small, 0);
+	zassert_equal(small[0], 'x', "size 0 writes nothing");
+}
+
+
+/**
+ * @brief A BSSID is written as six colon-separated hex bytes after its
+ *        prefix, and cut to fit a small buffer.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_bssid_text)
+{
+	const uint8_t bssid[CHAN_BSSID_LEN] = {0x02, 0x1f, 0x3c, 0x12, 0x34, 0x56};
+	char buf[32];
+	char small[6];
+
+	chan_bssid_text(bssid, "", buf, sizeof(buf));
+	zassert_str_equal(buf, "02:1f:3c:12:34:56");
+	chan_bssid_text(bssid, "hidden ", buf, sizeof(buf));
+	zassert_str_equal(buf, "hidden 02:1f:3c:12:34:56");
+	chan_bssid_text(bssid, "", small, sizeof(small));
+	zassert_str_equal(small, "02:1f");
+	chan_bssid_text(bssid, "hidden ", small, sizeof(small));
+	zassert_str_equal(small, "hidde");
+}
+
+
+/**
+ * @brief A block's last channel comes from the channel table; a channel
+ *        that doesn't start a block has none.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_5g_block_last)
+{
+	zassert_equal(chan_5g_block_last(36), 48);
+	zassert_equal(chan_5g_block_last(52), 64);
+	zassert_equal(chan_5g_block_last(149), 161);
+	zassert_equal(chan_5g_block_last(165), 177);
+	zassert_equal(chan_5g_block_last(40), 0, "not a block's first channel");
+	zassert_equal(chan_5g_block_last(6), 0, "a 2.4 GHz channel");
+	zassert_equal(chan_5g_block_last(0), 0);
+}
+
+
 /**
  * @brief Each level has the name the screens and the console show.
  *
@@ -611,8 +700,9 @@ ZTEST(meter_chan, test_level_name)
 	zassert_str_equal(chan_level_name(CHAN_LEVEL_CLEAR), "clear");
 	zassert_str_equal(chan_level_name(CHAN_LEVEL_MODERATE), "moderate");
 	zassert_str_equal(chan_level_name(CHAN_LEVEL_BUSY), "busy");
-	zassert_str_equal(chan_level_name((enum chan_level)3), "?");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_COUNT), "?");
 }
+
 
 /**
  * @brief Interference levels split at -85 and -70 dBm.
@@ -628,6 +718,7 @@ ZTEST(meter_chan, test_level)
 	zassert_equal(chan_stats_level(-70), CHAN_LEVEL_BUSY);
 	zassert_equal(chan_stats_level(-20), CHAN_LEVEL_BUSY);
 }
+
 
 /**
  * @brief A channel is as fresh as the freshest network reaching it.
@@ -655,6 +746,7 @@ ZTEST(meter_chan, test_channel_freshness)
 	chan_stats_channel(&s, 13, &info);
 	zassert_equal(info.freshness, 0, "nothing reaches 13");
 }
+
 
 /**
  * @brief Equal statistics compare equal; any field that differs makes them unequal.
@@ -692,6 +784,7 @@ ZTEST(meter_chan, test_equal)
 	zassert_false(chan_stats_equal(&a, &b), "band");
 }
 
+
 /**
  * @brief Only 1, 6 and 11 are standard channels.
  *
@@ -704,6 +797,7 @@ ZTEST(meter_chan, test_standard_channels)
 			      (unsigned int)ch);
 	}
 }
+
 
 /**
  * @brief A network is named by its SSID; a hidden one by the end of its
@@ -748,6 +842,7 @@ ZTEST(meter_chan, test_ap_name)
 	zassert_equal(name[0], 'x', "size 0 writes nothing");
 }
 
+
 ZTEST_SUITE(meter_chan, NULL, NULL, NULL, NULL, NULL);
 
 /* ---- History of access points -------------------------------------------- */
@@ -771,6 +866,7 @@ static void one_scan(struct chan_stats *scan, uint8_t id, uint8_t channel, int8_
 	add_ap(scan, id, channel, rssi);
 }
 
+
 /**
  * @brief Full brightness until the fade starts, then a straight line to 0.
  *
@@ -786,6 +882,7 @@ ZTEST(meter_history, test_freshness_curve)
 	zassert_equal(ap_history_freshness(60000, &fade), 0);
 }
 
+
 /** @brief A fade that ends when it starts (or before) drops straight to 0, without dividing by 0.
  *
  * @sideeffects None; errno unchanged.
@@ -800,6 +897,7 @@ ZTEST(meter_history, test_freshness_no_fade)
 	zassert_equal(ap_history_freshness(4000, &backwards), CHAN_FRESH);
 	zassert_equal(ap_history_freshness(5001, &backwards), 0);
 }
+
 
 /**
  * @brief An empty scan leaves the networks heard before on show.
@@ -824,6 +922,7 @@ ZTEST(meter_history, test_empty_scan_keeps_data)
 	zassert_equal(snap.aps[0].channel, 11);
 	zassert_equal(snap.aps[0].freshness, CHAN_FRESH, "10 s old: not fading yet");
 }
+
 
 /**
  * @brief Networks fade from 15 s and are gone at 30 s (the test's own times); hearing one
@@ -862,6 +961,7 @@ ZTEST(meter_history, test_fade_and_expire)
 	zassert_equal(snap.aps[0].freshness, CHAN_FRESH);
 }
 
+
 /**
  * @brief When full, a new network replaces the one heard longest ago.
  *
@@ -885,6 +985,7 @@ ZTEST(meter_history, test_full_replaces_oldest)
 	zassert_equal(h.heard_ms[0], 5000);
 }
 
+
 /**
  * @brief The latest scan's ignored and dropped counts are reported.
  *
@@ -905,6 +1006,7 @@ ZTEST(meter_history, test_counts)
 	zassert_equal(snap.ignored, 3);
 	zassert_equal(snap.dropped, 1);
 }
+
 
 /**
  * @brief A network's band survives the history: merged, then snapshot.
@@ -928,6 +1030,7 @@ ZTEST(meter_history, test_band_kept)
 	zassert_equal(chan_stats_band_count(&snap, CHAN_BAND_5G), 1);
 }
 
+
 /**
  * @brief With a minimum, a network fades only to it, stays visible until the
  *        end of the fade, then goes.
@@ -948,6 +1051,7 @@ ZTEST(meter_history, test_freshness_floor)
 	zassert_equal(ap_history_freshness(5, &too_high), CHAN_FRESH, "never above CHAN_FRESH");
 }
 
+
 ZTEST_SUITE(meter_history, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -964,6 +1068,7 @@ ZTEST(meter_raster, test_fade)
 	/* Half of 31 and 63, rounded down: 15 and 31, which 120 and 124 give */
 	zassert_equal(rgb565x_fade(rgb565x(255, 255, 255), 128), rgb565x(120, 124, 120));
 }
+
 
 /* ---- Text on a colour display -------------------------------------------- */
 
@@ -1009,6 +1114,7 @@ static uint16_t px(const uint16_t *band, size_t width, size_t x, size_t y)
 	return band[(y * width) + x];
 }
 
+
 /**
  * @brief RGB565, stored big-endian as the panel takes it.
  *
@@ -1028,6 +1134,7 @@ ZTEST(meter_raster, test_rgb)
 	zassert_true(b[0] == 0x00 && b[1] == 0x1f);
 	zassert_equal(raster_rgb(255, 255, 255), 0xffff);
 }
+
 
 /**
  * @brief Glyphs land where the font says, column after column.
@@ -1051,6 +1158,7 @@ ZTEST(meter_raster, test_glyphs)
 	}
 }
 
+
 /**
  * @brief Characters the font lacks show as '?'; a UTF-8 character takes
  *        one place; text is cut at the band's edge.
@@ -1070,6 +1178,7 @@ ZTEST(meter_raster, test_fallbacks)
 	zassert_equal(px(band, 5, 2, 0), FG, "the UTF-8 'e acute' as one '?'");
 	zassert_equal(px(band, 5, 4, 1), FG, "'A' cut to its first column");
 }
+
 
 /**
  * @brief An MSB-first font reads bit 7 as the top pixel.
@@ -1098,6 +1207,7 @@ ZTEST(meter_raster, test_msb_first)
 	zassert_equal(px(band, 1, 0, 7), BG);
 }
 
+
 /**
  * @brief Bold text inks every pixel of the plain text and the one to its
  *        right, but never across into the next character's cell.
@@ -1124,6 +1234,7 @@ ZTEST(meter_raster, test_bold)
 	zassert_true(extra > 0U, "bold differs from plain");
 }
 
+
 ZTEST_SUITE(meter_raster, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -1147,6 +1258,7 @@ ZTEST(meter_health, test_failures_in_a_row)
 	zassert_true(scan_health_record(&h, -EIO, 3), "and every one after it");
 }
 
+
 /**
  * @brief A limit of 0 never asks for a restart, and the count doesn't wrap
  *        round to zero.
@@ -1162,6 +1274,7 @@ ZTEST(meter_health, test_no_limit)
 	zassert_equal(h.failures, UINT_MAX, "stops at UINT_MAX");
 	zassert_true(scan_health_record(&h, -EAGAIN, 5), "still over a limit");
 }
+
 
 ZTEST_SUITE(meter_health, NULL, NULL, NULL, NULL, NULL);
 
@@ -1183,6 +1296,7 @@ ZTEST(meter_paging, test_move)
 	zassert_equal(paging_move(7, true, 25, 0), 7, "no rows: unchanged");
 }
 
+
 /**
  * @brief A page stays within a list that shrinks, and on a page boundary.
  *
@@ -1199,6 +1313,7 @@ ZTEST(meter_paging, test_clamp)
 	zassert_equal(paging_move(SIZE_MAX, true, 25, 10), 20, "no overflow moving either");
 	zassert_equal(paging_clamp(5, 25, 0), 0, "no rows");
 }
+
 
 ZTEST_SUITE(meter_paging, NULL, NULL, NULL, NULL, NULL);
 
@@ -1234,6 +1349,7 @@ ZTEST(meter_boot, test_record_round_trip)
 	zassert_equal(bytes[4], 0x98, "little-endian");
 }
 
+
 /**
  * @brief Anything that isn't a record is refused: wrong size, version or
  *        cause.
@@ -1258,6 +1374,7 @@ ZTEST(meter_boot, test_record_refused)
 	(void)memset(bytes, 0xff, sizeof(bytes));
 	zassert_equal(boot_record_decode(bytes, sizeof(bytes), &out), -EINVAL, "erased flash");
 }
+
 
 /**
  * @brief Each kind of start is described in a line, with how long the run
@@ -1302,6 +1419,7 @@ ZTEST(meter_boot, test_describe)
 	zassert_equal(text[0], 'x', "size 0 writes nothing");
 }
 
+
 /**
  * @brief A sealed note is valid; any change to it, or RAM's contents after
  *        a power cut, isn't.
@@ -1330,6 +1448,7 @@ ZTEST(meter_boot, test_note_valid)
 	(void)memset(&garbage, 0xa5, sizeof(garbage));
 	zassert_false(boot_note_valid(&garbage), "RAM after power-on");
 }
+
 
 /**
  * @brief A start is worked out from the note: none means power-on, one
@@ -1368,6 +1487,7 @@ ZTEST(meter_boot, test_from_note)
 	zassert_equal(r.uptime_s, 600);
 }
 
+
 /**
  * @brief The hardware's reset cause survives the flash format in the byte
  *        that used to be zero; records from before it, and causes this
@@ -1399,6 +1519,7 @@ ZTEST(meter_boot, test_hw_reset_round_trip)
 	boot_record_encode(&in, bytes);
 	zassert_equal(bytes[2], 0, "unknown writes the old zero byte");
 }
+
 
 /**
  * @brief A start the note can't explain is named by the hardware's reset
@@ -1448,6 +1569,7 @@ ZTEST(meter_boot, test_describe_hw_reset)
 	zassert_true(strlen(text) <= 32U, "fits the events screen: \"%s\"", text);
 }
 
+
 ZTEST_SUITE(meter_boot, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -1469,6 +1591,7 @@ ZTEST(meter_country, test_country_codes)
 	}
 	zassert_false(country_code_valid(NULL));
 }
+
 
 ZTEST_SUITE(meter_country, NULL, NULL, NULL, NULL, NULL);
 
@@ -1496,6 +1619,7 @@ ZTEST(meter_reset_cause, test_from_flags)
 	zassert_equal(reset_cause_from_flags(RESET_POR | RESET_PIN), BOOT_HW_PIN);
 }
 
+
 ZTEST_SUITE(meter_reset_cause, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -1513,6 +1637,7 @@ ZTEST(meter_keys, test_single)
 	zassert_equal(keys_event(&s, INPUT_KEY_X, false), -1);
 	zassert_equal(keys_event(&s, INPUT_KEY_Y, true), INPUT_KEY_Y, "X was released first");
 }
+
 
 /**
  * @brief X and Y together give KEYS_X_AND_Y, in either order; other keys
@@ -1536,5 +1661,6 @@ ZTEST(meter_keys, test_x_and_y)
 	zassert_equal(keys_event(&s, INPUT_KEY_A, true), INPUT_KEY_A);
 	zassert_equal(keys_event(&s, INPUT_KEY_X, true), INPUT_KEY_X, "A held isn't Y");
 }
+
 
 ZTEST_SUITE(meter_keys, NULL, NULL, NULL, NULL, NULL);

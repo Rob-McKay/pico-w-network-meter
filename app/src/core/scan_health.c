@@ -5,6 +5,7 @@
  */
 
 #include <limits.h>
+#include <stdbool.h>
 
 #include "scan_health.h"
 
@@ -15,6 +16,7 @@ void scan_health_reset(struct scan_health *h)
 {
 	h->failures = 0;
 }
+
 
 /*
  * Public interface: documented in scan_health.h.
