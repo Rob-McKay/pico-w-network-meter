@@ -267,6 +267,12 @@ hidden network's channel, signal and BSSID, not just a named network's.
 hidden networks and passes the scan's dwell times and bands on to
 Espressif's library, which it otherwise ignores.
 
+`wifi-scan-result-width.patch` (XIAO ESP32-C5): Zephyr's scan result gains
+each network's channel width and centre channel, which the ESP32 driver
+fills in from Espressif's scan record. So far the meter only logs them
+(with `CONFIG_METER_LOG_LEVEL_DBG`); it still takes every 5 GHz network
+to be 80 MHz wide.
+
 ## Status
 
 The firmware for both targets and the tests build and pass in the Docker

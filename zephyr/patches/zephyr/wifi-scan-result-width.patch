@@ -1,0 +1,82 @@
+diff --git a/drivers/wifi/esp32/src/esp_wifi_drv.c b/drivers/wifi/esp32/src/esp_wifi_drv.c
+index 708816506..fd43ba446 100644
+--- a/drivers/wifi/esp32/src/esp_wifi_drv.c
++++ b/drivers/wifi/esp32/src/esp_wifi_drv.c
+@@ -507,6 +507,34 @@ static void scan_done_handler(const wifi_event_sta_scan_done_t *evt)
+ 		res.channel = ap_record.primary;
+ 		res.band = wifi_utils_chan_to_band(res.channel);
+ 
++		switch (ap_record.bandwidth) {
++		case WIFI_BW20:
++			res.bandwidth = WIFI_FREQ_BANDWIDTH_20MHZ;
++			res.center_channel = ap_record.primary;
++			break;
++		case WIFI_BW40:
++			/* The secondary 20 MHz channel is 4 channel numbers above or below */
++			res.bandwidth = WIFI_FREQ_BANDWIDTH_40MHZ;
++			if (ap_record.second == WIFI_SECOND_CHAN_ABOVE) {
++				res.center_channel = ap_record.primary + 2;
++			} else if (ap_record.second == WIFI_SECOND_CHAN_BELOW) {
++				res.center_channel = ap_record.primary - 2;
++			}
++			break;
++		case WIFI_BW80:
++		case WIFI_BW80_BW80:
++			/* For 80+80 MHz, the lower 80 MHz segment */
++			res.bandwidth = WIFI_FREQ_BANDWIDTH_80MHZ;
++			res.center_channel = ap_record.vht_ch_freq1;
++			break;
++		case WIFI_BW160:
++			res.bandwidth = WIFI_FREQ_BANDWIDTH_160MHZ;
++			res.center_channel = ap_record.vht_ch_freq1;
++			break;
++		default:
++			break;
++		}
++
+ 		memcpy(res.mac, ap_record.bssid, WIFI_MAC_ADDR_LEN);
+ 		res.mac_length = WIFI_MAC_ADDR_LEN;
+ 
+diff --git a/include/zephyr/net/wifi.h b/include/zephyr/net/wifi.h
+index 01bf3812c..2594f820f 100644
+--- a/include/zephyr/net/wifi.h
++++ b/include/zephyr/net/wifi.h
+@@ -336,6 +336,8 @@ enum wifi_frequency_bandwidths {
+ 	WIFI_FREQ_BANDWIDTH_4MHZ,
+ 	/** 8 MHz. (Sub-1GHz channels only) */
+ 	WIFI_FREQ_BANDWIDTH_8MHZ,
++	/** 160 MHz. */
++	WIFI_FREQ_BANDWIDTH_160MHZ,
+ 
+ 	/** Number of frequency bandwidths available. */
+ 	__WIFI_FREQ_BANDWIDTH_AFTER_LAST,
+diff --git a/include/zephyr/net/wifi_mgmt.h b/include/zephyr/net/wifi_mgmt.h
+index d038cf938..57cb88fc6 100644
+--- a/include/zephyr/net/wifi_mgmt.h
++++ b/include/zephyr/net/wifi_mgmt.h
+@@ -685,6 +685,12 @@ struct wifi_scan_result {
+ 	uint8_t mac[WIFI_MAC_ADDR_LEN];
+ 	/** BSSID length */
+ 	uint8_t mac_length;
++	/** Channel width, enum wifi_frequency_bandwidths; 0 if the driver doesn't say */
++	uint8_t bandwidth;
++	/** Centre channel of the whole width (the primary channel for 20 MHz); 0 if the
++	 *  driver doesn't say
++	 */
++	uint8_t center_channel;
+ };
+ 
+ /** @brief Wi-Fi connect request parameters */
+diff --git a/subsys/net/l2/wifi/wifi_mgmt.c b/subsys/net/l2/wifi/wifi_mgmt.c
+index 4ec5979f8..f45b77d2d 100644
+--- a/subsys/net/l2/wifi/wifi_mgmt.c
++++ b/subsys/net/l2/wifi/wifi_mgmt.c
+@@ -184,6 +184,8 @@ const char *wifi_bandwidth_txt(enum wifi_frequency_bandwidths bandwidth)
+ 		return "4 MHz";
+ 	case WIFI_FREQ_BANDWIDTH_8MHZ:
+ 		return "8 MHz";
++	case WIFI_FREQ_BANDWIDTH_160MHZ:
++		return "160 MHz";
+ 	case WIFI_FREQ_BANDWIDTH_UNKNOWN:
+ 	default:
+ 		return "UNKNOWN";
