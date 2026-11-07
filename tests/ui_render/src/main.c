@@ -67,6 +67,7 @@ static void add(uint8_t id, const char *ssid, uint8_t channel, int8_t rssi, bool
 	zassert_ok(chan_stats_add(&stats, &ap));
 }
 
+
 /**
  * @brief Start the display and fill in a scan: busy on 1, a little on 4-6,
  *        a weak hidden network on 9, little near 11 (so 11 is recommended).
@@ -91,6 +92,7 @@ static void *setup(void)
 	return NULL;
 }
 
+
 /**
  * @brief Left edge of a channel's column on the chart.
  *
@@ -103,6 +105,7 @@ static int column_x(int ch)
 {
 	return AXIS_W + ((ch - 1) * COL_W);
 }
+
 
 /**
  * @brief Tell whether part of a line of text on the fake panel has any
@@ -128,6 +131,7 @@ static bool row_has_colour(int y, int x0, int x1, uint16_t colour)
 
 	return false;
 }
+
 
 /**
  * @brief Bars are coloured by how busy the channel is; empty ones aren't drawn.
@@ -159,6 +163,7 @@ ZTEST(meter_ui, test_channel_bars)
 	(void)fake_display_save_ppm("out/screens/channels.ppm");
 }
 
+
 /**
  * @brief The recommended channel's number is highlighted, the others aren't.
  *
@@ -173,6 +178,7 @@ ZTEST(meter_ui, test_recommended_highlight)
 	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255));
 	zassert_equal(fake_display_pixel(column_x(6), CHART_BOTTOM + 4), gfx_rgb(0, 0, 0));
 }
+
 
 /**
  * @brief Grid lines cross the empty columns and the gaps beside bars, the
@@ -208,6 +214,7 @@ ZTEST(meter_ui, test_grid_and_axis)
 		      "and stops there");
 }
 
+
 /**
  * @brief The list shows the strongest network first, its signal strength
  *        in green; a weak one's in red; a hidden network's name in grey.
@@ -233,6 +240,7 @@ ZTEST(meter_ui, test_network_list)
 	(void)fake_display_save_ppm("out/screens/networks.ppm");
 }
 
+
 /**
  * @brief Header and footer bars are drawn edge to edge.
  *
@@ -249,6 +257,7 @@ ZTEST(meter_ui, test_bars)
 	zassert_equal(fake_display_pixel(0, 240 - BAR_H), bar);
 	zassert_equal(fake_display_pixel(319, 239), bar);
 }
+
 
 /**
  * @brief Ageing networks are drawn darker; the static labels are not.
@@ -272,6 +281,7 @@ ZTEST(meter_ui, test_faded)
 		      "the recommended channel's highlight does not fade");
 	(void)fake_display_save_ppm("out/screens/faded.ppm");
 }
+
 
 /**
  * @brief A name long enough to be shortened fills its column, and still
@@ -307,6 +317,7 @@ ZTEST(meter_ui, test_name_gap)
 	}
 	zassert_true(digits, "the channel's \"11\" starts after the gap");
 }
+
 
 /**
  * @brief More networks than fit a page: the second page starts with the
@@ -355,6 +366,7 @@ ZTEST(meter_ui, test_network_pages)
 	zassert_false(row_has_colour(LIST_TOP + (4 * 20) + 2, 0, 320, gfx_rgb(255, 255, 255)));
 }
 
+
 /**
  * @brief Left edge of a 5 GHz channel's column on the chart.
  *
@@ -367,6 +379,7 @@ static int column_x_5g(int i)
 {
 	return X0_5G + (i * 10) + ((i / 4) * 6);
 }
+
 
 /**
  * @brief Fill in a dual-band scan like a real one: a strong network on 40
@@ -413,6 +426,7 @@ static void fill_dual_band(struct chan_stats *s)
 	}
 }
 
+
 /**
  * @brief The 5 GHz chart: a network fills its whole 80 MHz block, coloured
  *        by how busy it is; empty blocks have no bars; the quietest allowed
@@ -451,6 +465,7 @@ ZTEST(meter_ui, test_channels_5g)
 	zassert_equal(chan_stats_recommend_5g(&s, chan_5g_blocks(false, false)), 52);
 	(void)fake_display_save_ppm("out/screens/channels-5g.ppm");
 }
+
 
 /**
  * @brief The 5 GHz network list: only 5 GHz networks, strongest first,
@@ -505,6 +520,7 @@ ZTEST(meter_ui, test_networks_5g)
 	zassert_false(row_has_colour(LIST_TOP + 20 + 2, 0, 320, white), "and no 5 GHz ones");
 }
 
+
 /* Starts for the events screen, newest first. */
 static const struct boot_record test_events[] = {
 	{.boot = 14, .cause = BOOT_POWER_ON},
@@ -528,6 +544,7 @@ static const struct boot_record *test_event(size_t i)
 {
 	return i < ARRAY_SIZE(test_events) ? &test_events[i] : NULL;
 }
+
 
 /**
  * @brief The events screen lists starts newest first, coloured by how much
@@ -555,5 +572,6 @@ ZTEST(meter_ui, test_events_screen)
 	zassert_true(row_has_colour(LIST_TOP + 2, 0, 320, gfx_rgb(150, 150, 150)),
 		     "\"No events logged\", in grey");
 }
+
 
 ZTEST_SUITE(meter_ui, NULL, setup, NULL, NULL, NULL);

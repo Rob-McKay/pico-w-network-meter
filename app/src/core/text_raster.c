@@ -22,6 +22,7 @@ uint16_t raster_rgb(uint8_t r, uint8_t g, uint8_t b)
 	return rgb565x(r, g, b);
 }
 
+
 /**
  * @brief Tell whether a glyph pixel is set.
  *
@@ -45,6 +46,7 @@ static bool glyph_pixel(const struct cfb_font *font, const uint8_t *glyph, unsig
 	return (((unsigned int)byte >> bit) & 1U) != 0;
 }
 
+
 /**
  * @brief Find a character's glyph.
  *
@@ -65,6 +67,7 @@ static const uint8_t *glyph_of(const struct cfb_font *font, unsigned char c)
 
 	return (const uint8_t *)font->data + ((size_t)(c - font->first_char) * glyph_size);
 }
+
 
 /**
  * @brief Draw one glyph into the band, clipped to its width.
@@ -93,6 +96,7 @@ static void draw_glyph(const struct cfb_font *font, unsigned char c, uint16_t *b
 		}
 	}
 }
+
 
 /**
  * @brief Draw a line of text across a band of pixels, plain or bold.
@@ -124,6 +128,7 @@ static void draw_line(const struct cfb_font *font, const char *text, uint16_t *b
 	}
 }
 
+
 /*
  * Public interface: documented in text_raster.h.
  */
@@ -132,6 +137,7 @@ void raster_text(const struct cfb_font *font, const char *text, uint16_t *band, 
 {
 	draw_line(font, text, band, width, fg, bg, false);
 }
+
 
 /*
  * Public interface: documented in text_raster.h.

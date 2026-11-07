@@ -45,6 +45,7 @@ static int32_t from_twos_complement(uint32_t v)
 	return -(int32_t)(~v) - 1;
 }
 
+
 /*
  * Public interface: documented in boot_record.h.
  *
@@ -64,6 +65,7 @@ void boot_record_encode(const struct boot_record *r, uint8_t *out)
 	sys_put_le32(r->arg, &out[16]);
 }
 
+
 /*
  * Public interface: documented in boot_record.h.
  */
@@ -82,6 +84,7 @@ int boot_record_decode(const uint8_t *in, size_t len, struct boot_record *r)
 
 	return 0;
 }
+
 
 /**
  * @brief Write a length of time briefly: "3d04h", "2h31m" or "5m07s".
@@ -109,6 +112,7 @@ static void duration(uint32_t s, char *buf, size_t size)
 	}
 }
 
+
 /**
  * @brief Name a hardware reset cause that explains a restart the note can't.
  *
@@ -135,6 +139,7 @@ static const char *hw_reset_name(uint8_t hw_reset)
 		return NULL;
 	}
 }
+
 
 /*
  * Public interface: documented in boot_record.h.
@@ -174,6 +179,7 @@ void boot_record_describe(const struct boot_record *r, char *buf, size_t size)
 	}
 }
 
+
 /**
  * @brief Work out a note's checksum.
  *
@@ -198,6 +204,7 @@ static uint32_t note_check(const struct boot_note *n)
 	return crc32_ieee(bytes, sizeof(bytes));
 }
 
+
 /*
  * Public interface: documented in boot_record.h.
  */
@@ -207,6 +214,7 @@ void boot_note_seal(struct boot_note *n)
 	n->check = note_check(n);
 }
 
+
 /*
  * Public interface: documented in boot_record.h.
  */
@@ -214,6 +222,7 @@ bool boot_note_valid(const struct boot_note *n)
 {
 	return n->magic == NOTE_MAGIC && n->cause < BOOT_CAUSE_COUNT && n->check == note_check(n);
 }
+
 
 /*
  * Public interface: documented in boot_record.h.

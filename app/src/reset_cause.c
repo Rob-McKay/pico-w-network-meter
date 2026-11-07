@@ -40,6 +40,7 @@ uint8_t reset_cause_from_flags(uint32_t flags)
 	return flags != 0U ? (uint8_t)BOOT_HW_OTHER : (uint8_t)BOOT_HW_UNKNOWN;
 }
 
+
 /*
  * Public interface: documented in reset_cause.h.
  *
