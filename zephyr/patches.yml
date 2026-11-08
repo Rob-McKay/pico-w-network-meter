@@ -64,3 +64,20 @@ patches:
     date: 2026-11-06
     upstreamable: true
     merge-status: false
+  # XIAO ESP32-C5 (both targets build it). Zephyr's scan result carries
+  # only a network's primary channel, so the meter can't tell how wide a
+  # 5 GHz network is and assumes 80 MHz. struct wifi_scan_result gains
+  # the channel width and its centre channel (0 where a driver doesn't
+  # say), enum wifi_frequency_bandwidths gains 160 MHz, and the ESP32
+  # driver fills them in from Espressif's scan record (bandwidth, second,
+  # vht_ch_freq1 and, for 160 MHz under the current VHT signalling, where
+  # freq1 is only the primary 80 MHz's centre, vht_ch_freq2). Applies
+  # after esp32-wifi-scan-params.patch. Not yet sent upstream.
+  - path: zephyr/wifi-scan-result-width.patch
+    sha256sum: 6e19981170e30ada6b0ac29dfeaeec7a9d39636d2ce9d19f1ccea0d2ee26e2eb
+    module: zephyr
+    author: Claude
+    email: noreply@anthropic.com
+    date: 2026-11-06
+    upstreamable: true
+    merge-status: false

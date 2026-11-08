@@ -111,21 +111,25 @@ static bool is_empty_record(const struct chan_ap *ap)
  * @brief Log a scan result, at debug level.
  *
  * The SSID is printed through chan_ssid_printable(): it is whatever a nearby access point
- * sends, and control characters in it could rewrite the terminal.
+ * sends, and control characters in it could rewrite the terminal. The width and centre
+ * channel come from a carried Zephyr patch (wifi-scan-result-width.patch); drivers that
+ * don't fill them give "UNKNOWN" and 0.
  *
  * @param ap The access point.
+ * @param r Zephyr's scan result it came from, for the channel width.
  *
  * @sideeffects Writes a debug log message. errno unchanged.
  */
-static void log_result(const struct chan_ap *ap)
+static void log_result(const struct chan_ap *ap, const struct wifi_scan_result *r)
 {
 	char ssid[CHAN_SSID_MAX + 1];
 	char bssid[BSSID_TEXT_MAX];
 
 	chan_ssid_printable(ap->ssid, ssid, sizeof(ssid));
 	chan_bssid_text(ap->bssid, "", bssid, sizeof(bssid));
-	LOG_DBG("Result: %s ch %u %d dBm \"%s\"", bssid, (unsigned int)ap->channel, (int)ap->rssi,
-		ssid);
+	LOG_DBG("Result: %s ch %u, %s centre %u, %d dBm \"%s\"", bssid, (unsigned int)ap->channel,
+		wifi_bandwidth_txt((enum wifi_frequency_bandwidths)r->bandwidth),
+		(unsigned int)r->center_channel, (int)ap->rssi, ssid);
 }
 
 
@@ -149,7 +153,7 @@ static void on_result(const struct wifi_scan_result *r)
 		return;
 	}
 	if (IS_ENABLED(CONFIG_METER_LOG_LEVEL_DBG)) {
-		log_result(&ap);
+		log_result(&ap, r);
 	}
 
 	k_mutex_lock(&scan_lock, K_FOREVER);
