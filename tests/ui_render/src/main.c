@@ -383,9 +383,10 @@ static int column_x_5g(int i)
 
 
 /**
- * @brief Fill in a dual-band scan like a real one: a strong network on 40
- *        (36-48 busy), three on 100 and 104 (100-112 moderate), a weak one
- *        on 149, nothing on 52-64 or 116-128, and one 2.4 GHz network.
+ * @brief Fill in a dual-band scan like a real one: a strong 80 MHz network
+ *        on 40 (36-48 busy) and one of unknown width, two 80 MHz ones on 100
+ *        and a 20 MHz one on 104 (100-112 moderate), a weak 40 MHz one on
+ *        149, nothing on 52-64 or 116-128, and one 2.4 GHz network.
  *
  * @param[out] s The scan.
  *
@@ -396,15 +397,17 @@ static void fill_dual_band(struct chan_stats *s)
 {
 	static const struct {
 		uint8_t channel;
+		uint8_t width;
+		uint8_t centre;
 		int8_t rssi;
 		const char *ssid;
 	} aps[] = {
-		{40, -44, "HomeNetwork-5G"},
-		{40, -82, "Neighbour-5G"},
-		{100, -76, "Office"},
-		{100, -78, "Office-Guest"},
-		{104, -92, ""},
-		{149, -88, "Shed"},
+		{40, CHAN_WIDTH_80, 42, -44, "HomeNetwork-5G"},
+		{40, CHAN_WIDTH_UNKNOWN, 0, -82, "Neighbour-5G"},
+		{100, CHAN_WIDTH_80, 106, -76, "Office"},
+		{100, CHAN_WIDTH_80, 106, -78, "Office-Guest"},
+		{104, CHAN_WIDTH_20, 104, -92, ""},
+		{149, CHAN_WIDTH_40, 151, -88, "Shed"},
 	};
 	struct chan_ap ap = {
 		.bssid = {0x02, 0x1f, 0x3c, 0xa2, 0x50, 0},
@@ -421,6 +424,8 @@ static void fill_dual_band(struct chan_stats *s)
 	for (size_t i = 0; i < ARRAY_SIZE(aps); i++) {
 		ap.bssid[5] = (uint8_t)(i + 1U);
 		ap.channel = aps[i].channel;
+		ap.width = aps[i].width;
+		ap.centre = aps[i].centre;
 		ap.rssi = aps[i].rssi;
 		(void)snprintf(ap.ssid, sizeof(ap.ssid), "%s", aps[i].ssid);
 		zassert_ok(chan_stats_add(s, &ap));
@@ -429,9 +434,10 @@ static void fill_dual_band(struct chan_stats *s)
 
 
 /**
- * @brief The 5 GHz chart: a network fills its whole 80 MHz block, coloured
- *        by how busy it is; empty blocks have no bars; the quietest allowed
- *        block's label is highlighted; 2.4 GHz networks don't appear.
+ * @brief The 5 GHz chart: an 80 MHz network fills its whole block and a
+ *        40 MHz one two columns, coloured by how busy they are; empty blocks
+ *        have no bars; the quietest allowed block's label is highlighted;
+ *        2.4 GHz networks don't appear.
  *
  * @sideeffects Overwrites its own static scan; draws on the fake panel and saves it to
  *              out/screens/channels-5g.ppm. errno may be set by snprintf() (only on an output
@@ -457,6 +463,10 @@ ZTEST(meter_ui, test_channels_5g)
 		      "100: -76 and -78 make -74 dBm, moderate");
 	zassert_equal(fake_display_pixel(column_x_5g(4) + 5, CHART_BOTTOM - 1), black,
 		      "52-64: nothing heard");
+	zassert_not_equal(fake_display_pixel(column_x_5g(21) + 5, CHART_BOTTOM - 1), black,
+			  "153: the 40 MHz network on 149's secondary");
+	zassert_equal(fake_display_pixel(column_x_5g(22) + 5, CHART_BOTTOM - 1), black,
+		      "157: beyond the 40 MHz network");
 	zassert_equal(fake_display_pixel(column_x_5g(4) - 3, CHART_BOTTOM - 1), black,
 		      "the gap between blocks");
 	zassert_equal(fake_display_pixel(column_x_5g(4), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255),

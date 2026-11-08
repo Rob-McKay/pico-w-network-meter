@@ -92,13 +92,17 @@ There's no case for it yet.
   console lists each 5 GHz channel a network reaches and the quietest
   80 MHz block ("5 GHz: use 52-64 (80 MHz): clear, nothing heard").
   Channels 165-177 aren't charted, though their networks are listed.
-- **5 GHz widths are assumed.** Zephyr's scan results don't give a
-  network's channel width, so every 5 GHz network is taken to use its
-  whole 80 MHz block, as nearly every home router does. A 20 or 40 MHz
-  network is counted on channels it doesn't use. The recommendation
-  considers 36-48, 52-64, 100-112 and 116-128; 132-144 and 149-161 only
-  with `CONFIG_METER_RECOMMEND_5G_132` and `_UPPER` (allowed in the US,
-  not at 80 MHz or full power in the UK).
+- **Channel widths.** Zephyr's scan results don't give a network's
+  channel width, so a carried patch (`wifi-scan-result-width.patch`) adds
+  it, with the centre channel, and the ESP32 driver fills them in. Each
+  network counts on the channels of its own width: on 5 GHz 20, 40, 80 or
+  160 MHz, and 40 MHz networks on 2.4 GHz across both their channels. In
+  a 19-hour run every network had a width (checked on hardware). Without
+  one, a 5 GHz network would be taken to use its whole 80 MHz block.
+- **The 5 GHz recommendation** considers 36-48, 52-64, 100-112 and
+  116-128, each judged by every network using any of its channels;
+  132-144 and 149-161 only with `CONFIG_METER_RECOMMEND_5G_132` and
+  `_UPPER` (allowed in the US, not at 80 MHz or full power in the UK).
 - **Driver patch.** The ESP32 Wi-Fi driver needs a carried Zephyr patch
   (`esp32-wifi-scan-params.patch`) to report hidden networks and to honour
   the scan's 130 ms dwell time per channel; without it a sweep of both
@@ -137,6 +141,7 @@ with esptool 4 on macOS:
 | Channels 5 GHz screen | Shown (A). The six blocks are labelled 36, 52, 100, 116, 132, 149, by their first channel, and the network count sits over the column of its channel ("2" over 40, the block's second column). 36-48 is red (a -44 dBm network), the recommended block's "52" is highlighted, and the footer reads "Use 52-64: clear" |
 | Networks 5 GHz | Lists the 5 GHz networks, the channel numbers right-aligned ("40" under the end of "100") |
 | Screen order | A steps Channels, Networks (the 2.4 GHz list, channels 1-13), Channels 5 GHz, Networks 5 GHz, Events, and back to Channels |
+| Channel widths (debug log, 19 h, one boot, 4,301 scans, all succeeded) | Every result has a width and centre channel: 20, 40, 80 and 160 MHz, centres right (40 MHz on 149: 151; 80 MHz on 100: 106; 160 MHz on 100: 114, on 44: 50) |
 | Event log | Works: the first start shows as "#1 power on", so the log in flash (`storage_partition`, 64 KB) opens and records |
 | Power cut, reset button | Both show as "power on". The reset button resets the whole chip through its enable pin: the chip reports a power-on, and the restart note in RAM doesn't survive it, so the meter can't tell it from a power cut |
 
@@ -152,3 +157,5 @@ Not checked yet:
 4. Running for hours: no watchdog restarts or driver failures.
 5. A faster SPI clock (20 MHz with short wires).
 6. Current draw and battery life.
+7. The figures counted by width: the Channels screens and console with
+   20, 40 and 160 MHz networks about.

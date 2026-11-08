@@ -36,6 +36,12 @@
 #define CHAN_BASE_MHZ      2407
 #define CHAN_SPACING_MHZ   5
 #define CHAN_14_MHZ        2484
+/* Half a 20 MHz channel, MHz: from its centre to either edge. */
+#define HALF_CHAN_MHZ      (CHAN_WIDTH_MHZ / 2)
+/* 5 GHz channel n is centred at CHAN_5G_BASE_MHZ + n * CHAN_SPACING_MHZ. */
+#define CHAN_5G_BASE_MHZ   5000
+/* Widest a 2.4 GHz network can be (802.11n), MHz. */
+#define WIDEST_2G4_MHZ     40
 /* A hidden network's name: this, then its BSSID, "hidden 02:1f:3c:12:34:56". */
 #define HIDDEN_PREFIX      "hidden "
 /* Smallest buffer a name is shortened in the middle for: "ab..yz". */
@@ -65,6 +71,20 @@ enum block_5g {
 	BLOCK_5G_COUNT,
 };
 BUILD_ASSERT(BLOCK_5G_COUNT == CHAN_5G_BLOCKS, "a name for every 80 MHz block");
+
+/* A stretch of spectrum, lo to hi MHz. */
+struct span {
+	int lo;
+	int hi;
+};
+
+/* A channel's or block's figures being added up: the power of every network counted, and of
+ * the strongest whose primary channel it is.
+ */
+struct tally {
+	uint64_t power;
+	uint64_t best_power;
+};
 
 /* The DFS (radar detection) 5 GHz channels: 52-64 and 100-144. */
 #define DFS_LOW_FIRST  52
@@ -115,27 +135,6 @@ static uint64_t pow10_u64(unsigned int exp)
 static int centre_mhz(int channel)
 {
 	return channel == CHAN_LAST ? CHAN_14_MHZ : CHAN_BASE_MHZ + (CHAN_SPACING_MHZ * channel);
-}
-
-
-/**
- * @brief How much of a network's channel overlaps another channel.
- *
- * @param a One channel.
- * @param b The other.
- * @return Overlap in MHz: CHAN_WIDTH_MHZ for the same channel, down to 0.
- *
- * @sideeffects None; errno unchanged.
- */
-static int overlap_mhz(int a, int b)
-{
-	int df = centre_mhz(a) - centre_mhz(b);
-
-	if (df < 0) {
-		df = -df;
-	}
-
-	return df >= CHAN_WIDTH_MHZ ? 0 : CHAN_WIDTH_MHZ - df;
 }
 
 
@@ -282,6 +281,324 @@ static bool on_known_channel(const struct chan_ap *ap)
 }
 
 
+/**
+ * @brief Give a channel's centre frequency.
+ *
+ * @param band enum chan_band: 5 GHz, or otherwise 2.4 GHz.
+ * @param channel Channel number.
+ * @return MHz.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int channel_mhz(uint8_t band, uint8_t channel)
+{
+	return band == CHAN_BAND_5G ? CHAN_5G_BASE_MHZ + (CHAN_SPACING_MHZ * channel)
+				    : centre_mhz(channel);
+}
+
+
+/**
+ * @brief Give the stretch of spectrum around a centre frequency.
+ *
+ * @param centre MHz.
+ * @param width MHz.
+ * @return From @p centre - @p width / 2 to @p centre + @p width / 2.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static struct span span_around(int centre, int width)
+{
+	return (struct span){.lo = centre - (width / 2), .hi = centre + (width / 2)};
+}
+
+
+/**
+ * @brief Find how much two stretches of spectrum overlap.
+ *
+ * @param a One stretch.
+ * @param b The other.
+ * @return MHz in both; 0 if they don't overlap.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int span_overlap_mhz(struct span a, struct span b)
+{
+	int lo = MAX(a.lo, b.lo);
+	int hi = MIN(a.hi, b.hi);
+
+	return hi > lo ? hi - lo : 0;
+}
+
+
+/**
+ * @brief Give a reported channel width in MHz.
+ *
+ * @param width enum chan_width.
+ * @return 20, 40, 80 or 160; 0 for CHAN_WIDTH_UNKNOWN or a value that isn't a width.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int width_mhz(uint8_t width)
+{
+	/* Each width twice the one before. */
+	static const int mhz[] = {
+		[CHAN_WIDTH_UNKNOWN] = 0,
+		[CHAN_WIDTH_20] = CHAN_WIDTH_MHZ,
+		[CHAN_WIDTH_40] = 2 * CHAN_WIDTH_MHZ,
+		[CHAN_WIDTH_80] = 2 * 2 * CHAN_WIDTH_MHZ,
+		[CHAN_WIDTH_160] = 2 * 2 * 2 * CHAN_WIDTH_MHZ,
+	};
+
+	return width < ARRAY_SIZE(mhz) ? mhz[width] : 0;
+}
+
+
+/**
+ * @brief Give the spectrum of an 80 MHz block's four channels.
+ *
+ * @param block 0 (36-48) to CHAN_5G_BLOCKS - 1 (165-177).
+ * @return From the first channel's lower edge to the last's upper edge.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static struct span block_span(int block)
+{
+	size_t first = (size_t)block * CHAN_5G_BLOCK_CHANNELS;
+	size_t last = first + CHAN_5G_BLOCK_CHANNELS - 1U;
+
+	return (struct span){
+		.lo = channel_mhz(CHAN_BAND_5G, channels_5g[first]) - HALF_CHAN_MHZ,
+		.hi = channel_mhz(CHAN_BAND_5G, channels_5g[last]) + HALF_CHAN_MHZ,
+	};
+}
+
+
+/**
+ * @brief Work out the spectrum a network's reported width and centre give, if they make sense.
+ *
+ * They do if the width is known, its centre is given, a 2.4 GHz network is at most 40 MHz
+ * wide and centred below channel 14, and the primary channel is one of the 20 MHz channels
+ * the width is made of.
+ *
+ * @param ap The access point.
+ * @param[out] out The spectrum; written only when the result is true.
+ * @return True if the report makes sense.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+static bool reported_span(const struct chan_ap *ap, struct span *out)
+{
+	int width = width_mhz(ap->width);
+	struct span own = span_around(channel_mhz(ap->band, ap->channel), CHAN_WIDTH_MHZ);
+
+	if (width == 0 || ap->centre == 0U ||
+	    (ap->band != CHAN_BAND_5G && (width > WIDEST_2G4_MHZ || ap->centre >= CHAN_LAST))) {
+		return false;
+	}
+	struct span sp = span_around(channel_mhz(ap->band, ap->centre), width);
+
+	if (sp.lo > own.lo || own.hi > sp.hi || ((own.lo - sp.lo) % CHAN_WIDTH_MHZ) != 0) {
+		return false;
+	}
+	*out = sp;
+
+	return true;
+}
+
+
+/**
+ * @brief Give the spectrum a network is counted on.
+ *
+ * Its reported width around its centre (reported_span()); otherwise 20 MHz on its primary
+ * channel on 2.4 GHz, and its whole 80 MHz block on 5 GHz.
+ *
+ * @param ap The access point.
+ * @return The spectrum.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static struct span ap_span(const struct chan_ap *ap)
+{
+	struct span sp;
+
+	if (reported_span(ap, &sp)) {
+		return sp;
+	}
+	int block = ap->band == CHAN_BAND_5G ? block_5g(ap->channel) : -1;
+
+	if (block >= 0) {
+		return block_span(block);
+	}
+
+	return span_around(channel_mhz(ap->band, ap->channel), CHAN_WIDTH_MHZ);
+}
+
+
+/**
+ * @brief Start a channel's or block's figures: nothing heard.
+ *
+ * @param[out] out The figures.
+ * @param channel The channel, or the block's first channel.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+static void clear_figures(struct chan_info *out, uint8_t channel)
+{
+	out->channel = channel;
+	out->ap_count = 0;
+	out->best_rssi = CHAN_RSSI_NONE;
+	out->interference = CHAN_RSSI_NONE;
+	out->others = CHAN_RSSI_NONE;
+	out->freshness = 0;
+}
+
+
+/**
+ * @brief Count a network in a channel's or block's figures.
+ *
+ * @param[in,out] out The figures: ap_count, best_rssi and freshness.
+ * @param[in,out] t The power so far.
+ * @param ap The network.
+ * @param share Its power here, in chan_dbm_to_power()'s units.
+ * @param own True if it counts in @c ap_count: its primary channel is this one, or (for a
+ *        block) it reaches the block.
+ *
+ * @sideeffects None (writes only through @p out and @p t); errno unchanged.
+ */
+static void tally_add(struct chan_info *out, struct tally *t, const struct chan_ap *ap,
+		      uint64_t share, bool own)
+{
+	if (own) {
+		out->ap_count++;
+		if (ap->rssi > out->best_rssi) {
+			out->best_rssi = ap->rssi;
+			t->best_power = share;
+		}
+	}
+	if (ap->freshness > out->freshness) {
+		out->freshness = ap->freshness;
+	}
+	t->power += share;
+}
+
+
+/**
+ * @brief Finish a channel's or block's figures: its interference, with and without its
+ *        strongest network.
+ *
+ * @param[in,out] out The figures: interference and others.
+ * @param t The power added up.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+static void tally_finish(struct chan_info *out, const struct tally *t)
+{
+	out->interference = (int16_t)chan_power_to_dbm(t->power);
+	out->others = (int16_t)chan_power_to_dbm(t->power - t->best_power);
+}
+
+
+/**
+ * @brief Work out one channel's figures on a band.
+ *
+ * Adds up every network's power in mW (not dBm), each weighted by how much of its spectrum
+ * (ap_span()) overlaps the channel's 20 MHz, over CHAN_WIDTH_MHZ. A network's own primary
+ * channel is inside its spectrum, so the strongest network on the channel counts in full and
+ * taking its power off the total leaves the others' exactly.
+ *
+ * @param s Statistics.
+ * @param band enum chan_band: only its networks count.
+ * @param channel A channel of @p band.
+ * @param[out] out The channel's figures.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+static void channel_figures(const struct chan_stats *s, uint8_t band, uint8_t channel,
+			    struct chan_info *out)
+{
+	struct span chan = span_around(channel_mhz(band, channel), CHAN_WIDTH_MHZ);
+	struct tally t = {0};
+
+	clear_figures(out, channel);
+	for (size_t i = 0; i < s->ap_count; i++) {
+		const struct chan_ap *ap = &s->aps[i];
+
+		if (ap->band != band) {
+			continue;
+		}
+		int overlap = span_overlap_mhz(ap_span(ap), chan);
+
+		if (overlap == 0) {
+			continue;
+		}
+		uint64_t share =
+			(chan_dbm_to_power(ap->rssi) * (unsigned int)overlap) / CHAN_WIDTH_MHZ;
+
+		tally_add(out, &t, ap, share, ap->channel == channel);
+	}
+	tally_finish(out, &t);
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan_info *out)
+{
+	channel_figures(s, CHAN_BAND_2G4, channel, out);
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out)
+{
+	if (chan_5g_index(channel) < 0) {
+		clear_figures(out, channel);
+		return;
+	}
+	channel_figures(s, CHAN_BAND_5G, channel, out);
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+void chan_stats_block_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out)
+{
+	int block = block_5g(channel);
+	struct tally t = {0};
+
+	if (block < 0) {
+		clear_figures(out, channel);
+		return;
+	}
+	struct span span = block_span(block);
+
+	clear_figures(out, block_first(block));
+	for (size_t i = 0; i < s->ap_count; i++) {
+		const struct chan_ap *ap = &s->aps[i];
+
+		if (ap->band == CHAN_BAND_5G && span_overlap_mhz(ap_span(ap), span) > 0) {
+			tally_add(out, &t, ap, chan_dbm_to_power(ap->rssi), true);
+		}
+	}
+	tally_finish(out, &t);
+}
+
+
+/*
+ * Public interface: documented in chan_stats.h.
+ */
+int chan_ap_width_mhz(const struct chan_ap *ap)
+{
+	struct span sp = ap_span(ap);
+
+	return sp.hi - sp.lo;
+}
+
+
 /*
  * Public interface: documented in chan_stats.h.
  */
@@ -324,52 +641,6 @@ int chan_stats_add(struct chan_stats *s, const struct chan_ap *ap)
 
 /*
  * Public interface: documented in chan_stats.h.
- *
- * Adds up every access point's power in mW (not dBm), each weighted by its overlap with the
- * channel (overlap_mhz()) over CHAN_WIDTH_MHZ. The strongest network on the channel counts in
- * full (an overlap of CHAN_WIDTH_MHZ), so taking its power off the total leaves the others'
- * exactly.
- */
-void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan_info *out)
-{
-	uint64_t power = 0;
-	uint64_t best_power = 0;
-
-	out->channel = channel;
-	out->ap_count = 0;
-	out->best_rssi = CHAN_RSSI_NONE;
-	out->freshness = 0;
-
-	for (size_t i = 0; i < s->ap_count; i++) {
-		const struct chan_ap *ap = &s->aps[i];
-
-		if (ap->band != CHAN_BAND_2G4) {
-			continue;
-		}
-		int overlap = overlap_mhz(ap->channel, channel);
-		uint64_t share =
-			(chan_dbm_to_power(ap->rssi) * (unsigned int)overlap) / CHAN_WIDTH_MHZ;
-
-		if (ap->channel == channel) {
-			out->ap_count++;
-			if (ap->rssi > out->best_rssi) {
-				out->best_rssi = ap->rssi;
-				best_power = share;
-			}
-		}
-		if (overlap > 0 && ap->freshness > out->freshness) {
-			out->freshness = ap->freshness;
-		}
-		power += share;
-	}
-
-	out->interference = (int16_t)chan_power_to_dbm(power);
-	out->others = (int16_t)chan_power_to_dbm(power - best_power);
-}
-
-
-/*
- * Public interface: documented in chan_stats.h.
  */
 size_t chan_stats_band_count(const struct chan_stats *s, enum chan_band band)
 {
@@ -382,48 +653,6 @@ size_t chan_stats_band_count(const struct chan_stats *s, enum chan_band band)
 	}
 
 	return n;
-}
-
-
-/*
- * Public interface: documented in chan_stats.h.
- *
- * A network's RSSI is measured on its 20 MHz primary channel, which stands
- * for its power on each 20 MHz of its block, so it counts at full weight on
- * every channel of the block.
- */
-void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out)
-{
-	uint64_t power = 0;
-	uint64_t best_power = 0;
-	int block = block_5g(channel);
-
-	out->channel = channel;
-	out->ap_count = 0;
-	out->best_rssi = CHAN_RSSI_NONE;
-	out->freshness = 0;
-	for (size_t i = 0; block >= 0 && i < s->ap_count; i++) {
-		const struct chan_ap *ap = &s->aps[i];
-
-		if (ap->band != CHAN_BAND_5G || block_5g(ap->channel) != block) {
-			continue;
-		}
-		uint64_t share = chan_dbm_to_power(ap->rssi);
-
-		if (ap->channel == channel) {
-			out->ap_count++;
-			if (ap->rssi > out->best_rssi) {
-				out->best_rssi = ap->rssi;
-				best_power = share;
-			}
-		}
-		if (ap->freshness > out->freshness) {
-			out->freshness = ap->freshness;
-		}
-		power += share;
-	}
-	out->interference = (int16_t)chan_power_to_dbm(power);
-	out->others = (int16_t)chan_power_to_dbm(power - best_power);
 }
 
 
@@ -453,59 +682,31 @@ uint8_t chan_stats_recommend(const struct chan_stats *s)
 
 
 /**
- * @brief Count the 5 GHz networks in an 80 MHz block.
- *
- * @param s Statistics.
- * @param block 0 to CHAN_5G_BLOCKS - 1.
- * @return Networks whose primary channel is in the block.
- *
- * @sideeffects None; errno unchanged.
- */
-static size_t block_networks(const struct chan_stats *s, int block)
-{
-	size_t n = 0;
-
-	for (size_t i = 0; i < s->ap_count; i++) {
-		if (s->aps[i].band == CHAN_BAND_5G && block_5g(s->aps[i].channel) == block) {
-			n++;
-		}
-	}
-
-	return n;
-}
-
-
-/**
  * @brief Tell whether one 80 MHz block is a better choice than another.
  *
  * @param s Statistics.
  * @param a The candidate block, 0 to CHAN_5G_BLOCKS - 1.
  * @param b The best block so far, of a lower number.
- * @return True if @p a has less interference; on a tie, fewer networks;
- *         then if @p a is free of DFS and @p b isn't.
+ * @return True if @p a has less interference (chan_stats_block_5g()); on a tie, fewer
+ *         networks reaching it; then if @p a is free of DFS and @p b isn't.
  *
  * @sideeffects None; errno unchanged.
  */
 static bool block_better(const struct chan_stats *s, int a, int b)
 {
-	uint8_t first_a = block_first(a);
-	uint8_t first_b = block_first(b);
 	struct chan_info ia;
 	struct chan_info ib;
 
-	chan_stats_channel_5g(s, first_a, &ia);
-	chan_stats_channel_5g(s, first_b, &ib);
+	chan_stats_block_5g(s, block_first(a), &ia);
+	chan_stats_block_5g(s, block_first(b), &ib);
 	if (ia.interference != ib.interference) {
 		return ia.interference < ib.interference;
 	}
-	size_t na = block_networks(s, a);
-	size_t nb = block_networks(s, b);
-
-	if (na != nb) {
-		return na < nb;
+	if (ia.ap_count != ib.ap_count) {
+		return ia.ap_count < ib.ap_count;
 	}
 
-	return !chan_5g_dfs(first_a) && chan_5g_dfs(first_b);
+	return !chan_5g_dfs(ia.channel) && chan_5g_dfs(ib.channel);
 }
 
 
@@ -637,8 +838,9 @@ size_t chan_stats_strongest(const struct chan_stats *s, enum chan_band band,
 static bool chan_ap_equal(const struct chan_ap *a, const struct chan_ap *b)
 {
 	return strcmp(a->ssid, b->ssid) == 0 && memcmp(a->bssid, b->bssid, CHAN_BSSID_LEN) == 0 &&
-	       a->channel == b->channel && a->band == b->band && a->rssi == b->rssi &&
-	       a->secured == b->secured && a->freshness == b->freshness;
+	       a->channel == b->channel && a->band == b->band && a->width == b->width &&
+	       a->centre == b->centre && a->rssi == b->rssi && a->secured == b->secured &&
+	       a->freshness == b->freshness;
 }
 
 

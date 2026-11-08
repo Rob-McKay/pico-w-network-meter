@@ -106,7 +106,7 @@ static void report_5g(const struct chan_stats *s)
 		chan_stats_channel_5g(s, chan_5g_channel(i), &info);
 		report_channel(&info);
 	}
-	chan_stats_channel_5g(s, best, &info);
+	chan_stats_block_5g(s, best, &info);
 	unsigned int last = chan_5g_block_last(best);
 
 	if (info.interference == CHAN_RSSI_NONE) {
@@ -121,7 +121,8 @@ static void report_5g(const struct chan_stats *s)
 
 
 /**
- * @brief Log every network a scan kept, at debug level.
+ * @brief Log every network a scan kept, with the width it is counted at
+ *        (chan_ap_width_mhz()), at debug level.
  *
  * SSIDs are printed through chan_ssid_printable(): they are whatever nearby access points
  * send, and control characters in them could rewrite the terminal.
@@ -136,8 +137,8 @@ static void report_networks(const struct chan_stats *s)
 
 	for (size_t i = 0; i < s->ap_count; i++) {
 		chan_ssid_printable(s->aps[i].ssid, ssid, sizeof(ssid));
-		LOG_DBG("  %-32s ch %2u %4d dBm", ssid, (unsigned int)s->aps[i].channel,
-			(int)s->aps[i].rssi);
+		LOG_DBG("  %-32s ch %3u %3d MHz %4d dBm", ssid, (unsigned int)s->aps[i].channel,
+			chan_ap_width_mhz(&s->aps[i]), (int)s->aps[i].rssi);
 	}
 }
 
