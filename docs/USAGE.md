@@ -142,18 +142,19 @@ restarted itself, how long it had been running before:
 | **Wi-Fi restart after …** | amber | The Wi-Fi driver stopped working, so the meter restarted itself (after 5 failed scans in a row) |
 | **crash N after …** | red | A fatal error (number N): the meter restarted itself |
 | **scan hung / main hung after …** | red | A part of the meter stopped responding, and the watchdog restarted it |
-| **restart after …** | red | Restarted with no reason recorded: the reset button, a debugger, or the hardware watchdog |
+| **restart after …** | red | Restarted with no reason recorded: the reset button, a debugger, or a dip in the supply |
 
-On the XIAO ESP32-C5, which records the chip's own reset cause, a restart
-with no reason recorded says what the chip saw instead, where it tells
-more than "restart":
+A restart with no reason recorded says what the chip saw instead, where it
+tells more than "restart". The Pico W can say only whether its hardware
+watchdog did it; the XIAO ESP32-C5 records the chip's own reset cause, so
+it can name the others too:
 
 | Event | Colour | Meaning |
 |---|---|---|
-| **brown-out** | white | The supply dropped too low (a flat battery or a weak USB supply), then came back: shown in place of "power on" |
-| **HW watchdog after …** | red | The chip's hardware watchdog restarted it: the whole system stopped, not just one part of the meter |
-| **CPU fault after …** | red | The processor faulted in a way the meter couldn't record as a crash |
-| **reset button after …** | red | The chip's reset pin. The XIAO's own reset button resets the whole chip, which it reports as a power-on instead |
+| **brown-out** | white | The supply dropped too low (a flat battery or a weak USB supply), then came back: shown in place of "power on" (XIAO) |
+| **HW watchdog after …** | red | The chip's hardware watchdog restarted it: the whole system stopped, not just one part of the meter (both boards) |
+| **CPU fault after …** | red | The processor faulted in a way the meter couldn't record as a crash (XIAO) |
+| **reset button after …** | red | The chip's reset pin (XIAO). The XIAO's own reset button resets the whole chip, which it reports as a power-on instead |
 
 On the console's full listing (below), such a start ends with `hw` and the
 cause's number: 1 power-on, 2 reset pin, 3 software, 4 watchdog,
@@ -261,5 +262,5 @@ target's guide ([Pico W](targets/pico.md),
 | **Battery** | A separate charger (LiPo Amigo Pro) in the printed case; its USB-C socket charges and powers the meter | The XIAO charges a LiPo on its BAT pads from its own USB-C socket, and runs from it when unplugged |
 | **Console** | The Pico's USB socket (inside the case) | The XIAO's USB-C socket |
 | **Bands** | 2.4 GHz only | 2.4 and 5 GHz: Channels 5 GHz and Networks 5 GHz screens, and the LED follows the band of the screen last viewed |
-| **Unexplained restarts** | All shown as "restart after …" | Named where the chip says why: "HW watchdog", "brown-out", "CPU fault" |
+| **Unexplained restarts** | "HW watchdog after …" if the hardware watchdog made it; anything else "restart after …" | Named where the chip says why: "HW watchdog", "brown-out", "CPU fault" |
 | **Tested on hardware** | Yes | On a breadboard: scans, screens, buttons ([details](targets/xiao-esp32c5.md#checked-on-hardware)) |

@@ -98,10 +98,16 @@ case: the Pico's own USB socket is inside.
 - **Hidden networks** need a carried Zephyr patch
   (`airoc-hidden-network-results.patch`): without it the driver reports
   their channel and signal as zero.
-- **Unexplained restarts can't be told apart.** The reset button, a
-  debugger and the hardware watchdog all show as "restart after …": the
-  RP2040's reset register keeps the last power-on until the next one, so
-  the meter doesn't record a hardware reset cause on this board.
+- **Only the hardware watchdog is named among unexplained restarts.** The
+  RP2040's chip reset register keeps the last power-on until the next one,
+  so Zephyr's hwinfo driver can't say why it reset. Its watchdog reason
+  register can: the meter reads it at start-up
+  (`CONFIG_METER_RESET_CAUSE_RP2040`), so a restart the hardware watchdog
+  made shows as "HW watchdog after …". That means the whole system stopped
+  for 4 s, too stuck for the meter's own watchdog to note it first. Any
+  other reset the meter didn't make itself, such as a debugger, the RUN
+  pin or a dip in the supply short enough to leave RAM intact, shows as
+  "restart after …".
 - **The Display Pack sits over the antenna** (the end opposite the USB
   socket), which costs a little range.
 - **Hardware watchdog**: 4 s, within the RP2040's 8.3 s limit.
