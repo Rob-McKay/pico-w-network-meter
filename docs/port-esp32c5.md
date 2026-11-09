@@ -268,7 +268,8 @@ would sit in `zephyr/patches/` like the AIROC one.
   Simple, but wrong for 20/40 MHz enterprise deployments.
 
 Start with the assumption; carry the API patch if the figures prove
-misleading.
+misleading. *Done:* the API patch (`wifi-scan-result-width.patch`), with
+the assumption kept for drivers that don't give a width.
 
 ### Regulatory domain and DFS
 
@@ -948,7 +949,7 @@ the same script (`--layout xiao`) rather than a fork.
 | 8 | SPI clock | White screen above the panel's rating (seen at 31.25 MHz) | Start at 10 MHz (9.6 MHz worked); try 20 MHz with short wires |
 | 9 | USB Serial/JTAG console with no host: blocking or dropping? | Start-up hangs on a charger (the Pico problem) | Boot from a USB charger and a battery; watch the display |
 | 10 | Wi-Fi blob licence and size | Binary libraries in the firmware | As now with Infineon's: document in README's licence section ([esp32-wifi-lib][esp-wifi-lib]) |
-| 11 | 5 GHz bandwidth not in Zephyr's scan result | Overlap figures approximate | Start with the 80 MHz assumption; Zephyr API patch later |
+| 11 | 5 GHz bandwidth not in Zephyr's scan result | Overlap figures approximate | Start with the 80 MHz assumption; Zephyr API patch later. *Done: patched* |
 | 12 | Long-run stability of the ESP32 Wi-Fi driver (the AIROC leaked buffers after 12 h) | Needs the restart path, or not | 24–48 h soak test with the event log |
 | 13 | Antenna placement and case loss at 5 GHz | Fewer 5 GHz networks heard | Compare open board vs in case |
 

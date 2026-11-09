@@ -895,7 +895,7 @@ static void recommend_text(const struct chan_stats *s, enum chan_band band, char
 	if (band == CHAN_BAND_5G) {
 		uint8_t first = recommend_5g(s);
 
-		chan_stats_channel_5g(s, first, &best);
+		chan_stats_block_5g(s, first, &best);
 		(void)snprintf(buf, size, "Use %u-%u: %s", (unsigned int)first,
 			       (unsigned int)chan_5g_block_last(first),
 			       chan_level_name(chan_stats_level(best.interference)));

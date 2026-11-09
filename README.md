@@ -129,8 +129,8 @@ clang.
 
 **5 GHz on the XIAO.** A Channels 5 GHz screen follows the 2.4 GHz one:
 the channels in the 80 MHz blocks routers use (36-48 to 149-161), each
-network counted across its whole block, as the meter can't tell how wide
-a network is, and the quietest block recommended ("Use 52-64: clear").
+network counted on the channels of its own width (20, 40, 80 or
+160 MHz), and the quietest block recommended ("Use 52-64: clear").
 A Networks 5 GHz list follows it, and the LED shows the band of the
 screen last viewed. The 2.4 GHz screens are the same on both targets.
 
@@ -203,6 +203,13 @@ Details, debugging and the console in each target's guide.
   every network's signal power (in mW, not dBm), each scaled by its
   overlap ÷ 20 MHz, converted back to dBm. All of this is integer
   arithmetic, accurate to 1 dB.
+- A network's overlap is worked out from its whole width where the driver
+  reports it (the XIAO's does): a 40 MHz network on 2.4 GHz covers its
+  primary channel and the one 4 above or below in full, and spills over
+  beyond both. A 5 GHz network covers the channels of its width (20, 40,
+  80 or 160 MHz) in full and no others. Without a width, a 2.4 GHz
+  network is taken to be 20 MHz wide, and a 5 GHz one to use its whole
+  80 MHz block, as nearly every home router does.
 - Levels: below −85 dBm is **clear** (green), −85 to −71 dBm **moderate**
   (amber), −70 dBm and above **busy** (red).
 - The **recommended channel** is the one of 1, 6 and 11 with the least
@@ -269,9 +276,10 @@ Espressif's library, which it otherwise ignores.
 
 `wifi-scan-result-width.patch` (XIAO ESP32-C5): Zephyr's scan result gains
 each network's channel width and centre channel, which the ESP32 driver
-fills in from Espressif's scan record. So far the meter only logs them
-(with `CONFIG_METER_LOG_LEVEL_DBG`); it still takes every 5 GHz network
-to be 80 MHz wide.
+fills in from Espressif's scan record. The meter counts each network on
+the channels of its width; where a driver doesn't give it (the Pico W's),
+a 2.4 GHz network is taken to be 20 MHz wide and a 5 GHz one to use its
+80 MHz block.
 
 ## Status
 

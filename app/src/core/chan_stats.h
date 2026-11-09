@@ -7,17 +7,22 @@
  * access points. No Zephyr Wi-Fi API here: scanner.c feeds it, the UI and
  * the unit tests read it.
  *
- * Each 2.4 GHz channel is 20 MHz wide, but channels are only 5 MHz apart,
- * so a network interferes with its neighbours up to 3 channels away. The
- * "interference" of a channel adds up the signal power of every network
- * heard, each weighted by how much of its 20 MHz overlaps the channel's.
+ * A network takes up a stretch of spectrum: its width (20, 40, 80 or
+ * 160 MHz) around its centre channel, made of 20 MHz channels, one of them
+ * its primary. The "interference" of a channel adds up the signal power of
+ * every network heard, each weighted by how much of the network's spectrum
+ * overlaps the channel's 20 MHz. A network's RSSI is measured on its
+ * primary channel and stands for its power on each 20 MHz it uses.
  *
- * 5 GHz channels (36, 40, ...) don't overlap each other; a network spreads
- * over a block of them by bonding channels. Zephyr's scan results don't
- * say how wide a network is, so every 5 GHz network is taken to use its
- * whole 80 MHz block (four channels), as nearly every home router does:
- * it counts in full on each of the block's channels and not at all
- * outside it.
+ * 2.4 GHz channels are 20 MHz wide but only 5 MHz apart, so a network
+ * reaches neighbours up to 3 channels beyond its edges, partly. 5 GHz
+ * channels (36, 40, ...) don't overlap each other: a network counts in
+ * full on each channel it uses and not at all on the others.
+ *
+ * Where the width isn't known (the Pico W's driver doesn't say) or doesn't
+ * fit the primary channel, a 2.4 GHz network is taken to be 20 MHz, and a
+ * 5 GHz one to use its whole 80 MHz block (four channels), as nearly
+ * every home router does.
  *
  * Arithmetic is integer only: dBm values are whole numbers.
  */
@@ -54,6 +59,15 @@ enum chan_band {
  */
 #define CHAN_5G_BLOCKS         (CHAN_5G_COUNT / CHAN_5G_BLOCK_CHANNELS)
 
+/** A network's channel width, as its beacon gives it. */
+enum chan_width {
+	CHAN_WIDTH_UNKNOWN, /**< not reported: see the file comment */
+	CHAN_WIDTH_20,      /**< 20 MHz: the primary channel only */
+	CHAN_WIDTH_40,      /**< 40 MHz: two channels */
+	CHAN_WIDTH_80,      /**< 80 MHz: four channels */
+	CHAN_WIDTH_160,     /**< 160 MHz: eight channels */
+};
+
 /** Most access points kept from one scan. */
 #define CHAN_MAX_APS   64
 /** Longest SSID, in bytes. */
@@ -74,6 +88,8 @@ struct chan_ap {
 	uint8_t channel;   /**< CHAN_FIRST..CHAN_LAST, or a 5 GHz channel */
 	uint8_t band;      /**< enum chan_band */
 	int8_t rssi;       /**< dBm */
+	uint8_t width;     /**< enum chan_width */
+	uint8_t centre;    /**< channel number at the middle of the width; 0 if unknown */
 	bool secured;      /**< anything but an open network */
 	uint8_t freshness; /**< CHAN_FRESH when just heard, down to 0 (faded out) */
 };
@@ -92,7 +108,7 @@ struct chan_stats {
 /** A channel's figures, worked out by chan_stats_channel(). */
 struct chan_info {
 	uint8_t channel;
-	uint8_t ap_count;     /**< networks whose primary channel this is */
+	uint8_t ap_count;     /**< networks with this primary channel (a block: reaching it) */
 	int8_t best_rssi;     /**< strongest of those, or CHAN_RSSI_NONE */
 	int16_t interference; /**< overlap-weighted power, dBm, or CHAN_RSSI_NONE */
 	int16_t others;       /**< the same without the strongest network on the channel */
@@ -150,7 +166,8 @@ size_t chan_stats_band_count(const struct chan_stats *s, enum chan_band band);
  * @brief Work out one 2.4 GHz channel's figures.
  *
  * Only 2.4 GHz networks count. @c interference counts every network that
- * overlaps the channel, its own included. @c others leaves out the channel's strongest network (@c
+ * overlaps the channel, its own included, a 40 MHz one across both its
+ * channels. @c others leaves out the channel's strongest network (@c
  * best_rssi): it is what interferes with that network, from other
  * networks on the same channel and those spilling over from overlapping
  * channels.
@@ -179,11 +196,11 @@ uint8_t chan_stats_recommend(const struct chan_stats *s);
 /**
  * @brief Work out one 5 GHz channel's figures.
  *
- * Every 5 GHz network counts in full on each channel of its 80 MHz block
- * (the file comment says why), so the channels of a block share their
- * @c interference and @c freshness. @c ap_count, @c best_rssi and @c others
- * are as on 2.4 GHz: the networks whose primary channel this is, the
- * strongest of them, and the interference without it.
+ * Every 5 GHz network counts in full on each channel it uses: those of its
+ * width, or of its whole 80 MHz block where the width isn't known (the file
+ * comment says why). @c ap_count, @c best_rssi and @c others are as on
+ * 2.4 GHz: the networks whose primary channel this is, the strongest of
+ * them, and the interference without it.
  *
  * @param s Statistics.
  * @param channel A 5 GHz channel; any other gives an empty channel.
@@ -194,9 +211,28 @@ uint8_t chan_stats_recommend(const struct chan_stats *s);
 void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out);
 
 /**
+ * @brief Work out an 80 MHz block's figures: what a router using the whole
+ *        block would share it with.
+ *
+ * Every 5 GHz network using any channel of the block counts once, in full
+ * (a 20 MHz network on one channel of it as much as an 80 MHz one), and a
+ * 160 MHz network counts in both its blocks. @c ap_count is the networks
+ * reaching the block, @c best_rssi the strongest of them, @c others the
+ * interference without it, @c channel the block's first channel.
+ *
+ * @param s Statistics.
+ * @param channel Any channel of the block; any other gives an empty block.
+ * @param[out] out The block's figures.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+void chan_stats_block_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out);
+
+/**
  * @brief Pick the best 80 MHz block on 5 GHz.
  *
- * Of the blocks in @p blocks, the one with the least interference wins; on
+ * Of the blocks in @p blocks, the one with the least interference
+ * (chan_stats_block_5g()) wins; on
  * a tie, the one with fewer networks, then one without DFS (a router on a
  * DFS channel must first listen for radar for a minute, and may have to
  * move), then the lower block.
@@ -314,6 +350,19 @@ bool chan_5g_dfs(uint8_t channel);
  * @sideeffects None; errno unchanged.
  */
 bool chan_ap_hidden(const struct chan_ap *ap);
+
+/**
+ * @brief Give the width a network is counted at.
+ *
+ * Its own, where it is known and fits its primary channel; otherwise 20 MHz
+ * on 2.4 GHz and 80 MHz on 5 GHz (the file comment says why).
+ *
+ * @param ap The access point, on a channel of its band.
+ * @return 20, 40, 80 or 160 (MHz).
+ *
+ * @sideeffects None; errno unchanged.
+ */
+int chan_ap_width_mhz(const struct chan_ap *ap);
 
 /**
  * @brief Name an access point for display.

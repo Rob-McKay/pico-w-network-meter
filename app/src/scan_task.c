@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -38,6 +39,12 @@ LOG_MODULE_REGISTER(scan_task, CONFIG_METER_LOG_LEVEL);
 	 MSEC_PER_SEC)
 /* CONFIG_METER_FADE_MIN_PERCENT's whole. */
 #define PERCENT 100
+
+/* A hidden network's name on the console: this, then its BSSID, as on the screen. */
+#define HIDDEN_PREFIX "hidden "
+
+/* Room for a signal level as text: "-127 dBm" and its terminator. */
+#define DBM_TEXT_MAX 16U
 
 BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 	     "CONFIG_METER_FADE_END_S must be more than CONFIG_METER_FADE_START_S");
@@ -71,20 +78,49 @@ static struct ap_history history;
 static struct scan_task_state progress;
 
 /**
+ * @brief Write a signal level for the console: "-72 dBm", or "clear" for
+ *        CHAN_RSSI_NONE (nothing heard) rather than "-127 dBm".
+ *
+ * @param dbm dBm, or CHAN_RSSI_NONE.
+ * @param[out] buf The text, cut to fit and always terminated.
+ * @param size Size of @p buf, at least 1.
+ *
+ * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void dbm_text(int dbm, char *buf, size_t size)
+{
+	if (dbm == CHAN_RSSI_NONE) {
+		(void)snprintf(buf, size, "clear");
+	} else {
+		(void)snprintf(buf, size, "%d dBm", dbm);
+	}
+}
+
+
+/**
  * @brief Log one channel's figures, if anything reaches it.
  *
  * @param info The channel's figures.
  *
- * @sideeffects Writes a log message. errno unchanged.
+ * @sideeffects Writes a log message. errno may be set by snprintf() (only on an output
+ *              error).
  */
 static void report_channel(const struct chan_info *info)
 {
-	if (info->ap_count > 0U || info->interference != CHAN_RSSI_NONE) {
-		LOG_INF("  ch %2u: %u networks, strongest %4d dBm, interference %4d dBm, "
-			"total %4d dBm",
-			(unsigned int)info->channel, (unsigned int)info->ap_count, info->best_rssi,
-			info->others, info->interference);
+	char strongest[DBM_TEXT_MAX];
+	char others[DBM_TEXT_MAX];
+	char total[DBM_TEXT_MAX];
+
+	if (info->ap_count == 0U && info->interference == CHAN_RSSI_NONE) {
+		return;
 	}
+	dbm_text(info->best_rssi, strongest, sizeof(strongest));
+	dbm_text(info->others, others, sizeof(others));
+	dbm_text(info->interference, total, sizeof(total));
+	LOG_INF("  ch %2u: %u networks, strongest %8s, interference %8s, total %8s",
+		(unsigned int)info->channel, (unsigned int)info->ap_count, strongest, others,
+		total);
 }
 
 
@@ -106,7 +142,7 @@ static void report_5g(const struct chan_stats *s)
 		chan_stats_channel_5g(s, chan_5g_channel(i), &info);
 		report_channel(&info);
 	}
-	chan_stats_channel_5g(s, best, &info);
+	chan_stats_block_5g(s, best, &info);
 	unsigned int last = chan_5g_block_last(best);
 
 	if (info.interference == CHAN_RSSI_NONE) {
@@ -121,23 +157,30 @@ static void report_5g(const struct chan_stats *s)
 
 
 /**
- * @brief Log every network a scan kept, at debug level.
+ * @brief Log every network a scan kept, with the width it is counted at
+ *        (chan_ap_width_mhz()), at debug level.
  *
  * SSIDs are printed through chan_ssid_printable(): they are whatever nearby access points
- * send, and control characters in them could rewrite the terminal.
+ * send, and control characters in them could rewrite the terminal. A hidden network is
+ * shown by its BSSID, "hidden 02:1f:3c:12:34:56", as on the screen.
  *
  * @param s The scan.
  *
- * @sideeffects Writes debug log messages. errno unchanged.
+ * @sideeffects Writes debug log messages. errno may be set by snprintf() (only on an output
+ *              error).
  */
 static void report_networks(const struct chan_stats *s)
 {
 	char ssid[CHAN_SSID_MAX + 1];
 
 	for (size_t i = 0; i < s->ap_count; i++) {
-		chan_ssid_printable(s->aps[i].ssid, ssid, sizeof(ssid));
-		LOG_DBG("  %-32s ch %2u %4d dBm", ssid, (unsigned int)s->aps[i].channel,
-			(int)s->aps[i].rssi);
+		if (chan_ap_hidden(&s->aps[i])) {
+			chan_bssid_text(s->aps[i].bssid, HIDDEN_PREFIX, ssid, sizeof(ssid));
+		} else {
+			chan_ssid_printable(s->aps[i].ssid, ssid, sizeof(ssid));
+		}
+		LOG_DBG("  %-32s ch %3u %3d MHz %4d dBm", ssid, (unsigned int)s->aps[i].channel,
+			chan_ap_width_mhz(&s->aps[i]), (int)s->aps[i].rssi);
 	}
 }
 
