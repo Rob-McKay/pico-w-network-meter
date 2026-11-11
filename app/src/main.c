@@ -42,6 +42,7 @@
 #include "event_log.h"
 #include "keys.h"
 #include "paging.h"
+#include "recommend.h"
 #include "reset_cause.h"
 #include "reset_note.h"
 #include "scan_task.h"
@@ -91,17 +92,21 @@ static enum status level_status(enum chan_level level)
 	}
 }
 
+
 /**
  * @brief Pick the LED status: scanning (or no scan finished yet), failed,
- *        or how busy the recommended channel is.
+ *        or how busy the recommended channel (on 5 GHz, 80 MHz block) is.
  *
  * @param s The networks showing.
  * @param state The scan thread's progress.
+ * @param band The band whose recommendation counts: the last channels
+ *        screen's.
  * @return The status.
  *
  * @sideeffects None; errno unchanged.
  */
-static enum status led_status(const struct chan_stats *s, const struct scan_task_state *state)
+static enum status led_status(const struct chan_stats *s, const struct scan_task_state *state,
+			      enum chan_band band)
 {
 	struct chan_info best;
 
@@ -111,14 +116,41 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 	if (state->last_error != 0) {
 		return STATUS_ERROR;
 	}
-	chan_stats_channel(s, chan_stats_recommend(s), &best);
+	if (band == CHAN_BAND_5G) {
+		chan_stats_block_5g(s, recommend_5g(s), &best);
+	} else {
+		chan_stats_channel(s, chan_stats_recommend(s), &best);
+	}
 
 	return level_status(chan_stats_level(best.interference));
 }
 
+
+/* A screen A and B step through: a view, and for a channels or networks
+ * screen its band.
+ */
+struct page {
+	enum ui_view view;
+	enum chan_band band; /* CHAN_BAND_COUNT: keep the band of the screen before */
+};
+
+/* The screens in order: each band's channels and networks, side by side,
+ * then the events. The 5 GHz ones are left out without
+ * CONFIG_METER_BAND_5G.
+ */
+static const struct page pages[] = {
+	{UI_VIEW_CHANNELS, CHAN_BAND_2G4}, {UI_VIEW_NETWORKS, CHAN_BAND_2G4},
+	{UI_VIEW_CHANNELS, CHAN_BAND_5G},  {UI_VIEW_NETWORKS, CHAN_BAND_5G},
+	{UI_VIEW_EVENTS, CHAN_BAND_COUNT},
+};
+
 /* What the screen shows, to redraw only when something changes. */
 struct screen {
-	enum ui_view view;
+	size_t page;              /* index in pages[] */
+	enum ui_view view;        /* pages[page].view */
+	enum chan_band band;      /* the band of the last channels or networks screen:
+				   * the LED shows its recommendation
+				   */
 	size_t first;             /* networks or events screen: first row shown */
 	bool full;                /* the whole screen needs drawing */
 	unsigned int drawn_scans; /* scan count on screen */
@@ -128,16 +160,30 @@ struct screen {
 /**
  * @brief Change the screen shown, back to the top of its list.
  *
+ * Steps through pages[], skipping the 5 GHz screens without
+ * CONFIG_METER_BAND_5G. A channels or networks screen sets the band; the
+ * events screen keeps it.
+ *
  * @param[in,out] scr What is on screen.
- * @param step 1 for the next screen, -1 for the previous one.
+ * @param step 1 for the next screen, -1 (or any other value) for the
+ *        previous one.
  *
  * @sideeffects None (writes only through @p scr); errno unchanged.
  */
 static void change_view(struct screen *scr, int step)
 {
-	scr->view = (enum ui_view)(((int)scr->view + UI_VIEW_COUNT + step) % UI_VIEW_COUNT);
+	const size_t n = ARRAY_SIZE(pages);
+
+	do {
+		scr->page = (scr->page + (step > 0 ? 1U : n - 1U)) % n;
+	} while (!IS_ENABLED(CONFIG_METER_BAND_5G) && pages[scr->page].band == CHAN_BAND_5G);
+	scr->view = pages[scr->page].view;
+	if (pages[scr->page].band != CHAN_BAND_COUNT) {
+		scr->band = pages[scr->page].band;
+	}
 	scr->first = 0;
 }
+
 
 /**
  * @brief Count the rows of the list on screen.
@@ -151,13 +197,14 @@ static size_t list_length(const struct screen *scr)
 {
 	switch (scr->view) {
 	case UI_VIEW_NETWORKS:
-		return scr->shown.ap_count;
+		return chan_stats_band_count(&scr->shown, scr->band);
 	case UI_VIEW_EVENTS:
 		return event_log_count();
 	default:
 		return 0;
 	}
 }
+
 
 /**
  * @brief Page the list on screen up or down.
@@ -176,6 +223,7 @@ static bool page_list(struct screen *scr, bool down)
 
 	return scr->first != was;
 }
+
 
 /**
  * @brief Wait for the console to take what has been logged, feeding the
@@ -202,6 +250,7 @@ static bool wait_for_console(void)
 
 	return !log_data_pending();
 }
+
 
 /**
  * @brief Log one start with all its details (event_log_dump() function).
@@ -235,6 +284,7 @@ static void log_one_start(const struct boot_record *r, void *arg)
 	*stalled = !wait_for_console();
 }
 
+
 /**
  * @brief Log the whole event log from flash, oldest first, with all the
  *        details, a line at a time as the console takes them.
@@ -260,6 +310,7 @@ static void dump_log(void)
 	}
 	ui_message("Event log sent to the console");
 }
+
 
 /**
  * @brief Act on a button: A and B change the screen; X and Y page the
@@ -304,6 +355,7 @@ static bool handle_key(int key, struct screen *scr)
 	}
 }
 
+
 /**
  * @brief Redraw the screen if the networks, their fading, the scan count
  *        or the view have changed.
@@ -324,10 +376,11 @@ static void update_screen(struct screen *scr, const struct chan_stats *next, uns
 	}
 	scr->shown = *next;
 	scr->first = paging_clamp(scr->first, list_length(scr), ui_list_rows());
-	ui_show(scr->view, &scr->shown, scans, scr->first, scr->full);
+	ui_show(scr->view, scr->band, &scr->shown, scans, scr->first, scr->full);
 	scr->drawn_scans = scans;
 	scr->full = false;
 }
+
 
 /**
  * @brief Start the display, LEDs and buttons.
@@ -351,43 +404,78 @@ static void start_io(void)
 	ui_message("Scanning...");
 }
 
+
 /**
- * @brief Log this start in flash, with why it happened, and show the log
- *        on the console and the events screen.
+ * @brief Record this start in the flash log, with why it happened.
  *
  * Takes the note the run before left (reset_note_take()) first, before
- * anything else can restart the meter. With CONFIG_METER_RESET_CAUSE_HWINFO,
+ * anything else can restart the meter. With CONFIG_METER_RESET_CAUSE,
  * the record also keeps the hardware's reset cause (reset_cause_take()).
  *
+ * @retval 0 Recorded, or the log is open but the record couldn't be added.
+ * @retval <0 Negative errno from event_log_init(): there is no log.
+ *
  * @sideeffects Those of reset_note_take(), reset_cause_take() (with
- *              CONFIG_METER_RESET_CAUSE_HWINFO), event_log_init() and event_log_add(): starts
+ *              CONFIG_METER_RESET_CAUSE), event_log_init() and event_log_add(): starts
  *              this run's note, reads and clears the hardware's reset cause, reads and writes
- *              the flash log; logs the newest starts; gives the UI its event source
- *              (ui_set_events()). errno may be set by snprintf() (only on an output error).
+ *              the flash log. errno unchanged.
  */
-static void log_start(void)
+static int record_start(void)
 {
 	struct boot_note note;
 	struct boot_record r;
-	char text[START_TEXT_MAX];
+	int ret;
 
 	reset_note_take(&note);
-	if (event_log_init() != 0) {
-		return;
+	ret = event_log_init();
+	if (ret != 0) {
+		return ret;
 	}
 	boot_record_from_note(&note, event_log_last_boot() + 1U, &r);
-	if (IS_ENABLED(CONFIG_METER_RESET_CAUSE_HWINFO)) {
+	if (IS_ENABLED(CONFIG_METER_RESET_CAUSE)) {
 		r.hw_reset = reset_cause_take();
 	}
 	(void)event_log_add(&r);
+
+	return 0;
+}
+
+
+/**
+ * @brief Print the newest starts on the console.
+ *
+ * @sideeffects Logs up to STARTS_ON_CONSOLE lines. errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void print_starts(void)
+{
+	char text[START_TEXT_MAX];
+
 	for (size_t i = 0; i < MIN(event_log_count(), (size_t)STARTS_ON_CONSOLE); i++) {
 		const struct boot_record *e = event_log_get(i);
 
 		boot_record_describe(e, text, sizeof(text));
 		LOG_INF("Start %s (detail %d, 0x%08x)", text, (int)e->detail, (unsigned int)e->arg);
 	}
+}
+
+
+/**
+ * @brief Bring the event log up for this run: record this start, print the
+ *        newest, hand them to the events screen.
+ *
+ * @sideeffects Those of record_start() and print_starts(); gives the UI its event source
+ *              (ui_set_events()). errno may be set by snprintf() (only on an output error).
+ */
+static void log_start(void)
+{
+	if (record_start() != 0) {
+		return;
+	}
+	print_starts();
 	ui_set_events(event_log_count(), event_log_get);
 }
+
 
 /**
  * @brief Entry point: start the display and Wi-Fi, then redraw for ever.
@@ -403,7 +491,12 @@ static void log_start(void)
 int main(void)
 {
 	/* Static: struct screen holds a whole scan, too big for the stack. */
-	static struct screen scr = {.view = UI_VIEW_CHANNELS, .full = true};
+	static struct screen scr = {
+		.page = 0,
+		.view = UI_VIEW_CHANNELS,
+		.band = CHAN_BAND_2G4,
+		.full = true,
+	};
 	static struct chan_stats next;
 
 	log_start();
@@ -427,7 +520,7 @@ int main(void)
 			scr.full = true;
 		}
 		scan_task_snapshot(k_uptime_get(), &next, &state);
-		status_set(led_status(&next, &state));
+		status_set(led_status(&next, &state, scr.band));
 		if (state.scans > 0U) { /* "Scanning..." until the first scan ends */
 			update_screen(&scr, &next, state.scans);
 		}

@@ -61,6 +61,7 @@ static int fake_write(const struct device *dev, const uint16_t x, const uint16_t
 	return 0;
 }
 
+
 /**
  * @brief Describe the panel.
  *
@@ -79,6 +80,7 @@ static void fake_get_capabilities(const struct device *dev, struct display_capab
 	caps->current_pixel_format = PIXEL_FORMAT_RGB_565X;
 }
 
+
 /**
  * @brief Turn the panel on: nothing to do.
  *
@@ -93,6 +95,7 @@ static int fake_blanking_off(const struct device *dev)
 
 	return 0;
 }
+
 
 static DEVICE_API(display, fake_api) = {
 	.write = fake_write,
@@ -116,6 +119,7 @@ uint16_t fake_display_pixel(int x, int y)
 {
 	return pixels[(y * WIDTH) + x];
 }
+
 
 /*
  * Public interface: documented in fake_display.h.

@@ -49,6 +49,34 @@ config METER_SCAN_DWELL_ACTIVE_MS
 	  channel (wifi_scan_params.dwell_time_active). 0 leaves it to the
 	  Wi-Fi driver.
 
+config METER_BAND_5G
+	bool "Keep 5 GHz networks"
+	help
+	  Keep the 5 GHz networks a scan hears, for a Wi-Fi chip that has the
+	  band: the XIAO ESP32-C5's board .conf turns it on; the Pico W's
+	  CYW43439 is 2.4 GHz only. Without it they count as "other". With
+	  it, Channels 5 GHz and Networks 5 GHz screens follow the 2.4 GHz
+	  ones, the LED follows the band of the screen last shown, and the
+	  console reports both bands.
+
+config METER_RECOMMEND_5G_132
+	bool "Recommend the 5 GHz block 132-144"
+	depends on METER_BAND_5G
+	help
+	  Consider the 80 MHz block 132-144 for the 5 GHz recommendation. The
+	  US allows it; Europe and the UK stop at 140, so a router there
+	  can't use the block at 80 MHz. 36-48, 52-64, 100-112 and 116-128 are
+	  always considered.
+
+config METER_RECOMMEND_5G_UPPER
+	bool "Recommend the 5 GHz block 149-161"
+	depends on METER_BAND_5G
+	help
+	  Consider the 80 MHz block 149-161 for the 5 GHz recommendation. The
+	  US allows it at full power; in the UK it is short-range-device
+	  spectrum (indoors, low power), which many routers don't offer.
+	  Networks on it are counted either way.
+
 config METER_WIFI_COUNTRY
 	string "Wi-Fi country, ISO 3166 alpha-2"
 	default ""
@@ -67,16 +95,26 @@ config METER_WIFI_REG_DOMAIN
 	  Set when METER_WIFI_COUNTRY names a country: builds
 	  src/wifi_country.c.
 
+config METER_RESET_CAUSE
+	bool
+	help
+	  Set when the board has a way to read the hardware's reset cause
+	  (one of the options that select it): each start's record keeps
+	  it, so the events screen can name what the restart note can't
+	  tell apart. Builds src/reset_cause.c.
+
 config METER_RESET_CAUSE_HWINFO
-	bool "Record the hardware's reset cause with each start"
+	bool "Record the hardware's reset cause with each start, through hwinfo"
 	select HWINFO
+	select METER_RESET_CAUSE
 	help
 	  Reads the reset cause from the hardware (hwinfo_get_reset_cause())
 	  and keeps it in each start's record, so the events screen can
 	  name what the restart note can't tell apart: the reset button, a
 	  hardware watchdog, a brown-out, a CPU fault. Only for boards whose
 	  hwinfo driver reports it reliably: the RP2040's keeps the last
-	  power-on until the next one, so the Pico W leaves this off.
+	  power-on until the next one, so the Pico W reads its watchdog
+	  instead (METER_RESET_CAUSE_RP2040).
 
 config METER_RETRY_S
 	int "Seconds before retrying a scan that heard nothing"
@@ -123,10 +161,12 @@ config METER_FADE_MIN_PERCENT
 config METER_REDRAW_MS
 	int "Milliseconds between screen updates"
 	default 500
-	range 50 10000
+	range 50 1250
 	help
 	  How often the screen is checked for changes (new results or
-	  fading), and redrawn if anything changed.
+	  fading), and redrawn if anything changed. At most 1250: the main
+	  thread's 5 s watchdog deadline must allow several redraws
+	  (main.c).
 
 config METER_LED_BRIGHTNESS
 	int "RGB LED brightness, percent"

@@ -25,7 +25,7 @@
 </style>
 </head>
 <body>
-<h1>Pico W network meter</h1>
+<h1>Wi-Fi network meter <span style="font-size:10pt; font-weight:normal; color:#555">Pico W and XIAO ESP32-C5</span></h1>
 <p class="sub">Shows how crowded each 2.4 GHz Wi-Fi channel is, so you can pick the best channel for your router.</p>
 
 <div class="cols">
@@ -81,7 +81,7 @@
 <div class="cols">
   <div>
     <h2>Events screen</h2>
-    <p>Each start, newest first, with the run time before it: <b>power on</b> (white); <b>Wi-Fi restart</b> (amber); <b>crash</b>, <b>scan/main hung</b> or <b>restart</b> with no reason (red). Kept in flash. <span class="key">X</span>+<span class="key">Y</span>: whole log to the serial console.</p>
+    <p>Each start, newest first, with the run time before it: <b>power on</b> (white); <b>Wi-Fi restart</b> (amber); <b>crash</b>, <b>scan/main hung</b> or <b>restart</b> with no reason (red). Also <b>HW watchdog</b>; XIAO also <b>CPU fault</b>, <b>brown-out</b>. Kept in flash. <span class="key">X</span>+<span class="key">Y</span>: whole log to the serial console.</p>
   </div>
   <div>
     <h2>Fading</h2>
@@ -92,9 +92,9 @@
 <h2>Good to know</h2>
 <ul>
   <li>Scans run every 10 s (<span class="key">X</span> on Channels: now). Measure where you use Wi-Fi, not by the router.</li>
-  <li>2.4 GHz only: the Pico W cannot hear 5 GHz networks.</li>
+  <li>XIAO: <b>Channels</b> and <b>Networks 5 GHz</b> too (by channel width; bold: no DFS); LED: the band last viewed.</li>
   <li>Keep it away from USB 3 hubs: their noise drowns out all but the strongest networks. Use a long cable or a USB charger.</li>
-  <li>Serial log on the Pico's USB socket: <code>screen /dev/cu.usbmodem&lt;N&gt; 115200</code> on a Mac.</li>
+  <li>Serial log on the board's USB socket: <code>screen /dev/cu.usbmodem&lt;N&gt; 115200</code> on a Mac.</li>
 </ul>
 </body>
 </html>

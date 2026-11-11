@@ -63,11 +63,6 @@ whd_interface_t airoc_wifi_get_whd_interface(void);
 /** How long to give the WHD thread after waking it, ms. */
 #define WAKE_WAIT_MS 100
 
-/** With CONFIG_METER_DEBUG_WIFI_BUS_AWAKE, how long WHD keeps the bus up after a
- * transfer, ms: an hour, far longer than the time between scans.
- */
-#define BUS_AWAKE_MS (60U * 60U * 1000U)
-
 /** How long to let the WHD thread settle after a scan before reading the chip, ms. */
 #define SETTLE_MS 500
 
@@ -115,18 +110,21 @@ static const struct {
 static const struct gpio_dt_spec host_wake =
 	GPIO_DT_SPEC_GET(DT_COMPAT_GET_ANY_STATUS_OKAY(infineon_airoc_wifi), wifi_host_wake_gpios);
 
+/** Room for k_thread_state_str()'s names of a thread's states, such as "pending". */
+#define THREAD_STATE_MAX 32U
+
 /** What the WHD library was doing, at one moment. */
 struct whd_snapshot {
-	uint8_t tx_seq;          /**< the next message's sequence number */
-	uint8_t tx_max;          /**< the chip's credit: may send up to, not including, this */
-	uint8_t credits;         /**< messages the chip will take now */
-	uint32_t queued;         /**< messages waiting to be sent */
-	uint32_t queued_control; /**< of which control messages (requests) */
-	bool bus_up;             /**< WHD thinks the chip's bus is awake */
-	bool irq_flag;           /**< the WHD thread has an interrupt to handle */
-	bool save_restore;       /**< the bus sleeps in the chip's save/restore deep sleep */
-	bool waiting;            /**< the WHD thread is asleep on its semaphore */
-	char state[32];          /**< the WHD thread's state, as Zephyr names it */
+	uint8_t tx_seq;               /**< the next message's sequence number */
+	uint8_t tx_max;               /**< the chip's credit: may send up to, not including, this */
+	uint8_t credits;              /**< messages the chip will take now */
+	uint32_t queued;              /**< messages waiting to be sent */
+	uint32_t queued_control;      /**< of which control messages (requests) */
+	bool bus_up;                  /**< WHD thinks the chip's bus is awake */
+	bool irq_flag;                /**< the WHD thread has an interrupt to handle */
+	bool save_restore;            /**< the bus sleeps in the chip's save/restore deep sleep */
+	bool waiting;                 /**< the WHD thread is asleep on its semaphore */
+	char state[THREAD_STATE_MAX]; /**< the WHD thread's state, as Zephyr names it */
 };
 
 /**
@@ -142,6 +140,7 @@ static whd_driver_t whd_driver_get(void)
 
 	return iface == NULL ? NULL : iface->whd_driver;
 }
+
 
 /**
  * @brief Sample the chip's interrupt line.
@@ -177,6 +176,7 @@ static int sample_line(bool *asserted)
 	return 0;
 }
 
+
 /**
  * @brief Copy the WHD library's state.
  *
@@ -205,6 +205,7 @@ static void snapshot(whd_driver_t whd, struct whd_snapshot *s)
 	k_sched_unlock();
 }
 
+
 /**
  * @brief Log a copy of the WHD library's state.
  *
@@ -222,6 +223,7 @@ static void log_snapshot(const char *when, const struct whd_snapshot *s)
 		s->save_restore ? "on" : "off", s->irq_flag ? "set" : "clear", s->state,
 		s->waiting ? ", asleep waiting to be woken" : "");
 }
+
 
 /**
  * @brief Ask the chip's bus to stay awake, and wake it.
@@ -249,6 +251,7 @@ static int keep_bus_awake(whd_driver_t whd)
 	return 0;
 }
 
+
 /**
  * @brief Undo keep_bus_awake().
  *
@@ -266,6 +269,7 @@ static void let_bus_sleep(whd_driver_t whd)
 		whd_thread_notify(whd);
 	}
 }
+
 
 /** What the chip's bus registers read. */
 struct chip_regs {
@@ -306,6 +310,7 @@ static void read_chip_regs(whd_driver_t whd, struct chip_regs *r)
 	}
 }
 
+
 /**
  * @brief Log the chip's bus registers, and tell whether its ID is right.
  *
@@ -337,6 +342,7 @@ static int check_chip_answers(whd_driver_t whd, const char *when)
 
 	return r.res == WHD_SUCCESS && (r.id & CHIP_ID_MASK) == expected ? 0 : -EIO;
 }
+
 
 /**
  * @brief Read the backplane window the chip has: the base address its
@@ -370,6 +376,7 @@ static int read_chip_window(whd_driver_t whd, uint32_t *base)
 	return 0;
 }
 
+
 /**
  * @brief Set the chip's backplane window to a base address.
  *
@@ -383,9 +390,9 @@ static int read_chip_window(whd_driver_t whd, uint32_t *base)
 static int write_chip_window(whd_driver_t whd, uint32_t base)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(window_regs); i++) {
-		whd_result_t res =
-			whd_bus_write_register_value(whd, BACKPLANE_FUNCTION, window_regs[i].reg, 1,
-						     (base >> window_regs[i].shift) & 0xffU);
+		whd_result_t res = whd_bus_write_register_value(
+			whd, BACKPLANE_FUNCTION, window_regs[i].reg, 1,
+			(base >> window_regs[i].shift) & BIT_MASK(BITS_PER_BYTE));
 
 		if (res != WHD_SUCCESS) {
 			LOG_ERR("Can't set the chip's backplane window: 0x%08x", (unsigned int)res);
@@ -395,6 +402,7 @@ static int write_chip_window(whd_driver_t whd, uint32_t base)
 
 	return 0;
 }
+
 
 /**
  * @brief Compare the chip's backplane window with the one WHD believes it
@@ -426,6 +434,7 @@ static void check_window(whd_driver_t whd, const char *when)
 		LOG_WRN("Set the chip's backplane window to WHD's, 0x%08x", (unsigned int)wanted);
 	}
 }
+
 
 /**
  * @brief Log the chip's bus registers, and if it answers, print its
@@ -469,6 +478,7 @@ static void check_chip(whd_driver_t whd, const char *when)
 	let_bus_sleep(whd);
 }
 
+
 /*
  * Public interface: documented in wifi_debug.h.
  *
@@ -505,30 +515,6 @@ void wifi_debug_scan_failed(void)
 	check_chip(whd, "after the failure");
 }
 
-/**
- * @brief Stop WHD letting the chip's bus sleep.
- *
- * After each transfer WHD can keep the bus up for a while before letting it sleep; when it
- * lets it sleep, on the CYW43439 it clears the chip's keep-SDIO-on bit, and the chip goes
- * into its save/restore deep sleep. Asking for a delay of BUS_AWAKE_MS, which each
- * transfer starts again, keeps the bus up, and the chip out of deep sleep, while the meter
- * scans. WHD's own setter for the delay is declared but not built, so this sets the request
- * it would have set (an aligned 32-bit store, which the RP2040 makes atomic); the WHD
- * thread applies it the next time it waits.
- *
- * @param whd The WHD driver.
- *
- * @sideeffects Sets WHD's delayed bus release request; logs it. errno unchanged.
- */
-static void keep_bus_up(whd_driver_t whd)
-{
-	struct whd_bus_common_mirror *common = (struct whd_bus_common_mirror *)whd->bus_common_info;
-
-	common->delayed_bus_release_timeout_ms_request = BUS_AWAKE_MS;
-	LOG_WRN("Keeping the Wi-Fi chip's bus up, out of save/restore deep sleep, for %u ms "
-		"after each transfer (CONFIG_METER_DEBUG_WIFI_BUS_AWAKE)",
-		(unsigned int)BUS_AWAKE_MS);
-}
 
 /*
  * Public interface: documented in wifi_debug.h.
@@ -552,7 +538,4 @@ void wifi_debug_scan_ok(void)
 	/* Let the WHD thread finish with the scan first: this reads the chip's bus too. */
 	k_msleep(SETTLE_MS);
 	check_chip(whd, "while working");
-	if (IS_ENABLED(CONFIG_METER_DEBUG_WIFI_BUS_AWAKE)) {
-		keep_bus_up(whd);
-	}
 }

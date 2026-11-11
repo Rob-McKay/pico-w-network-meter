@@ -38,15 +38,12 @@ void wifi_debug_scan_failed(void);
  * Built only with CONFIG_METER_DEBUG_WIFI_IRQ; call it under
  * IS_ENABLED(CONFIG_METER_DEBUG_WIFI_IRQ), from the scan thread.
  *
- * With CONFIG_METER_DEBUG_WIFI_BUS_AWAKE, it then stops WHD letting the
- * chip's bus sleep, which keeps the chip out of its save/restore deep sleep.
  *
  * @sideeffects The first time only: records that it ran; sleeps 500 ms, so the WHD thread
  *              has finished with the scan; wakes the chip's bus, reads its
  *              registers and logs them, and if the chip answers, reads its firmware's
  *              console log from its memory and prints it all, blocking the calling thread
- *              meanwhile; with CONFIG_METER_DEBUG_WIFI_BUS_AWAKE, sets WHD's delayed bus
- *              release to an hour and logs it. Later calls do nothing. errno unchanged.
+ *              meanwhile. Later calls do nothing. errno unchanged.
  */
 void wifi_debug_scan_ok(void);
 

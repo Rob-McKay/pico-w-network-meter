@@ -5,8 +5,10 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -18,6 +20,7 @@
 #include "reset_note.h"
 #include "scan_health.h"
 #include "scan_task.h"
+#include "recommend.h"
 #include "scanner.h"
 #include "watchdog.h"
 #include "wifi_debug.h"
@@ -26,13 +29,23 @@
 
 LOG_MODULE_REGISTER(scan_task, CONFIG_METER_LOG_LEVEL);
 
-/* The scan thread's watchdog deadline: the longest scan and wait, and a
- * margin for the driver's own waits.
+/* A margin on the scan thread's watchdog for the Wi-Fi driver's own waits, s: it waits up to
+ * 30 s for its lock before giving up on a request.
  */
+#define DRIVER_MARGIN_S 30U
+/* The scan thread's watchdog deadline: the longest scan and wait, and the driver's margin. */
 #define SCAN_DEADLINE_MS                                                                           \
 	((CONFIG_METER_SCAN_TIMEOUT_S + MAX(CONFIG_METER_SCAN_INTERVAL_S, CONFIG_METER_RETRY_S) +  \
-	  30U) *                                                                                   \
+	  DRIVER_MARGIN_S) *                                                                       \
 	 MSEC_PER_SEC)
+/* CONFIG_METER_FADE_MIN_PERCENT's whole. */
+#define PERCENT 100
+
+/* A hidden network's name on the console: this, then its BSSID, as on the screen. */
+#define HIDDEN_PREFIX "hidden "
+
+/* Room for a signal level as text: "-127 dBm" and its terminator. */
+#define DBM_TEXT_MAX 16U
 
 BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 	     "CONFIG_METER_FADE_END_S must be more than CONFIG_METER_FADE_START_S");
@@ -40,7 +53,7 @@ BUILD_ASSERT(CONFIG_METER_FADE_END_S > CONFIG_METER_FADE_START_S,
 static const struct ap_fade fade = {
 	.start_ms = (int64_t)CONFIG_METER_FADE_START_S * MSEC_PER_SEC,
 	.end_ms = (int64_t)CONFIG_METER_FADE_END_S * MSEC_PER_SEC,
-	.min_level = (uint8_t)((CONFIG_METER_FADE_MIN_PERCENT * CHAN_FRESH) / 100),
+	.min_level = (uint8_t)((CONFIG_METER_FADE_MIN_PERCENT * CHAN_FRESH) / PERCENT),
 };
 
 /* Zephyr's definition macros can end in an empty statement: ISO C -Wpedantic
@@ -66,6 +79,114 @@ static struct ap_history history;
 static struct scan_task_state progress;
 
 /**
+ * @brief Write a signal level for the console: "-72 dBm", or "clear" for
+ *        CHAN_RSSI_NONE (nothing heard) rather than "-127 dBm".
+ *
+ * @param dbm dBm, or CHAN_RSSI_NONE.
+ * @param[out] buf The text, cut to fit and always terminated.
+ * @param size Size of @p buf, at least 1.
+ *
+ * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void dbm_text(int dbm, char *buf, size_t size)
+{
+	if (dbm == CHAN_RSSI_NONE) {
+		(void)snprintf(buf, size, "clear");
+	} else {
+		(void)snprintf(buf, size, "%d dBm", dbm);
+	}
+}
+
+
+/**
+ * @brief Log one channel's figures, if anything reaches it.
+ *
+ * @param info The channel's figures.
+ *
+ * @sideeffects Writes a log message. errno may be set by snprintf() (only on an output
+ *              error).
+ */
+static void report_channel(const struct chan_info *info)
+{
+	char strongest[DBM_TEXT_MAX];
+	char others[DBM_TEXT_MAX];
+	char total[DBM_TEXT_MAX];
+
+	if (info->ap_count == 0U && info->interference == CHAN_RSSI_NONE) {
+		return;
+	}
+	dbm_text(info->best_rssi, strongest, sizeof(strongest));
+	dbm_text(info->others, others, sizeof(others));
+	dbm_text(info->interference, total, sizeof(total));
+	LOG_INF("  ch %2u: %u networks, strongest %8s, interference %8s, total %8s",
+		(unsigned int)info->channel, (unsigned int)info->ap_count, strongest, others,
+		total);
+}
+
+
+/**
+ * @brief Log a scan's 5 GHz results on the console: each channel reached,
+ *        and the best 80 MHz block with how busy it is ("nothing heard"
+ *        rather than CHAN_RSSI_NONE's -127 dBm).
+ *
+ * @param s The scan.
+ *
+ * @sideeffects Writes log messages. errno unchanged.
+ */
+static void report_5g(const struct chan_stats *s)
+{
+	uint8_t best = recommend_5g(s);
+	struct chan_info info;
+
+	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
+		chan_stats_channel_5g(s, chan_5g_channel(i), &info);
+		report_channel(&info);
+	}
+	chan_stats_block_5g(s, best, &info);
+	unsigned int last = chan_5g_block_last(best);
+
+	if (info.interference == CHAN_RSSI_NONE) {
+		LOG_INF("  5 GHz: use %u-%u (80 MHz): clear, nothing heard", (unsigned int)best,
+			last);
+	} else {
+		LOG_INF("  5 GHz: use %u-%u (80 MHz): %s, interference %d dBm", (unsigned int)best,
+			last, chan_level_name(chan_stats_level(info.interference)),
+			info.interference);
+	}
+}
+
+
+/**
+ * @brief Log every network a scan kept, with the width it is counted at
+ *        (chan_ap_width_mhz()), at debug level.
+ *
+ * SSIDs are printed through chan_ssid_printable(): they are whatever nearby access points
+ * send, and control characters in them could rewrite the terminal. A hidden network is
+ * shown by its BSSID, "hidden 02:1f:3c:12:34:56", as on the screen.
+ *
+ * @param s The scan.
+ *
+ * @sideeffects Writes debug log messages. errno may be set by snprintf() (only on an output
+ *              error).
+ */
+static void report_networks(const struct chan_stats *s)
+{
+	char ssid[CHAN_SSID_MAX + 1];
+
+	for (size_t i = 0; i < s->ap_count; i++) {
+		if (chan_ap_hidden(&s->aps[i])) {
+			chan_bssid_text(s->aps[i].bssid, HIDDEN_PREFIX, ssid, sizeof(ssid));
+		} else {
+			chan_ssid_printable(s->aps[i].ssid, ssid, sizeof(ssid));
+		}
+		LOG_DBG("  %-32s ch %3u %3d MHz %4d dBm", ssid, (unsigned int)s->aps[i].channel,
+			chan_ap_width_mhz(&s->aps[i]), (int)s->aps[i].rssi);
+	}
+}
+
+
+/**
  * @brief Log a scan's results on the console.
  *
  * @param s The scan.
@@ -75,24 +196,29 @@ static struct scan_task_state progress;
  */
 static void report(const struct chan_stats *s, unsigned int scan_no)
 {
-	LOG_INF("Scan %u: %u networks on 2.4 GHz, %u other", scan_no, (unsigned int)s->ap_count,
-		(unsigned int)(s->ignored + s->dropped));
+	unsigned int n_2g4 = (unsigned int)chan_stats_band_count(s, CHAN_BAND_2G4);
+	unsigned int other = (unsigned int)(s->ignored + s->dropped);
+
+	if (IS_ENABLED(CONFIG_METER_BAND_5G)) {
+		LOG_INF("Scan %u: %u networks on 2.4 GHz, %u on 5 GHz, %u other", scan_no, n_2g4,
+			(unsigned int)chan_stats_band_count(s, CHAN_BAND_5G), other);
+	} else {
+		LOG_INF("Scan %u: %u networks on 2.4 GHz, %u other", scan_no, n_2g4, other);
+	}
 	for (uint8_t ch = CHAN_FIRST; ch <= CHAN_LAST; ch++) {
 		struct chan_info info;
 
 		chan_stats_channel(s, ch, &info);
-		if (info.ap_count > 0U || info.interference != CHAN_RSSI_NONE) {
-			LOG_INF("  ch %2u: %u networks, strongest %4d dBm, interference %4d dBm, "
-				"total %4d dBm",
-				(unsigned int)ch, (unsigned int)info.ap_count, info.best_rssi,
-				info.others, info.interference);
-		}
+		report_channel(&info);
 	}
-	for (size_t i = 0; i < s->ap_count; i++) {
-		LOG_DBG("  %-32s ch %2u %4d dBm", s->aps[i].ssid, (unsigned int)s->aps[i].channel,
-			s->aps[i].rssi);
+	if (IS_ENABLED(CONFIG_METER_BAND_5G)) {
+		report_5g(s);
+	}
+	if (IS_ENABLED(CONFIG_METER_LOG_LEVEL_DBG)) {
+		report_networks(s);
 	}
 }
+
 
 /**
  * @brief Mark a scan as running, for the LED.
@@ -105,6 +231,7 @@ static void set_busy(void)
 	progress.busy = true;
 	k_mutex_unlock(&lock);
 }
+
 
 /**
  * @brief Run one scan into the scan thread's buffer.
@@ -143,6 +270,7 @@ static int run_scan(void)
 	return ret;
 }
 
+
 /**
  * @brief Make a finished scan visible to the display thread.
  *
@@ -174,15 +302,16 @@ static unsigned int publish(int ret)
 	return scan_no;
 }
 
+
 /**
  * @brief Restart the meter, to recover a Wi-Fi driver that has stopped
  *        working.
  *
- * A Wi-Fi driver can stop working for good: the Pico W's AIROC driver runs
- * out of packet buffers (a leak in it or its WHD library), after which every
- * scan fails to start. Only a restart
- * gets them back; it takes a few seconds. The next start logs it
- * (reset_note_restart()).
+ * A Wi-Fi driver can stop working for good: on the Pico W, the CYW43439 can
+ * fail to wake from its deep sleep, after which every request to it times
+ * out (CONFIG_METER_WIFI_KEEP_AWAKE keeps it out of that sleep). Only a
+ * restart, which powers the chip off and on again, recovers it; it takes a
+ * few seconds. The next start logs it (reset_note_restart()).
  *
  * @param ret The last scan's error.
  *
@@ -195,6 +324,7 @@ static FUNC_NORETURN void recover(int ret)
 	LOG_ERR("%u scans in a row failed: restarting", health.failures);
 	reset_note_restart(BOOT_WIFI_RESTART, ret, health.failures);
 }
+
 
 /**
  * @brief Run one scan, publish it and log it.
@@ -224,6 +354,7 @@ static bool scan_once(void)
 	return ret == 0 && scanning.ap_count > 0U;
 }
 
+
 /**
  * @brief Scan for ever: every CONFIG_METER_SCAN_INTERVAL_S seconds, sooner
  *        after a scan that heard nothing, or at once on request.
@@ -251,6 +382,7 @@ static void scan_loop(void *p1, void *p2, void *p3)
 	}
 }
 
+
 /*
  * Public interface: documented in scan_task.h.
  *
@@ -266,6 +398,7 @@ void scan_task_start(void)
 	k_thread_name_set(&scan_thread, "scan");
 }
 
+
 /*
  * Public interface: documented in scan_task.h.
  */
@@ -273,6 +406,7 @@ void scan_task_request(void)
 {
 	k_sem_give(&scan_now);
 }
+
 
 /*
  * Public interface: documented in scan_task.h.

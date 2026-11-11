@@ -20,6 +20,7 @@
 #include <zephyr/toolchain.h>
 
 #include "scanner.h"
+#include "wifi_awake.h"
 #include "wifi_country.h"
 #include "chan_stats.h"
 
@@ -30,8 +31,15 @@ LOG_MODULE_REGISTER(scanner, CONFIG_METER_LOG_LEVEL);
 static struct net_if *wifi_iface;
 static struct net_mgmt_event_callback scan_cb;
 
+/* A BSSID as text, "02:1f:3c:12:34:56": two hex digits and a ':' (or, last, the
+ * terminator) for each byte.
+ */
+#define BSSID_TEXT_MAX (CHAN_BSSID_LEN * 3U)
+
 /* The scan in progress: results go to *target while it is set. The mutex
- * covers target and scan_status against the net_mgmt event thread.
+ * covers target, scan_status and raw_results against the net_mgmt event
+ * thread, and is only ever held for a few assignments, so the event
+ * callbacks never wait long for it.
  */
 static K_MUTEX_DEFINE(scan_lock);
 static struct chan_stats *target;
@@ -47,10 +55,40 @@ static K_SEM_DEFINE(scan_done, 0, 1);
 #pragma GCC diagnostic pop
 
 /**
+ * @brief Convert a scan result's channel width to the meter's.
+ *
+ * The width comes from a carried Zephyr patch (wifi-scan-result-width.patch); drivers that
+ * don't fill it in leave 0, which isn't a width.
+ *
+ * @param bandwidth enum wifi_frequency_bandwidths, or 0.
+ * @return enum chan_width: CHAN_WIDTH_UNKNOWN for anything but 20, 40, 80 and 160 MHz.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint8_t to_chan_width(uint8_t bandwidth)
+{
+	switch (bandwidth) {
+	case WIFI_FREQ_BANDWIDTH_20MHZ:
+		return CHAN_WIDTH_20;
+	case WIFI_FREQ_BANDWIDTH_40MHZ:
+		return CHAN_WIDTH_40;
+	case WIFI_FREQ_BANDWIDTH_80MHZ:
+		return CHAN_WIDTH_80;
+	case WIFI_FREQ_BANDWIDTH_160MHZ:
+		return CHAN_WIDTH_160;
+	default:
+		return CHAN_WIDTH_UNKNOWN;
+	}
+}
+
+
+/**
  * @brief Convert a Zephyr scan result to an access point record.
  *
- * Only 2.4 GHz results get a channel; anything else is left at 0, which
- * chan_stats_add() counts as ignored.
+ * 2.4 GHz results, and 5 GHz ones with CONFIG_METER_BAND_5G, keep their
+ * band and channel; anything else is left on channel 0, which
+ * chan_stats_add() counts as ignored. The width and centre channel are
+ * kept as the driver gives them: chan_stats checks they make sense.
  *
  * @param r Zephyr's scan result.
  * @param[out] ap The access point.
@@ -65,11 +103,20 @@ static void to_chan_ap(const struct wifi_scan_result *r, struct chan_ap *ap)
 	memcpy(ap->ssid, r->ssid, len);
 	ap->ssid[len] = '\0';
 	memcpy(ap->bssid, r->mac, MIN((size_t)r->mac_length, sizeof(ap->bssid)));
-	ap->channel = r->band == WIFI_FREQ_BAND_2_4_GHZ ? r->channel : 0U;
+	if (r->band == WIFI_FREQ_BAND_2_4_GHZ) {
+		ap->band = CHAN_BAND_2G4;
+		ap->channel = r->channel;
+	} else if (IS_ENABLED(CONFIG_METER_BAND_5G) && r->band == WIFI_FREQ_BAND_5_GHZ) {
+		ap->band = CHAN_BAND_5G;
+		ap->channel = r->channel;
+	}
+	ap->width = to_chan_width(r->bandwidth);
+	ap->centre = r->center_channel;
 	ap->rssi = r->rssi;
 	ap->secured = r->security != WIFI_SECURITY_TYPE_NONE;
 	ap->freshness = CHAN_FRESH;
 }
+
 
 /**
  * @brief Tell whether a scan result is an empty record.
@@ -90,6 +137,33 @@ static bool is_empty_record(const struct chan_ap *ap)
 	return memcmp(ap->bssid, zero, sizeof(zero)) == 0;
 }
 
+
+/**
+ * @brief Log a scan result, at debug level.
+ *
+ * The SSID is printed through chan_ssid_printable(): it is whatever a nearby access point
+ * sends, and control characters in it could rewrite the terminal. The width and centre
+ * channel come from a carried Zephyr patch (wifi-scan-result-width.patch); drivers that
+ * don't fill them give "UNKNOWN" and 0.
+ *
+ * @param ap The access point.
+ * @param r Zephyr's scan result it came from, for the channel width.
+ *
+ * @sideeffects Writes a debug log message. errno unchanged.
+ */
+static void log_result(const struct chan_ap *ap, const struct wifi_scan_result *r)
+{
+	char ssid[CHAN_SSID_MAX + 1];
+	char bssid[BSSID_TEXT_MAX];
+
+	chan_ssid_printable(ap->ssid, ssid, sizeof(ssid));
+	chan_bssid_text(ap->bssid, "", bssid, sizeof(bssid));
+	LOG_DBG("Result: %s ch %u, %s centre %u, %d dBm \"%s\"", bssid, (unsigned int)ap->channel,
+		wifi_bandwidth_txt((enum wifi_frequency_bandwidths)r->bandwidth),
+		(unsigned int)r->center_channel, (int)ap->rssi, ssid);
+}
+
+
 /**
  * @brief Add a scan result to the scan in progress (net_mgmt event thread).
  *
@@ -97,8 +171,9 @@ static bool is_empty_record(const struct chan_ap *ap)
  *
  * @param r The result.
  *
- * @sideeffects Logs the result; under @c scan_lock, adds it to the waiting scan's statistics
- *              (@c target) and counts it in @c raw_results. errno unchanged.
+ * @sideeffects With debug logging, logs the result (log_result()); under @c scan_lock, adds it
+ *              to the waiting scan's statistics (@c target) and counts it in @c raw_results.
+ *              errno unchanged.
  */
 static void on_result(const struct wifi_scan_result *r)
 {
@@ -108,9 +183,9 @@ static void on_result(const struct wifi_scan_result *r)
 	if (is_empty_record(&ap)) {
 		return;
 	}
-	LOG_DBG("Result: %02x:%02x:%02x:%02x:%02x:%02x ch %u %d dBm \"%s\"", ap.bssid[0],
-		ap.bssid[1], ap.bssid[2], ap.bssid[3], ap.bssid[4], ap.bssid[5],
-		(unsigned int)ap.channel, ap.rssi, ap.ssid);
+	if (IS_ENABLED(CONFIG_METER_LOG_LEVEL_DBG)) {
+		log_result(&ap, r);
+	}
 
 	k_mutex_lock(&scan_lock, K_FOREVER);
 	if (target != NULL) {
@@ -119,6 +194,7 @@ static void on_result(const struct wifi_scan_result *r)
 	}
 	k_mutex_unlock(&scan_lock);
 }
+
 
 /**
  * @brief End the scan in progress (net_mgmt event thread).
@@ -150,6 +226,7 @@ static void on_done(const struct wifi_status *st)
 	}
 }
 
+
 /**
  * @brief Dispatch a Wi-Fi scan event (net_mgmt event thread).
  *
@@ -171,6 +248,7 @@ static void on_scan_event(struct net_mgmt_event_callback *cb, uint64_t mgmt_even
 	}
 }
 
+
 /*
  * Public interface: documented in scanner.h.
  *
@@ -190,24 +268,30 @@ int scanner_init(void)
 	if (IS_ENABLED(CONFIG_METER_WIFI_REG_DOMAIN)) {
 		(void)wifi_country_apply(wifi_iface);
 	}
+	if (IS_ENABLED(CONFIG_METER_WIFI_KEEP_AWAKE)) {
+		(void)wifi_awake_apply();
+	}
 	net_mgmt_init_event_callback(&scan_cb, on_scan_event, SCAN_EVENTS);
 	net_mgmt_add_event_callback(&scan_cb);
 
 	return 0;
 }
 
+
 /**
  * @brief Point incoming results at @p out, emptied, for a new scan.
  *
+ * @p out is emptied before the lock is taken: no callback can reach it until it is the target.
+ *
  * @param[out] out Where the scan's results go.
  *
- * @sideeffects Under @c scan_lock: empties @p out and makes it the scan's @c target, clears @c
+ * @sideeffects Empties @p out; under @c scan_lock, makes it the scan's @c target, clears @c
  *              scan_status and @c raw_results, and resets @c scan_done. errno unchanged.
  */
 static void arm(struct chan_stats *out)
 {
-	k_mutex_lock(&scan_lock, K_FOREVER);
 	chan_stats_reset(out);
+	k_mutex_lock(&scan_lock, K_FOREVER);
 	target = out;
 	scan_status = 0;
 	raw_results = 0;
@@ -215,28 +299,30 @@ static void arm(struct chan_stats *out)
 	k_mutex_unlock(&scan_lock);
 }
 
+
 /**
- * @brief Stop taking results, and log how the scan went.
+ * @brief Stop taking results.
  *
  * @param ret 0, or the error so far (failed request, -ETIMEDOUT timeout).
+ * @param[out] results How many results the driver delivered.
  * @return @p ret, or the driver's status if the scan completed.
  *
- * @sideeffects Under @c scan_lock, clears @c target, so later results are dropped; logs the
- *              scan's outcome. errno unchanged.
+ * @sideeffects Under @c scan_lock, clears @c target, so later results are dropped, and reads
+ *              @c scan_status and @c raw_results. errno unchanged.
  */
-static int disarm(int ret)
+static int disarm(int ret, unsigned int *results)
 {
 	k_mutex_lock(&scan_lock, K_FOREVER);
 	if (ret == 0) {
 		ret = scan_status;
 	}
-	LOG_INF("Scan ended (%d): %u results from the driver, %u networks kept", ret, raw_results,
-		(unsigned int)target->ap_count);
+	*results = raw_results;
 	target = NULL;
 	k_mutex_unlock(&scan_lock);
 
 	return ret;
 }
+
 
 /**
  * @brief Ask the driver to scan every channel.
@@ -263,6 +349,7 @@ static int request_scan(void)
 	return ret;
 }
 
+
 /*
  * Public interface: documented in scanner.h.
  *
@@ -272,6 +359,7 @@ static int request_scan(void)
  */
 int scanner_run(struct chan_stats *out, k_timeout_t timeout)
 {
+	unsigned int results;
 	int ret;
 
 	if (wifi_iface == NULL) {
@@ -283,6 +371,9 @@ int scanner_run(struct chan_stats *out, k_timeout_t timeout)
 	if (ret == 0 && k_sem_take(&scan_done, timeout) != 0) {
 		ret = -ETIMEDOUT;
 	}
+	ret = disarm(ret, &results);
+	LOG_INF("Scan ended (%d): %u results from the driver, %u networks kept", ret, results,
+		(unsigned int)out->ap_count);
 
-	return disarm(ret);
+	return ret;
 }

@@ -8,6 +8,7 @@
  * out/screens/ when scripts/test.sh runs the test.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -34,6 +35,10 @@
 #define LIST_NAME_W  (24 * 10)
 #define LIST_CHAN_X  (LIST_NAME_W + 8)
 #define LIST_RSSI_X  (LIST_CHAN_X + (3 * 10))
+/* The 5 GHz chart: six blocks of four 10-pixel columns, 6 pixels apart,
+ * centred beside the axis (270 of 286 pixels).
+ */
+#define X0_5G        (AXIS_W + ((320 - AXIS_W - 270) / 2))
 
 static struct chan_stats stats;
 
@@ -63,6 +68,7 @@ static void add(uint8_t id, const char *ssid, uint8_t channel, int8_t rssi, bool
 	zassert_ok(chan_stats_add(&stats, &ap));
 }
 
+
 /**
  * @brief Start the display and fill in a scan: busy on 1, a little on 4-6,
  *        a weak hidden network on 9, little near 11 (so 11 is recommended).
@@ -87,6 +93,7 @@ static void *setup(void)
 	return NULL;
 }
 
+
 /**
  * @brief Left edge of a channel's column on the chart.
  *
@@ -99,6 +106,7 @@ static int column_x(int ch)
 {
 	return AXIS_W + ((ch - 1) * COL_W);
 }
+
 
 /**
  * @brief Tell whether part of a line of text on the fake panel has any
@@ -125,6 +133,7 @@ static bool row_has_colour(int y, int x0, int x1, uint16_t colour)
 	return false;
 }
 
+
 /**
  * @brief Bars are coloured by how busy the channel is; empty ones aren't drawn.
  *
@@ -133,7 +142,7 @@ static bool row_has_colour(int y, int x0, int x1, uint16_t colour)
  */
 ZTEST(meter_ui, test_channel_bars)
 {
-	ui_show(UI_VIEW_CHANNELS, &stats, 1, 0, true);
+	ui_show(UI_VIEW_CHANNELS, CHAN_BAND_2G4, &stats, 1, 0, true);
 
 	zassert_equal(fake_display_pixel(column_x(1) + (COL_W / 2), CHART_BOTTOM - 1),
 		      gfx_rgb(230, 40, 40), "channel 1: busy, red");
@@ -155,6 +164,7 @@ ZTEST(meter_ui, test_channel_bars)
 	(void)fake_display_save_ppm("out/screens/channels.ppm");
 }
 
+
 /**
  * @brief The recommended channel's number is highlighted, the others aren't.
  *
@@ -163,12 +173,13 @@ ZTEST(meter_ui, test_channel_bars)
  */
 ZTEST(meter_ui, test_recommended_highlight)
 {
-	ui_show(UI_VIEW_CHANNELS, &stats, 1, 0, true);
+	ui_show(UI_VIEW_CHANNELS, CHAN_BAND_2G4, &stats, 1, 0, true);
 
 	zassert_equal(chan_stats_recommend(&stats), 11);
 	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255));
 	zassert_equal(fake_display_pixel(column_x(6), CHART_BOTTOM + 4), gfx_rgb(0, 0, 0));
 }
+
 
 /**
  * @brief Grid lines cross the empty columns and the gaps beside bars, the
@@ -183,8 +194,8 @@ ZTEST(meter_ui, test_grid_and_axis)
 	uint16_t labelled = gfx_rgb(80, 80, 80);
 	uint16_t unlabelled = gfx_rgb(40, 40, 40);
 
-	ui_show(UI_VIEW_CHANNELS, &stats, 1, 0, true);
-	ui_show(UI_VIEW_CHANNELS, &stats, 2, 0, false);
+	ui_show(UI_VIEW_CHANNELS, CHAN_BAND_2G4, &stats, 1, 0, true);
+	ui_show(UI_VIEW_CHANNELS, CHAN_BAND_2G4, &stats, 2, 0, false);
 
 	zassert_equal(fake_display_pixel(column_x(13) + (COL_W / 2), ROW_MINUS_60), labelled,
 		      "grid line across an empty column");
@@ -204,6 +215,7 @@ ZTEST(meter_ui, test_grid_and_axis)
 		      "and stops there");
 }
 
+
 /**
  * @brief The list shows the strongest network first, its signal strength
  *        in green; a weak one's in red; a hidden network's name in grey.
@@ -213,7 +225,7 @@ ZTEST(meter_ui, test_grid_and_axis)
  */
 ZTEST(meter_ui, test_network_list)
 {
-	ui_show(UI_VIEW_NETWORKS, &stats, 2, 0, true);
+	ui_show(UI_VIEW_NETWORKS, CHAN_BAND_2G4, &stats, 2, 0, true);
 
 	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, gfx_rgb(0, 200, 80)),
 		     "-42 dBm: green");
@@ -229,6 +241,7 @@ ZTEST(meter_ui, test_network_list)
 	(void)fake_display_save_ppm("out/screens/networks.ppm");
 }
 
+
 /**
  * @brief Header and footer bars are drawn edge to edge.
  *
@@ -239,12 +252,13 @@ ZTEST(meter_ui, test_bars)
 {
 	uint16_t bar = gfx_rgb(0, 50, 110);
 
-	ui_show(UI_VIEW_CHANNELS, &stats, 3, 0, true);
+	ui_show(UI_VIEW_CHANNELS, CHAN_BAND_2G4, &stats, 3, 0, true);
 	zassert_equal(fake_display_pixel(0, 0), bar);
 	zassert_equal(fake_display_pixel(319, BAR_H - 1), bar);
 	zassert_equal(fake_display_pixel(0, 240 - BAR_H), bar);
 	zassert_equal(fake_display_pixel(319, 239), bar);
 }
+
 
 /**
  * @brief Ageing networks are drawn darker; the static labels are not.
@@ -261,13 +275,14 @@ ZTEST(meter_ui, test_faded)
 	for (size_t i = 0; i < faded.ap_count; i++) {
 		faded.aps[i].freshness = 128;
 	}
-	ui_show(UI_VIEW_CHANNELS, &faded, 4, 0, true);
+	ui_show(UI_VIEW_CHANNELS, CHAN_BAND_2G4, &faded, 4, 0, true);
 	zassert_equal(fake_display_pixel(column_x(1) + (COL_W / 2), CHART_BOTTOM - 1),
 		      gfx_fade(gfx_rgb(230, 40, 40), 128), "channel 1's bar at half brightness");
 	zassert_equal(fake_display_pixel(column_x(11), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255),
 		      "the recommended channel's highlight does not fade");
 	(void)fake_display_save_ppm("out/screens/faded.ppm");
 }
+
 
 /**
  * @brief A name long enough to be shortened fills its column, and still
@@ -290,7 +305,7 @@ ZTEST(meter_ui, test_name_gap)
 
 	chan_stats_reset(&one);
 	zassert_ok(chan_stats_add(&one, &ap));
-	ui_show(UI_VIEW_NETWORKS, &one, 1, 0, true);
+	ui_show(UI_VIEW_NETWORKS, CHAN_BAND_2G4, &one, 1, 0, true);
 
 	for (int y = LIST_TOP + 2; y < LIST_TOP + 2 + 16; y++) {
 		for (int x = LIST_NAME_W; x < LIST_CHAN_X; x++) {
@@ -303,6 +318,7 @@ ZTEST(meter_ui, test_name_gap)
 	}
 	zassert_true(digits, "the channel's \"11\" starts after the gap");
 }
+
 
 /**
  * @brief More networks than fit a page: the second page starts with the
@@ -333,10 +349,10 @@ ZTEST(meter_ui, test_network_pages)
 		zassert_ok(chan_stats_add(&many, &ap));
 	}
 
-	ui_show(UI_VIEW_NETWORKS, &many, 1, 0, true);
+	ui_show(UI_VIEW_NETWORKS, CHAN_BAND_2G4, &many, 1, 0, true);
 	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, green), "page 1: strongest");
 
-	ui_show(UI_VIEW_NETWORKS, &many, 1, 9, true);
+	ui_show(UI_VIEW_NETWORKS, CHAN_BAND_2G4, &many, 1, 9, true);
 	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, red), "page 2: 10th, red");
 	zassert_true(
 		row_has_colour(LIST_TOP + (3 * 20) + 2, 0, LIST_NAME_W, gfx_rgb(255, 255, 255)),
@@ -345,11 +361,176 @@ ZTEST(meter_ui, test_network_pages)
 		      "nothing after the 13th");
 	(void)fake_display_save_ppm("out/screens/networks-page2.ppm");
 
-	ui_show(UI_VIEW_NETWORKS, &many, 1, 30, true);
+	ui_show(UI_VIEW_NETWORKS, CHAN_BAND_2G4, &many, 1, 30, true);
 	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, red),
 		     "past the end: last page");
 	zassert_false(row_has_colour(LIST_TOP + (4 * 20) + 2, 0, 320, gfx_rgb(255, 255, 255)));
 }
+
+
+/**
+ * @brief Left edge of a 5 GHz channel's column on the chart.
+ *
+ * @param i The channel's place: 0 for 36, ..., 23 for 161.
+ * @return x.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static int column_x_5g(int i)
+{
+	return X0_5G + (i * 10) + ((i / 4) * 6);
+}
+
+
+/**
+ * @brief Fill in a dual-band scan like a real one: a strong 80 MHz network
+ *        on 40 (36-48 busy) and one of unknown width, two 80 MHz ones on 100
+ *        and a 20 MHz one on 104 (100-112 moderate), a weak 40 MHz one on
+ *        149, nothing on 52-64 or 116-128, and one 2.4 GHz network.
+ *
+ * @param[out] s The scan.
+ *
+ * @sideeffects None (writes only through @p s). errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void fill_dual_band(struct chan_stats *s)
+{
+	static const struct {
+		uint8_t channel;
+		uint8_t width;
+		uint8_t centre;
+		int8_t rssi;
+		const char *ssid;
+	} aps[] = {
+		{40, CHAN_WIDTH_80, 42, -44, "HomeNetwork-5G"},
+		{40, CHAN_WIDTH_UNKNOWN, 0, -82, "Neighbour-5G"},
+		{100, CHAN_WIDTH_80, 106, -76, "Office"},
+		{100, CHAN_WIDTH_80, 106, -78, "Office-Guest"},
+		{104, CHAN_WIDTH_20, 104, -92, ""},
+		{149, CHAN_WIDTH_40, 151, -88, "Shed"},
+	};
+	struct chan_ap ap = {
+		.bssid = {0x02, 0x1f, 0x3c, 0xa2, 0x50, 0},
+		.channel = 6,
+		.rssi = -70,
+		.secured = true,
+		.freshness = CHAN_FRESH,
+	};
+
+	chan_stats_reset(s);
+	(void)snprintf(ap.ssid, sizeof(ap.ssid), "2.4 GHz only");
+	zassert_ok(chan_stats_add(s, &ap));
+	ap.band = CHAN_BAND_5G;
+	for (size_t i = 0; i < ARRAY_SIZE(aps); i++) {
+		ap.bssid[5] = (uint8_t)(i + 1U);
+		ap.channel = aps[i].channel;
+		ap.width = aps[i].width;
+		ap.centre = aps[i].centre;
+		ap.rssi = aps[i].rssi;
+		(void)snprintf(ap.ssid, sizeof(ap.ssid), "%s", aps[i].ssid);
+		zassert_ok(chan_stats_add(s, &ap));
+	}
+}
+
+
+/**
+ * @brief The 5 GHz chart: an 80 MHz network fills its whole block and a
+ *        40 MHz one two columns, coloured by how busy they are; empty blocks
+ *        have no bars; the quietest allowed block's label is highlighted;
+ *        2.4 GHz networks don't appear.
+ *
+ * @sideeffects Overwrites its own static scan; draws on the fake panel and saves it to
+ *              out/screens/channels-5g.ppm. errno may be set by snprintf() (only on an output
+ *              error).
+ */
+ZTEST(meter_ui, test_channels_5g)
+{
+	static struct chan_stats s;
+	uint16_t red = gfx_rgb(230, 40, 40);
+	uint16_t amber = gfx_rgb(255, 170, 0);
+	uint16_t black = gfx_rgb(0, 0, 0);
+
+	fill_dual_band(&s);
+	ui_show(UI_VIEW_CHANNELS, CHAN_BAND_5G, &s, 1, 0, true);
+
+	zassert_equal(fake_display_pixel(column_x_5g(1) + 5, CHART_BOTTOM - 1), red,
+		      "40: its own network, bright red (-44 dBm: busy)");
+	zassert_equal(fake_display_pixel(column_x_5g(0) + 5, CHART_BOTTOM - 1), gfx_fade(red, 153),
+		      "36: the 80 MHz block's network, dim");
+	zassert_equal(fake_display_pixel(column_x_5g(3) + 5, CHART_BOTTOM - 1), gfx_fade(red, 153),
+		      "48: still in the block");
+	zassert_equal(fake_display_pixel(column_x_5g(8) + 5, CHART_BOTTOM - 1), amber,
+		      "100: -76 and -78 make -74 dBm, moderate");
+	zassert_equal(fake_display_pixel(column_x_5g(4) + 5, CHART_BOTTOM - 1), black,
+		      "52-64: nothing heard");
+	zassert_not_equal(fake_display_pixel(column_x_5g(21) + 5, CHART_BOTTOM - 1), black,
+			  "153: the 40 MHz network on 149's secondary");
+	zassert_equal(fake_display_pixel(column_x_5g(22) + 5, CHART_BOTTOM - 1), black,
+		      "157: beyond the 40 MHz network");
+	zassert_equal(fake_display_pixel(column_x_5g(4) - 3, CHART_BOTTOM - 1), black,
+		      "the gap between blocks");
+	zassert_equal(fake_display_pixel(column_x_5g(4), CHART_BOTTOM + 4), gfx_rgb(0, 210, 255),
+		      "52-64 recommended: the quietest, though DFS");
+	zassert_equal(fake_display_pixel(column_x_5g(0), CHART_BOTTOM + 4), black,
+		      "36-48 not highlighted");
+	zassert_equal(chan_stats_recommend_5g(&s, chan_5g_blocks(false, false)), 52);
+	(void)fake_display_save_ppm("out/screens/channels-5g.ppm");
+}
+
+
+/**
+ * @brief The 5 GHz network list: only 5 GHz networks, strongest first,
+ *        and a three-digit channel fits its column, clear of the signal
+ *        strength.
+ *
+ * @sideeffects Overwrites its own static scan; draws on the fake panel and saves it to
+ *              out/screens/networks-5g.ppm. errno may be set by snprintf() (only on an output
+ *              error).
+ */
+ZTEST(meter_ui, test_networks_5g)
+{
+	static struct chan_stats s;
+	uint16_t white = gfx_rgb(255, 255, 255);
+	bool digits = false;
+
+	fill_dual_band(&s);
+	ui_show(UI_VIEW_NETWORKS, CHAN_BAND_5G, &s, 1, 0, true);
+
+	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, gfx_rgb(0, 200, 80)),
+		     "first: -44 dBm, green");
+	zassert_true(
+		row_has_colour(LIST_TOP + (5 * 20) + 2, 0, LIST_NAME_W, gfx_rgb(150, 150, 150)),
+		"sixth and last: the hidden network on 104");
+	zassert_false(row_has_colour(LIST_TOP + (6 * 20) + 2, 0, 320, white),
+		      "the 2.4 GHz network isn't listed");
+
+	/* Row 2: "Office" on 100 at -76 dBm */
+	for (int y = LIST_TOP + 20 + 2; y < LIST_TOP + 20 + 2 + 16; y++) {
+		for (int x = LIST_CHAN_X; x < LIST_RSSI_X; x++) {
+			digits = digits || fake_display_pixel(x, y) != gfx_rgb(0, 0, 0);
+		}
+		for (int x = LIST_RSSI_X; x < LIST_RSSI_X + 10; x++) {
+			zassert_equal(fake_display_pixel(x, y), gfx_rgb(0, 0, 0),
+				      "space before \"-76\" at %d,%d", x, y);
+		}
+	}
+	zassert_true(digits, "\"100\" in the channel column");
+
+	/* Row 1: "40", right-aligned under the "100" below it: its first character cell is empty */
+	for (int y = LIST_TOP + 2; y < LIST_TOP + 2 + 16; y++) {
+		for (int x = LIST_CHAN_X; x < LIST_CHAN_X + 10; x++) {
+			zassert_equal(fake_display_pixel(x, y), gfx_rgb(0, 0, 0),
+				      "\"40\" right-aligned: blank at %d,%d", x, y);
+		}
+	}
+	(void)fake_display_save_ppm("out/screens/networks-5g.ppm");
+
+	ui_show(UI_VIEW_NETWORKS, CHAN_BAND_2G4, &s, 1, 0, true);
+	zassert_true(row_has_colour(LIST_TOP + 2, LIST_RSSI_X, 320, gfx_rgb(255, 170, 0)),
+		     "2.4 GHz list: its one network, -70 dBm, amber");
+	zassert_false(row_has_colour(LIST_TOP + 20 + 2, 0, 320, white), "and no 5 GHz ones");
+}
+
 
 /* Starts for the events screen, newest first. */
 static const struct boot_record test_events[] = {
@@ -375,6 +556,7 @@ static const struct boot_record *test_event(size_t i)
 	return i < ARRAY_SIZE(test_events) ? &test_events[i] : NULL;
 }
 
+
 /**
  * @brief The events screen lists starts newest first, coloured by how much
  *        they matter; with none logged, it says so.
@@ -389,7 +571,7 @@ ZTEST(meter_ui, test_events_screen)
 	uint16_t red = gfx_rgb(230, 40, 40);
 
 	ui_set_events(ARRAY_SIZE(test_events), test_event);
-	ui_show(UI_VIEW_EVENTS, &stats, 5, 0, true);
+	ui_show(UI_VIEW_EVENTS, CHAN_BAND_2G4, &stats, 5, 0, true);
 	zassert_true(row_has_colour(LIST_TOP + 2, 0, 320, white), "power on: white");
 	zassert_true(row_has_colour(LIST_TOP + 20 + 2, 0, 320, amber), "Wi-Fi restart: amber");
 	zassert_true(row_has_colour(LIST_TOP + (3 * 20) + 2, 0, 320, red), "hung thread: red");
@@ -397,9 +579,10 @@ ZTEST(meter_ui, test_events_screen)
 	(void)fake_display_save_ppm("out/screens/events.ppm");
 
 	ui_set_events(0, NULL);
-	ui_show(UI_VIEW_EVENTS, &stats, 5, 0, true);
+	ui_show(UI_VIEW_EVENTS, CHAN_BAND_2G4, &stats, 5, 0, true);
 	zassert_true(row_has_colour(LIST_TOP + 2, 0, 320, gfx_rgb(150, 150, 150)),
 		     "\"No events logged\", in grey");
 }
+
 
 ZTEST_SUITE(meter_ui, NULL, setup, NULL, NULL, NULL);

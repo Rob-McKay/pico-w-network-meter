@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -40,20 +41,17 @@ uint8_t reset_cause_from_flags(uint32_t flags)
 	return flags != 0U ? (uint8_t)BOOT_HW_OTHER : (uint8_t)BOOT_HW_UNKNOWN;
 }
 
+
 /*
  * Public interface: documented in reset_cause.h.
  *
- * Cleared after reading, as Zephyr asks: some drivers accumulate flags across resets until they
- * are cleared. A driver without clearing returns -ENOSYS, which changes nothing here.
+ * The timer wins if both are set: the system stopped, whatever else happened.
  */
-uint8_t reset_cause_take(void)
+uint8_t reset_cause_from_watchdog(bool timer, bool force)
 {
-	uint32_t flags = 0;
-
-	if (hwinfo_get_reset_cause(&flags) != 0) {
-		return BOOT_HW_UNKNOWN;
+	if (timer) {
+		return BOOT_HW_WATCHDOG;
 	}
-	(void)hwinfo_clear_reset_cause();
 
-	return reset_cause_from_flags(flags);
+	return force ? (uint8_t)BOOT_HW_SOFTWARE : (uint8_t)BOOT_HW_UNKNOWN;
 }

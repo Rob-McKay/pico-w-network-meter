@@ -19,5 +19,6 @@ target_sources(app PRIVATE
   src/main.c
   src/fake_display.c
   ${APP_SRC}/ui.c
+  ${APP_SRC}/recommend.c
   ${APP_SRC}/gfx.c
 )

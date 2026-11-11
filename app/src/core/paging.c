@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "paging.h"
@@ -21,6 +22,7 @@ size_t paging_clamp(size_t first, size_t count, size_t rows)
 
 	return first > last ? last : (first / rows) * rows;
 }
+
 
 /*
  * Public interface: documented in paging.h.

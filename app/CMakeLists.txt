@@ -21,6 +21,7 @@ target_sources(app PRIVATE
   src/reset_note.c
   src/watchdog.c
   src/scanner.c
+  src/recommend.c
   src/ui.c
   src/gfx.c
   src/controls.c
@@ -28,12 +29,17 @@ target_sources(app PRIVATE
 )
 # Hooks a board's .conf turns on (app/Kconfig).
 target_sources_ifdef(CONFIG_METER_WIFI_REG_DOMAIN app PRIVATE src/wifi_country.c)
-target_sources_ifdef(CONFIG_METER_RESET_CAUSE_HWINFO app PRIVATE src/reset_cause.c)
+target_sources_ifdef(CONFIG_METER_RESET_CAUSE app PRIVATE src/reset_cause.c)
+target_sources_ifdef(CONFIG_METER_RESET_CAUSE_HWINFO app PRIVATE src/reset_cause_hwinfo.c)
 
 # Target-only code: src/target/<target>/, each file under its own option. It may use
 # the app's own headers, in src/.
 target_include_directories(app PRIVATE src)
 # The Pico's: flow control for the console on its USB port.
 target_sources_ifdef(CONFIG_METER_USB_CONSOLE_FLOW app PRIVATE src/target/pico/usb_console.c)
+# The Pico's: keeping the Wi-Fi chip out of its deep sleep.
+target_sources_ifdef(CONFIG_METER_WIFI_KEEP_AWAKE app PRIVATE src/target/pico/wifi_awake.c)
+# The Pico's: whether the hardware watchdog ended the run before.
+target_sources_ifdef(CONFIG_METER_RESET_CAUSE_RP2040 app PRIVATE src/target/pico/reset_cause_rp2040.c)
 # The Pico's: debugging the Wi-Fi driver after failed scans.
 target_sources_ifdef(CONFIG_METER_DEBUG_WIFI_IRQ app PRIVATE src/target/pico/wifi_debug.c)

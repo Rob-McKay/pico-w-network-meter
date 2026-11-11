@@ -3,14 +3,27 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Channel statistics for the 2.4 GHz Wi-Fi band, from one scan's access
- * points. No Zephyr Wi-Fi API here: scanner.c feeds it, the UI and the unit
- * tests read it.
+ * Channel statistics for the 2.4 and 5 GHz Wi-Fi bands, from one scan's
+ * access points. No Zephyr Wi-Fi API here: scanner.c feeds it, the UI and
+ * the unit tests read it.
  *
- * Each 2.4 GHz channel is 20 MHz wide, but channels are only 5 MHz apart,
- * so a network interferes with its neighbours up to 3 channels away. The
- * "interference" of a channel adds up the signal power of every network
- * heard, each weighted by how much of its 20 MHz overlaps the channel's.
+ * A network takes up a stretch of spectrum: its width (20, 40, 80 or
+ * 160 MHz) around its centre channel, made of 20 MHz channels, one of them
+ * its primary. The "interference" of a channel adds up the signal power of
+ * every network heard, each weighted by how much of the network's spectrum
+ * overlaps the channel's 20 MHz. A network's RSSI is measured on its
+ * primary channel and stands for its power on each 20 MHz it uses.
+ *
+ * 2.4 GHz channels are 20 MHz wide but only 5 MHz apart, so a network
+ * reaches neighbours up to 3 channels beyond its edges, partly. 5 GHz
+ * channels (36, 40, ...) don't overlap each other: a network counts in
+ * full on each channel it uses and not at all on the others.
+ *
+ * Where the width isn't known (the Pico W's driver doesn't say) or doesn't
+ * fit the primary channel, a 2.4 GHz network is taken to be 20 MHz, and a
+ * 5 GHz one to use its whole 80 MHz block (four channels), as nearly
+ * every home router does.
+ *
  * Arithmetic is integer only: dBm values are whole numbers.
  */
 
@@ -27,6 +40,33 @@
 #define CHAN_LAST  14
 /** Number of 2.4 GHz channels. */
 #define CHAN_COUNT (CHAN_LAST - CHAN_FIRST + 1)
+
+/** The bands the meter knows. 2.4 GHz is 0, so a zeroed record is a
+ *  2.4 GHz one.
+ */
+enum chan_band {
+	CHAN_BAND_2G4, /**< 2.4 GHz: channels CHAN_FIRST..CHAN_LAST */
+	CHAN_BAND_5G,  /**< 5 GHz: the channels chan_5g_index() knows */
+	CHAN_BAND_COUNT,
+};
+
+/** 5 GHz 20 MHz channels the meter knows: 36 to 177, in 80 MHz blocks. */
+#define CHAN_5G_COUNT          28
+/** 5 GHz channels in one 80 MHz block. */
+#define CHAN_5G_BLOCK_CHANNELS 4
+/** 80 MHz blocks: 36-48, 52-64, 100-112, 116-128, 132-144, 149-161,
+ *  165-177.
+ */
+#define CHAN_5G_BLOCKS         (CHAN_5G_COUNT / CHAN_5G_BLOCK_CHANNELS)
+
+/** A network's channel width, as its beacon gives it. */
+enum chan_width {
+	CHAN_WIDTH_UNKNOWN, /**< not reported: see the file comment */
+	CHAN_WIDTH_20,      /**< 20 MHz: the primary channel only */
+	CHAN_WIDTH_40,      /**< 40 MHz: two channels */
+	CHAN_WIDTH_80,      /**< 80 MHz: four channels */
+	CHAN_WIDTH_160,     /**< 160 MHz: eight channels */
+};
 
 /** Most access points kept from one scan. */
 #define CHAN_MAX_APS   64
@@ -45,8 +85,11 @@
 struct chan_ap {
 	char ssid[CHAN_SSID_MAX + 1]; /**< NUL-terminated; empty if hidden */
 	uint8_t bssid[CHAN_BSSID_LEN];
-	uint8_t channel;   /**< CHAN_FIRST..CHAN_LAST */
+	uint8_t channel;   /**< CHAN_FIRST..CHAN_LAST, or a 5 GHz channel */
+	uint8_t band;      /**< enum chan_band */
 	int8_t rssi;       /**< dBm */
+	uint8_t width;     /**< enum chan_width */
+	uint8_t centre;    /**< channel number at the middle of the width; 0 if unknown */
 	bool secured;      /**< anything but an open network */
 	uint8_t freshness; /**< CHAN_FRESH when just heard, down to 0 (faded out) */
 };
@@ -56,13 +99,16 @@ struct chan_stats {
 	struct chan_ap aps[CHAN_MAX_APS];
 	size_t ap_count;
 	size_t dropped; /**< access points that did not fit in aps[] */
-	size_t ignored; /**< results not on a 2.4 GHz channel (or hidden) */
+	/** Results on no channel the meter knows: 6 GHz, or a hidden network reported without
+	 *  one.
+	 */
+	size_t ignored;
 };
 
 /** A channel's figures, worked out by chan_stats_channel(). */
 struct chan_info {
 	uint8_t channel;
-	uint8_t ap_count;     /**< networks whose primary channel this is */
+	uint8_t ap_count;     /**< networks with this primary channel (a block: reaching it) */
 	int8_t best_rssi;     /**< strongest of those, or CHAN_RSSI_NONE */
 	int16_t interference; /**< overlap-weighted power, dBm, or CHAN_RSSI_NONE */
 	int16_t others;       /**< the same without the strongest network on the channel */
@@ -74,6 +120,7 @@ enum chan_level {
 	CHAN_LEVEL_CLEAR,    /**< below -85 dBm, or nothing heard */
 	CHAN_LEVEL_MODERATE, /**< -85 to -71 dBm */
 	CHAN_LEVEL_BUSY,     /**< -70 dBm and above */
+	CHAN_LEVEL_COUNT,    /**< not a level: how many there are */
 };
 
 /**
@@ -89,14 +136,14 @@ void chan_stats_reset(struct chan_stats *s);
  * @brief Add one scan result.
  *
  * A BSSID already present is updated in place if this report is stronger
- * (a scan can hear an access point more than once). A result with no
- * 2.4 GHz channel (5 GHz, or a hidden network the driver reports without
- * one) only counts in @p s->ignored.
+ * (a scan can hear an access point more than once). A result on no
+ * channel of its band (6 GHz, or a hidden network the driver reports
+ * without a channel) only counts in @p s->ignored.
  *
  * @param[in,out] s Statistics.
  * @param ap The access point.
  * @retval 0 Added or updated.
- * @retval -EINVAL Not on a 2.4 GHz channel: counted as ignored.
+ * @retval -EINVAL Not on a channel of its band: counted as ignored.
  * @retval -ENOSPC No room: counted as dropped.
  *
  * @sideeffects None (writes only through @p s, including its ignored and dropped counts); errno
@@ -105,10 +152,22 @@ void chan_stats_reset(struct chan_stats *s);
 int chan_stats_add(struct chan_stats *s, const struct chan_ap *ap);
 
 /**
- * @brief Work out one channel's figures.
+ * @brief Count the access points on one band.
  *
- * @c interference counts every network that overlaps the channel, its own
- * included. @c others leaves out the channel's strongest network (@c
+ * @param s Statistics.
+ * @param band enum chan_band.
+ * @return How many of @p s->aps are on @p band.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+size_t chan_stats_band_count(const struct chan_stats *s, enum chan_band band);
+
+/**
+ * @brief Work out one 2.4 GHz channel's figures.
+ *
+ * Only 2.4 GHz networks count. @c interference counts every network that
+ * overlaps the channel, its own included, a 40 MHz one across both its
+ * channels. @c others leaves out the channel's strongest network (@c
  * best_rssi): it is what interferes with that network, from other
  * networks on the same channel and those spilling over from overlapping
  * channels.
@@ -135,16 +194,97 @@ void chan_stats_channel(const struct chan_stats *s, uint8_t channel, struct chan
 uint8_t chan_stats_recommend(const struct chan_stats *s);
 
 /**
- * @brief List the access points strongest first.
+ * @brief Work out one 5 GHz channel's figures.
+ *
+ * Every 5 GHz network counts in full on each channel it uses: those of its
+ * width, or of its whole 80 MHz block where the width isn't known (the file
+ * comment says why). @c ap_count, @c best_rssi and @c others are as on
+ * 2.4 GHz: the networks whose primary channel this is, the strongest of
+ * them, and the interference without it.
  *
  * @param s Statistics.
+ * @param channel A 5 GHz channel; any other gives an empty channel.
+ * @param[out] out The channel's figures.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+void chan_stats_channel_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out);
+
+/**
+ * @brief Work out an 80 MHz block's figures: what a router using the whole
+ *        block would share it with.
+ *
+ * Every 5 GHz network using any channel of the block counts once, in full
+ * (a 20 MHz network on one channel of it as much as an 80 MHz one), and a
+ * 160 MHz network counts in both its blocks. @c ap_count is the networks
+ * reaching the block, @c best_rssi the strongest of them, @c others the
+ * interference without it, @c channel the block's first channel.
+ *
+ * @param s Statistics.
+ * @param channel Any channel of the block; any other gives an empty block.
+ * @param[out] out The block's figures.
+ *
+ * @sideeffects None (writes only through @p out); errno unchanged.
+ */
+void chan_stats_block_5g(const struct chan_stats *s, uint8_t channel, struct chan_info *out);
+
+/**
+ * @brief Pick the best 80 MHz block on 5 GHz.
+ *
+ * Of the blocks in @p blocks, the one with the least interference
+ * (chan_stats_block_5g()) wins; on
+ * a tie, the one with fewer networks, then one without DFS (a router on a
+ * DFS channel must first listen for radar for a minute, and may have to
+ * move), then the lower block.
+ *
+ * @param s Statistics.
+ * @param blocks Bit n set to consider block n (0: 36-48, ...,
+ *        CHAN_5G_BLOCKS - 1: 165-177), for the blocks the country allows.
+ * @return The block's first channel (36, 52, ...), or 0 if @p blocks has
+ *         none of them.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+uint8_t chan_stats_recommend_5g(const struct chan_stats *s, uint32_t blocks);
+
+/**
+ * @brief Say which 80 MHz blocks the 5 GHz recommendation may pick.
+ *
+ * @param with_132 Include 132-144 (the US allows it; Europe and the UK stop
+ *        at 140, so not at 80 MHz there).
+ * @param with_upper Include 149-161 (full power in the US; low-power,
+ *        indoor short-range-device spectrum in the UK).
+ * @return A mask for chan_stats_recommend_5g(): 36-48, 52-64, 100-112 and
+ *         116-128 always, plus the two above if asked for. 165-177 is
+ *         never included.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+uint32_t chan_5g_blocks(bool with_132, bool with_upper);
+
+/**
+ * @brief Find the last channel of an 80 MHz block: 48 for 36-48.
+ *
+ * @param first The block's first channel, as chan_stats_recommend_5g() gives.
+ * @return Its last channel; 0 if @p first doesn't start a block.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+uint8_t chan_5g_block_last(uint8_t first);
+
+/**
+ * @brief List one band's access points strongest first.
+ *
+ * @param s Statistics.
+ * @param band enum chan_band: only its access points are listed.
  * @param[out] out Pointers into @p s->aps.
  * @param max Room in @p out.
  * @return Number of entries written: at most @p max.
  *
  * @sideeffects None (writes only through @p out); errno unchanged.
  */
-size_t chan_stats_strongest(const struct chan_stats *s, const struct chan_ap **out, size_t max);
+size_t chan_stats_strongest(const struct chan_stats *s, enum chan_band band,
+			    const struct chan_ap **out, size_t max);
 
 /**
  * @brief Tell whether two sets of statistics hold the same access points,
@@ -170,6 +310,37 @@ bool chan_stats_equal(const struct chan_stats *a, const struct chan_stats *b);
 bool chan_is_standard(uint8_t channel);
 
 /**
+ * @brief Find a 5 GHz channel's place in the meter's list of them.
+ *
+ * @param channel Channel number.
+ * @return 0 (36) to CHAN_5G_COUNT - 1 (177), or -1 if it isn't a 5 GHz
+ *         20 MHz channel the meter knows.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+int chan_5g_index(uint8_t channel);
+
+/**
+ * @brief Give the 5 GHz channel at a place in the meter's list of them.
+ *
+ * @param index 0 to CHAN_5G_COUNT - 1.
+ * @return The channel number (36 ... 177), or 0 for an index past the end.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+uint8_t chan_5g_channel(size_t index);
+
+/**
+ * @brief Tell whether a 5 GHz channel needs radar detection (DFS).
+ *
+ * @param channel Channel number.
+ * @return True for 52 to 144, the DFS channels in Europe and the US.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+bool chan_5g_dfs(uint8_t channel);
+
+/**
  * @brief Tell whether an access point hides its network's name.
  *
  * @param ap The access point.
@@ -179,6 +350,19 @@ bool chan_is_standard(uint8_t channel);
  * @sideeffects None; errno unchanged.
  */
 bool chan_ap_hidden(const struct chan_ap *ap);
+
+/**
+ * @brief Give the width a network is counted at.
+ *
+ * Its own, where it is known and fits its primary channel; otherwise 20 MHz
+ * on 2.4 GHz and 80 MHz on 5 GHz (the file comment says why).
+ *
+ * @param ap The access point, on a channel of its band.
+ * @return 20, 40, 80 or 160 (MHz).
+ *
+ * @sideeffects None; errno unchanged.
+ */
+int chan_ap_width_mhz(const struct chan_ap *ap);
 
 /**
  * @brief Name an access point for display.
@@ -202,6 +386,35 @@ bool chan_ap_hidden(const struct chan_ap *ap);
 void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size);
 
 /**
+ * @brief Copy an SSID for the console, with anything that isn't printable
+ *        ASCII replaced by '?'.
+ *
+ * An SSID is whatever bytes a nearby access point sends: control characters
+ * in it could move the cursor or rewrite lines on a terminal showing the
+ * log. The screen draws such bytes as '?' too (text_raster.c).
+ *
+ * @param ssid The SSID, NUL-terminated.
+ * @param[out] buf The copy, cut to fit and always terminated.
+ * @param size Size of @p buf; 0 writes nothing.
+ *
+ * @sideeffects None (writes only through @p buf); errno unchanged.
+ */
+void chan_ssid_printable(const char *ssid, char *buf, size_t size);
+
+/**
+ * @brief Write a BSSID as text after a prefix: "hidden 02:1f:3c:12:34:56".
+ *
+ * @param bssid The BSSID, CHAN_BSSID_LEN bytes.
+ * @param prefix Text before it; "" for none.
+ * @param[out] buf The text, cut to fit and always terminated.
+ * @param size Size of @p buf, at least 1.
+ *
+ * @sideeffects None (writes only through @p buf); errno may be set by snprintf() (only on an
+ *              output error).
+ */
+void chan_bssid_text(const uint8_t *bssid, const char *prefix, char *buf, size_t size);
+
+/**
  * @brief Classify an interference level.
  *
  * @param interference dBm, or CHAN_RSSI_NONE.
@@ -210,6 +423,17 @@ void chan_ap_name(const struct chan_ap *ap, char *buf, size_t size);
  * @sideeffects None; errno unchanged.
  */
 enum chan_level chan_stats_level(int interference);
+
+/**
+ * @brief Name a level, as the screens and the console show it.
+ *
+ * @param level enum chan_level.
+ * @return "clear", "moderate" or "busy"; "?" for a value that isn't a
+ *         level.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+const char *chan_level_name(enum chan_level level);
 
 /**
  * @brief Convert a power in dBm to a linear power.

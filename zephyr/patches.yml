@@ -46,3 +46,39 @@ patches:
     date: 2026-11-04
     upstreamable: true
     merge-status: false
+  # Pico W. Between requests the WHD library lets the CYW43439's bus sleep,
+  # which on this chip clears its keep-SDIO-on bit and puts it in its
+  # save/restore deep sleep; every few hours it fails to wake properly: its
+  # gSPI side answers but its backplane and firmware don't, and every request
+  # times out until the meter restarts. WHD can keep the bus up for a while
+  # after each transfer, but its setter for that,
+  # whd_bus_sdio_wlan_set_delayed_bus_powersave_milliseconds(), is declared in
+  # whd_bus_common.h and never defined. This defines it, so the meter can
+  # keep the chip out of deep sleep (CONFIG_METER_WIFI_KEEP_AWAKE). Not yet
+  # sent upstream.
+  - path: hal_infineon/whd-delayed-bus-release-setter.patch
+    sha256sum: 95e84d16b8cd6d00fa3fd3fa88441e3f9dfbec22079a868bf9cb782693ad7c5b
+    module: hal_infineon
+    author: Claude
+    email: noreply@anthropic.com
+    date: 2026-11-06
+    upstreamable: true
+    merge-status: false
+  # XIAO ESP32-C5 (both targets build it). Zephyr's scan result carries
+  # only a network's primary channel, so without this the meter can't
+  # tell how wide a network is and assumes 80 MHz on 5 GHz and 20 MHz on
+  # 2.4 GHz. struct wifi_scan_result gains
+  # the channel width and its centre channel (0 where a driver doesn't
+  # say), enum wifi_frequency_bandwidths gains 160 MHz, and the ESP32
+  # driver fills them in from Espressif's scan record (bandwidth, second,
+  # vht_ch_freq1 and, for 160 MHz under the current VHT signalling, where
+  # freq1 is only the primary 80 MHz's centre, vht_ch_freq2). Applies
+  # after esp32-wifi-scan-params.patch. Not yet sent upstream.
+  - path: zephyr/wifi-scan-result-width.patch
+    sha256sum: 6e19981170e30ada6b0ac29dfeaeec7a9d39636d2ce9d19f1ccea0d2ee26e2eb
+    module: zephyr
+    author: Claude
+    email: noreply@anthropic.com
+    date: 2026-11-06
+    upstreamable: true
+    merge-status: false

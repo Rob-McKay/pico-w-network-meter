@@ -20,6 +20,7 @@ void ap_history_reset(struct ap_history *h)
 	memset(h, 0, sizeof(*h));
 }
 
+
 /**
  * @brief Find an access point by BSSID.
  *
@@ -39,6 +40,7 @@ static size_t find(const struct ap_history *h, const uint8_t *bssid)
 
 	return i;
 }
+
 
 /**
  * @brief Find the access point heard longest ago.
@@ -60,6 +62,7 @@ static size_t oldest(const struct ap_history *h)
 
 	return old;
 }
+
 
 /*
  * Public interface: documented in ap_history.h.
@@ -90,6 +93,7 @@ void ap_history_merge(struct ap_history *h, const struct chan_stats *scan, int64
 	h->dropped = scan->dropped;
 }
 
+
 /*
  * Public interface: documented in ap_history.h.
  *
@@ -108,6 +112,7 @@ void ap_history_expire(struct ap_history *h, int64_t now_ms, const struct ap_fad
 	}
 	h->count = kept;
 }
+
 
 /*
  * Public interface: documented in ap_history.h.
@@ -131,6 +136,7 @@ uint8_t ap_history_freshness(int64_t age_ms, const struct ap_fade *fade)
 
 	return (uint8_t)(min + share);
 }
+
 
 /*
  * Public interface: documented in ap_history.h.

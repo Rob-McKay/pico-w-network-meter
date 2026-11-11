@@ -60,6 +60,7 @@ static void remember(const struct boot_record *r)
 	last_boot = MAX(last_boot, r->boot);
 }
 
+
 /**
  * @brief Read one record from flash.
  *
@@ -86,6 +87,7 @@ static int read_record(const struct fcb_entry_ctx *ctx, struct boot_record *r)
 	return boot_record_decode(bytes, sizeof(bytes), r);
 }
 
+
 /**
  * @brief Read one record from flash into the RAM copy (fcb_walk() callback).
  *
@@ -108,6 +110,7 @@ static int read_entry(struct fcb_entry_ctx *ctx, void *arg)
 
 	return 0;
 }
+
 
 /* What event_log_dump() walks the log with. */
 struct dump {
@@ -141,6 +144,7 @@ static int dump_entry(struct fcb_entry_ctx *ctx, void *arg)
 	return 0;
 }
 
+
 /**
  * @brief Read the storage partition's sector table.
  *
@@ -156,6 +160,7 @@ static int load_sectors(void)
 
 	return flash_area_get_sectors(LOG_PARTITION, &sector_count, sectors);
 }
+
 
 /**
  * @brief Set up the FCB over the storage partition's sectors (load_sectors()).
@@ -176,6 +181,7 @@ static int open_fcb(void)
 
 	return fcb_init(LOG_PARTITION, &fcb);
 }
+
 
 /**
  * @brief Erase the storage partition.
@@ -198,6 +204,37 @@ static int erase_partition(void)
 
 	return ret;
 }
+
+
+/**
+ * @brief Open the log, or start a new one where the flash holds something
+ *        else.
+ *
+ * Only foreign data starts a new log: fcb_init() gives -ENOMSG for a sector whose magic
+ * number isn't the log's (the partition used for something else). Any other failure, such as
+ * a flash read error, leaves the flash alone, so the log isn't lost to a passing fault.
+ * Records in an unknown format are skipped as they are read (boot_record_decode()).
+ *
+ * @retval 0 Open.
+ * @retval <0 Negative errno from fcb_init() or the erase.
+ *
+ * @sideeffects Reads the storage partition and fills the module's FCB state (open_fcb()); on
+ *              foreign data, erases the partition (erase_partition()) and logs it. errno
+ *              unchanged.
+ */
+static int open_or_start(void)
+{
+	int ret = open_fcb();
+
+	if (ret != -ENOMSG) {
+		return ret;
+	}
+	LOG_WRN("No event log in flash: starting one");
+	ret = erase_partition();
+
+	return ret == 0 ? open_fcb() : ret;
+}
+
 
 /*
  * Public interface: documented in event_log.h.
@@ -226,15 +263,7 @@ int event_log_init(void)
 		LOG_ERR("Event log off: no storage_partition layout (%d)", ret);
 		return ret;
 	}
-	ret = open_fcb();
-
-	if (ret != 0) {
-		LOG_WRN("No event log in flash (%d): starting one", ret);
-		ret = erase_partition();
-		if (ret == 0) {
-			ret = open_fcb();
-		}
-	}
+	ret = open_or_start();
 	if (ret != 0) {
 		LOG_ERR("Event log unavailable: %d", ret);
 		return ret;
@@ -249,6 +278,7 @@ int event_log_init(void)
 
 	return 0;
 }
+
 
 /**
  * @brief Write a record into the FCB at its next free place.
@@ -275,6 +305,7 @@ static int append(const uint8_t *bytes)
 
 	return fcb_append_finish(&fcb, &loc);
 }
+
 
 /*
  * Public interface: documented in event_log.h.
@@ -304,6 +335,7 @@ int event_log_add(const struct boot_record *r)
 	return 0;
 }
 
+
 /*
  * Public interface: documented in event_log.h.
  */
@@ -312,6 +344,7 @@ uint32_t event_log_last_boot(void)
 	return last_boot;
 }
 
+
 /*
  * Public interface: documented in event_log.h.
  */
@@ -319,6 +352,7 @@ size_t event_log_count(void)
 {
 	return recent_count;
 }
+
 
 /*
  * Public interface: documented in event_log.h.
@@ -331,6 +365,7 @@ const struct boot_record *event_log_get(size_t i)
 
 	return &recent[(recent_start + recent_count - 1U - i) % EVENT_LOG_RECENT];
 }
+
 
 /*
  * Public interface: documented in event_log.h.

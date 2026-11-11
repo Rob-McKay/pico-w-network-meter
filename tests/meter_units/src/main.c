@@ -11,6 +11,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -60,6 +61,7 @@ static struct chan_ap make_ap(uint8_t id, uint8_t channel, int8_t rssi)
 	return ap;
 }
 
+
 /**
  * @brief Add an access point, failing the test if it is refused.
  *
@@ -78,6 +80,7 @@ static void add_ap(struct chan_stats *s, uint8_t id, uint8_t channel, int8_t rss
 	zassert_ok(chan_stats_add(s, &ap));
 }
 
+
 /**
  * @brief dBm to linear power and back gives the same whole dBm, -130 to 0.
  *
@@ -95,6 +98,7 @@ ZTEST(meter_chan, test_power_round_trip)
 	zassert_equal(chan_power_to_dbm(0), CHAN_RSSI_NONE);
 }
 
+
 /**
  * @brief Twice the power is 3 dB more; ten times is 10 dB.
  *
@@ -107,6 +111,7 @@ ZTEST(meter_chan, test_power_sums)
 	zassert_equal(chan_power_to_dbm(p * 2U), -57);
 	zassert_equal(chan_power_to_dbm(p * 10U), -50);
 }
+
 
 /**
  * @brief Every network at 0 dBm on one channel: a large sum still converts.
@@ -126,6 +131,7 @@ ZTEST(meter_chan, test_power_large)
 	chan_stats_channel(&s, 6, &info);
 	zassert_equal(info.interference, 18, "64 x 1 mW is 18 dBm");
 }
+
 
 /**
  * @brief A BSSID heard twice is kept once, at its stronger signal.
@@ -147,6 +153,7 @@ ZTEST(meter_chan, test_add_dedupes)
 	zassert_equal(s.aps[1].rssi, -75);
 }
 
+
 /**
  * @brief Results off the 2.4 GHz channels are counted, not kept.
  *
@@ -165,6 +172,7 @@ ZTEST(meter_chan, test_add_ignores_other_channels)
 	zassert_equal(s.ap_count, 0);
 	zassert_equal(s.ignored, 2);
 }
+
 
 /**
  * @brief Past CHAN_MAX_APS access points, the rest are counted as dropped.
@@ -187,6 +195,7 @@ ZTEST(meter_chan, test_add_full)
 	add_ap(&s, 0, 1, -40); /* a known BSSID still updates */
 	zassert_equal(s.aps[0].rssi, -40);
 }
+
 
 /**
  * @brief A network counts on its own channel and interferes, less and less,
@@ -219,6 +228,7 @@ ZTEST(meter_chan, test_channel_overlap)
 	zassert_equal(info.ap_count, 0, "neighbours don't count it");
 	zassert_equal(info.best_rssi, CHAN_RSSI_NONE);
 }
+
 
 /**
  * @brief The others figure counts every network but the channel's
@@ -257,6 +267,7 @@ ZTEST(meter_chan, test_channel_others)
 	zassert_equal(info.others, -51, "-60 on 6, and -50 spilling from 7 at 3/4");
 }
 
+
 /**
  * @brief Channel 14 sits 12 MHz above 13, not 5.
  *
@@ -278,6 +289,7 @@ ZTEST(meter_chan, test_channel_14)
 	zassert_equal(info.interference, CHAN_RSSI_NONE, "22 MHz apart");
 }
 
+
 /**
  * @brief Signals on one channel add up; the strongest is reported.
  *
@@ -298,6 +310,7 @@ ZTEST(meter_chan, test_channel_sum)
 	zassert_equal(info.best_rssi, -60);
 	zassert_equal(info.interference, -57);
 }
+
 
 /**
  * @brief The quietest of 1, 6 and 11 is recommended; ties go to fewer networks, then 1.
@@ -330,6 +343,7 @@ ZTEST(meter_chan, test_recommend)
 	zassert_equal(chan_stats_recommend(&s), 11);
 }
 
+
 /**
  * @brief Networks are listed strongest first, cut to the room given.
  *
@@ -347,17 +361,590 @@ ZTEST(meter_chan, test_strongest)
 		add_ap(&s, (uint8_t)i, 1, rssi[i]);
 	}
 
-	zassert_equal(chan_stats_strongest(&s, list, ARRAY_SIZE(list)), 3);
+	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_2G4, list, ARRAY_SIZE(list)), 3);
 	zassert_equal(list[0]->rssi, -40);
 	zassert_equal(list[1]->rssi, -50);
 	zassert_equal(list[2]->rssi, -60);
 
-	zassert_equal(chan_stats_strongest(&s, list, 1), 1);
+	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_2G4, list, 1), 1);
 	zassert_equal(list[0]->rssi, -40);
 
 	chan_stats_reset(&s);
-	zassert_equal(chan_stats_strongest(&s, list, ARRAY_SIZE(list)), 0);
+	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_2G4, list, ARRAY_SIZE(list)), 0);
 }
+
+
+/* ---- 5 GHz ---------------------------------------------------------------- */
+
+/**
+ * @brief Add a 5 GHz access point, failing the test if it is refused.
+ *
+ * @param[in,out] s Statistics.
+ * @param id See make_ap().
+ * @param channel A 5 GHz channel.
+ * @param rssi dBm.
+ *
+ * @sideeffects None (writes only through @p s). errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void add_ap_5g(struct chan_stats *s, uint8_t id, uint8_t channel, int8_t rssi)
+{
+	struct chan_ap ap = make_ap(id, channel, rssi);
+
+	ap.band = CHAN_BAND_5G;
+	zassert_ok(chan_stats_add(s, &ap));
+}
+
+
+/**
+ * @brief The 5 GHz channel list: 36 to 177 in 80 MHz blocks, and which
+ *        channels need DFS.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_5g_channels)
+{
+	zassert_equal(chan_5g_index(36), 0);
+	zassert_equal(chan_5g_index(48), 3);
+	zassert_equal(chan_5g_index(100), 8);
+	zassert_equal(chan_5g_index(149), 20);
+	zassert_equal(chan_5g_index(177), CHAN_5G_COUNT - 1);
+	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
+		zassert_equal(chan_5g_index(chan_5g_channel(i)), (int)i, "round trip %zu", i);
+	}
+	zassert_equal(chan_5g_channel(CHAN_5G_COUNT), 0, "past the end");
+
+	static const uint8_t not_5g[] = {0, 1, 14, 34, 37, 68, 96, 145, 147, 178, 255};
+
+	for (size_t i = 0; i < ARRAY_SIZE(not_5g); i++) {
+		zassert_equal(chan_5g_index(not_5g[i]), -1, "channel %u", not_5g[i]);
+	}
+
+	zassert_false(chan_5g_dfs(36));
+	zassert_false(chan_5g_dfs(48));
+	zassert_true(chan_5g_dfs(52));
+	zassert_true(chan_5g_dfs(64));
+	zassert_true(chan_5g_dfs(100));
+	zassert_true(chan_5g_dfs(144));
+	zassert_false(chan_5g_dfs(149));
+	zassert_false(chan_5g_dfs(165));
+}
+
+
+/**
+ * @brief 5 GHz results are kept on a 5 GHz channel and ignored off one; a
+ *        2.4 GHz record can't carry a 5 GHz channel.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_add_5g)
+{
+	static struct chan_stats s;
+	struct chan_ap ap = make_ap(1, 36, -50);
+
+	chan_stats_reset(&s);
+	zassert_equal(chan_stats_add(&s, &ap), -EINVAL, "36 is not a 2.4 GHz channel");
+	ap.band = CHAN_BAND_5G;
+	zassert_ok(chan_stats_add(&s, &ap));
+	ap = make_ap(2, 6, -50);
+	ap.band = CHAN_BAND_5G;
+	zassert_equal(chan_stats_add(&s, &ap), -EINVAL, "6 is not a 5 GHz channel");
+	ap = make_ap(3, 38, -50);
+	ap.band = CHAN_BAND_5G;
+	zassert_equal(chan_stats_add(&s, &ap), -EINVAL, "38 is a 40 MHz centre, not a channel");
+	ap = make_ap(4, 36, -50);
+	ap.band = CHAN_BAND_COUNT;
+	zassert_equal(chan_stats_add(&s, &ap), -EINVAL, "unknown band");
+	add_ap(&s, 5, 6, -60);
+
+	zassert_equal(s.ap_count, 2);
+	zassert_equal(s.ignored, 4);
+	zassert_equal(chan_stats_band_count(&s, CHAN_BAND_2G4), 1);
+	zassert_equal(chan_stats_band_count(&s, CHAN_BAND_5G), 1);
+}
+
+
+/**
+ * @brief A 5 GHz network counts in full on every channel of its 80 MHz
+ *        block and nowhere else, and not on 2.4 GHz.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_channel_5g_block)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	add_ap_5g(&s, 1, 40, -50);
+
+	static const uint8_t block[] = {36, 40, 44, 48};
+
+	for (size_t i = 0; i < ARRAY_SIZE(block); i++) {
+		chan_stats_channel_5g(&s, block[i], &c);
+		zassert_equal(c.channel, block[i]);
+		zassert_equal(c.interference, -50, "channel %u", block[i]);
+		zassert_equal(c.freshness, CHAN_FRESH);
+		zassert_equal(c.ap_count, block[i] == 40 ? 1 : 0);
+	}
+	chan_stats_channel_5g(&s, 40, &c);
+	zassert_equal(c.best_rssi, -50);
+	zassert_equal(c.others, CHAN_RSSI_NONE, "nothing else in the block");
+
+	chan_stats_channel_5g(&s, 52, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "the next block");
+	zassert_equal(c.ap_count, 0);
+	zassert_equal(c.freshness, 0);
+
+	chan_stats_channel_5g(&s, 38, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "not a channel");
+
+	for (uint8_t ch = CHAN_FIRST; ch <= CHAN_LAST; ch++) {
+		chan_stats_channel(&s, ch, &c);
+		zassert_equal(c.interference, CHAN_RSSI_NONE, "2.4 GHz channel %u", ch);
+		zassert_equal(c.ap_count, 0);
+	}
+
+	/* A second network in the block: -50 and -50 dBm make -47 dBm */
+	add_ap_5g(&s, 2, 48, -50);
+	chan_stats_channel_5g(&s, 36, &c);
+	zassert_equal(c.interference, -47);
+	chan_stats_channel_5g(&s, 48, &c);
+	zassert_equal(c.others, -50, "the other network on 40");
+}
+
+
+/**
+ * @brief 2.4 GHz networks don't count on 5 GHz channels.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_channel_5g_ignores_2g4)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	add_ap(&s, 1, 13, -40);
+	for (size_t i = 0; i < CHAN_5G_COUNT; i++) {
+		chan_stats_channel_5g(&s, chan_5g_channel(i), &c);
+		zassert_equal(c.interference, CHAN_RSSI_NONE);
+		zassert_equal(c.ap_count, 0);
+	}
+}
+
+
+/**
+ * @brief Add an access point with a reported width, failing the test if it is refused.
+ *
+ * @param[in,out] s Statistics.
+ * @param id See make_ap().
+ * @param band enum chan_band.
+ * @param channel Primary channel.
+ * @param width enum chan_width.
+ * @param centre Centre channel; 0 for none.
+ * @param rssi dBm.
+ *
+ * @sideeffects None (writes only through @p s). errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void add_ap_wide(struct chan_stats *s, uint8_t id, uint8_t band, uint8_t channel,
+			uint8_t width, uint8_t centre, int8_t rssi)
+{
+	struct chan_ap ap = make_ap(id, channel, rssi);
+
+	ap.band = band;
+	ap.width = width;
+	ap.centre = centre;
+	zassert_ok(chan_stats_add(s, &ap));
+}
+
+
+/**
+ * @brief Make an access point with a reported width.
+ *
+ * @param band enum chan_band.
+ * @param channel Primary channel.
+ * @param width enum chan_width.
+ * @param centre Centre channel; 0 for none.
+ * @return The record.
+ *
+ * @sideeffects None. errno may be set by snprintf() (only on an output error).
+ */
+static struct chan_ap make_wide(uint8_t band, uint8_t channel, uint8_t width, uint8_t centre)
+{
+	struct chan_ap ap = make_ap(1, channel, -50);
+
+	ap.band = band;
+	ap.width = width;
+	ap.centre = centre;
+
+	return ap;
+}
+
+
+/**
+ * @brief A network is counted at its reported width when it fits its primary channel, and
+ *        otherwise at 20 MHz on 2.4 GHz and its 80 MHz block on 5 GHz.
+ *
+ * @sideeffects None. errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_chan, test_width_mhz)
+{
+	static const struct {
+		uint8_t band;
+		uint8_t channel;
+		uint8_t width;
+		uint8_t centre;
+		int mhz;
+		const char *why;
+	} cases[] = {
+		{CHAN_BAND_2G4, 6, CHAN_WIDTH_UNKNOWN, 0, 20, "2.4 GHz, not reported"},
+		{CHAN_BAND_2G4, 6, CHAN_WIDTH_20, 6, 20, "2.4 GHz 20 MHz"},
+		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 3, 40, "2.4 GHz 40 MHz, secondary above"},
+		{CHAN_BAND_2G4, 11, CHAN_WIDTH_40, 9, 40, "2.4 GHz 40 MHz, secondary below"},
+		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 2, 20, "centre one off: not two channels"},
+		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 0, 20, "no centre"},
+		{CHAN_BAND_2G4, 6, CHAN_WIDTH_80, 6, 20, "no 80 MHz on 2.4 GHz"},
+		{CHAN_BAND_2G4, 14, CHAN_WIDTH_20, 14, 20, "channel 14"},
+		{CHAN_BAND_2G4, 12, CHAN_WIDTH_40, 14, 20, "no centre on channel 14"},
+		{CHAN_BAND_2G4, 6, 9, 6, 20, "not a width"},
+		{CHAN_BAND_5G, 40, CHAN_WIDTH_UNKNOWN, 0, 80, "5 GHz, not reported: its block"},
+		{CHAN_BAND_5G, 36, CHAN_WIDTH_20, 36, 20, "5 GHz 20 MHz"},
+		{CHAN_BAND_5G, 36, CHAN_WIDTH_20, 40, 80, "20 MHz off its primary"},
+		{CHAN_BAND_5G, 149, CHAN_WIDTH_40, 151, 40, "5 GHz 40 MHz"},
+		{CHAN_BAND_5G, 40, CHAN_WIDTH_80, 42, 80, "5 GHz 80 MHz"},
+		{CHAN_BAND_5G, 52, CHAN_WIDTH_80, 42, 80, "80 MHz around another block: the block"},
+		{CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, 160, "5 GHz 160 MHz"},
+		{CHAN_BAND_5G, 44, CHAN_WIDTH_160, 50, 160, "160 MHz from 36"},
+		{CHAN_BAND_5G, 100, CHAN_WIDTH_160, 0, 80, "160 MHz without a centre"},
+		{CHAN_BAND_5G, 100, CHAN_WIDTH_80, 104, 80, "centre between channels: the block"},
+	};
+
+	for (size_t i = 0; i < ARRAY_SIZE(cases); i++) {
+		struct chan_ap ap =
+			make_wide(cases[i].band, cases[i].channel, cases[i].width, cases[i].centre);
+
+		zassert_equal(chan_ap_width_mhz(&ap), cases[i].mhz, "%s", cases[i].why);
+	}
+}
+
+
+/**
+ * @brief A 2.4 GHz 40 MHz network counts in full on both its channels and partly on their
+ *        neighbours.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_channel_40_2g4)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	add_ap_wide(&s, 1, CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 3, -50);
+
+	chan_stats_channel(&s, 1, &c);
+	zassert_equal(c.interference, -50, "its primary");
+	zassert_equal(c.ap_count, 1);
+	chan_stats_channel(&s, 5, &c);
+	zassert_equal(c.interference, -50, "its secondary, in full");
+	zassert_equal(c.ap_count, 0, "not its primary");
+	chan_stats_channel(&s, 6, &c);
+	zassert_equal(c.interference, -51, "15 of its 20 MHz");
+	chan_stats_channel(&s, 8, &c);
+	zassert_equal(c.interference, -56, "5 of 20 MHz");
+	chan_stats_channel(&s, 9, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "beyond it");
+	zassert_equal(c.freshness, 0);
+	zassert_equal(chan_stats_recommend(&s), 11);
+}
+
+
+/**
+ * @brief 5 GHz networks count on the channels of their width: 20 MHz on its own, 40 on its
+ *        pair, 160 on two blocks.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_channel_5g_widths)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	add_ap_wide(&s, 1, CHAN_BAND_5G, 36, CHAN_WIDTH_20, 36, -50);
+	add_ap_wide(&s, 2, CHAN_BAND_5G, 149, CHAN_WIDTH_40, 151, -60);
+	add_ap_wide(&s, 3, CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, -70);
+
+	chan_stats_channel_5g(&s, 36, &c);
+	zassert_equal(c.interference, -50);
+	zassert_equal(c.best_rssi, -50);
+	chan_stats_channel_5g(&s, 40, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "20 MHz stays on 36");
+	zassert_equal(c.freshness, 0);
+
+	chan_stats_channel_5g(&s, 153, &c);
+	zassert_equal(c.interference, -60, "40 MHz: its secondary");
+	chan_stats_channel_5g(&s, 157, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "40 MHz: not the rest of the block");
+
+	static const uint8_t wide[] = {100, 104, 108, 112, 116, 120, 124, 128};
+
+	for (size_t i = 0; i < ARRAY_SIZE(wide); i++) {
+		chan_stats_channel_5g(&s, wide[i], &c);
+		zassert_equal(c.interference, -70, "160 MHz on %u", wide[i]);
+		zassert_equal(c.ap_count, wide[i] == 100 ? 1 : 0);
+	}
+	chan_stats_channel_5g(&s, 132, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "160 MHz ends at 128");
+	chan_stats_channel_5g(&s, 64, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE);
+}
+
+
+/**
+ * @brief A block's figures count every network reaching it, once and in full.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_block_5g)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	chan_stats_block_5g(&s, 44, &c);
+	zassert_equal(c.channel, 36, "named by its first channel");
+	zassert_equal(c.interference, CHAN_RSSI_NONE);
+	zassert_equal(c.ap_count, 0);
+
+	add_ap_wide(&s, 1, CHAN_BAND_5G, 36, CHAN_WIDTH_20, 36, -50);
+	add_ap_wide(&s, 2, CHAN_BAND_5G, 48, CHAN_WIDTH_20, 48, -60);
+	add_ap_wide(&s, 3, CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, -70);
+	add_ap_5g(&s, 4, 132, -80);
+	add_ap(&s, 5, 6, -30);
+
+	chan_stats_block_5g(&s, 44, &c);
+	zassert_equal(c.channel, 36);
+	zassert_equal(c.ap_count, 2, "two 20 MHz networks in the block");
+	zassert_equal(c.best_rssi, -50);
+	zassert_equal(c.interference, -50, "-50 and -60 dBm make -49.6");
+	zassert_equal(c.others, -60);
+	zassert_equal(c.freshness, CHAN_FRESH);
+
+	chan_stats_block_5g(&s, 100, &c);
+	zassert_equal(c.interference, -70, "160 MHz: in its first block");
+	zassert_equal(c.ap_count, 1);
+	chan_stats_block_5g(&s, 128, &c);
+	zassert_equal(c.channel, 116);
+	zassert_equal(c.interference, -70, "and in its second");
+	chan_stats_block_5g(&s, 140, &c);
+	zassert_equal(c.interference, -80, "width unknown: its block");
+	chan_stats_block_5g(&s, 52, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "2.4 GHz doesn't count");
+	chan_stats_block_5g(&s, 38, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "not a channel");
+	zassert_equal(c.ap_count, 0);
+}
+
+
+/**
+ * @brief The recommendation weighs a block by every network reaching it: a 20 MHz network
+ *        makes its whole block busy for an 80 MHz router, and a 160 MHz one both its blocks.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_recommend_5g_widths)
+{
+	static struct chan_stats s;
+	const uint32_t europe = chan_5g_blocks(false, false);
+
+	chan_stats_reset(&s);
+	add_ap_wide(&s, 1, CHAN_BAND_5G, 48, CHAN_WIDTH_20, 48, -50);
+	add_ap_wide(&s, 2, CHAN_BAND_5G, 64, CHAN_WIDTH_20, 64, -85);
+	add_ap_wide(&s, 3, CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, -80);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 52, "52-64: -85 dBm, the quietest");
+
+	add_ap_wide(&s, 4, CHAN_BAND_5G, 56, CHAN_WIDTH_40, 54, -75);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 100, "-80 dBm: a tie, the lower");
+}
+
+
+/**
+ * @brief The quietest allowed 80 MHz block is recommended; ties go to
+ *        fewer networks, then a block without DFS, then the lower block.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_recommend_5g)
+{
+	static struct chan_stats s;
+	const uint32_t europe = BIT(0) | BIT(1) | BIT(2) | BIT(3);
+
+	chan_stats_reset(&s);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 36, "nothing heard: the lowest");
+	zassert_equal(chan_stats_recommend_5g(&s, 0), 0, "no block allowed");
+	zassert_equal(chan_stats_recommend_5g(&s, BIT(2)), 100, "only 100-112 allowed");
+
+	add_ap_5g(&s, 1, 36, -50);
+	add_ap_5g(&s, 2, 52, -60);
+	add_ap_5g(&s, 3, 100, -70);
+	add_ap_5g(&s, 4, 120, -80);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 116);
+	zassert_equal(chan_stats_recommend_5g(&s, BIT(0) | BIT(1)), 52);
+	zassert_equal(chan_stats_recommend_5g(&s, europe | BIT(4)), 132, "132-144 is empty");
+
+	/* 2.4 GHz networks don't count */
+	add_ap(&s, 5, 1, -30);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 116);
+
+	/* Same interference, -60 dBm: 100-112 has two networks, 116-128 one */
+	chan_stats_reset(&s);
+	add_ap_5g(&s, 1, 36, -40);
+	add_ap_5g(&s, 2, 52, -40);
+	add_ap_5g(&s, 3, 100, -63);
+	add_ap_5g(&s, 4, 104, -63);
+	add_ap_5g(&s, 5, 116, -60);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 116);
+
+	/* Empty 52-64 (DFS) and 149-161 (not): the one without DFS wins, though higher */
+	chan_stats_reset(&s);
+	add_ap_5g(&s, 1, 36, -40);
+	zassert_equal(chan_stats_recommend_5g(&s, BIT(0) | BIT(1) | BIT(5)), 149);
+	/* Both without DFS and empty: the lower */
+	zassert_equal(chan_stats_recommend_5g(&s, BIT(5) | BIT(6)), 149);
+}
+
+
+/**
+ * @brief The allowed blocks: always 36-48 to 116-128; 132-144 and 149-161
+ *        when asked for; never 165-177.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_5g_blocks)
+{
+	zassert_equal(chan_5g_blocks(false, false), BIT(0) | BIT(1) | BIT(2) | BIT(3));
+	zassert_equal(chan_5g_blocks(true, false), chan_5g_blocks(false, false) | BIT(4));
+	zassert_equal(chan_5g_blocks(false, true), chan_5g_blocks(false, false) | BIT(5));
+	zassert_equal(chan_5g_blocks(true, true) & BIT(6), 0U, "165-177 never");
+}
+
+
+/**
+ * @brief The strongest-first list keeps to the band asked for.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_strongest_band)
+{
+	static struct chan_stats s;
+	const struct chan_ap *list[4];
+
+	chan_stats_reset(&s);
+	add_ap(&s, 1, 1, -70);
+	add_ap_5g(&s, 2, 36, -40);
+	add_ap(&s, 3, 6, -60);
+	add_ap_5g(&s, 4, 149, -80);
+
+	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_2G4, list, ARRAY_SIZE(list)), 2);
+	zassert_equal(list[0]->rssi, -60);
+	zassert_equal(list[1]->rssi, -70);
+	zassert_equal(chan_stats_strongest(&s, CHAN_BAND_5G, list, ARRAY_SIZE(list)), 2);
+	zassert_equal(list[0]->channel, 36);
+	zassert_equal(list[1]->channel, 149);
+}
+
+
+/**
+ * @brief Printable ASCII passes through; control characters, DEL and
+ *        bytes above 0x7f become '?'; the copy is cut to fit.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_ssid_printable)
+{
+	char buf[CHAN_SSID_MAX + 1];
+	char small[4];
+
+	chan_ssid_printable("Home Wi-Fi 5G", buf, sizeof(buf));
+	zassert_str_equal(buf, "Home Wi-Fi 5G");
+	chan_ssid_printable("a\x1b[2Jb\r\n\x7f\xc3\xa9", buf, sizeof(buf));
+	zassert_str_equal(buf, "a?[2Jb?????");
+	chan_ssid_printable("abcdef", small, sizeof(small));
+	zassert_str_equal(small, "abc");
+	chan_ssid_printable("", buf, sizeof(buf));
+	zassert_str_equal(buf, "");
+	small[0] = 'x';
+	chan_ssid_printable("abc", small, 0);
+	zassert_equal(small[0], 'x', "size 0 writes nothing");
+}
+
+
+/**
+ * @brief A BSSID is written as six colon-separated hex bytes after its
+ *        prefix, and cut to fit a small buffer.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_bssid_text)
+{
+	const uint8_t bssid[CHAN_BSSID_LEN] = {0x02, 0x1f, 0x3c, 0x12, 0x34, 0x56};
+	char buf[32];
+	char small[6];
+
+	chan_bssid_text(bssid, "", buf, sizeof(buf));
+	zassert_str_equal(buf, "02:1f:3c:12:34:56");
+	chan_bssid_text(bssid, "hidden ", buf, sizeof(buf));
+	zassert_str_equal(buf, "hidden 02:1f:3c:12:34:56");
+	chan_bssid_text(bssid, "", small, sizeof(small));
+	zassert_str_equal(small, "02:1f");
+	chan_bssid_text(bssid, "hidden ", small, sizeof(small));
+	zassert_str_equal(small, "hidde");
+}
+
+
+/**
+ * @brief A block's last channel comes from the channel table; a channel
+ *        that doesn't start a block has none.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_5g_block_last)
+{
+	zassert_equal(chan_5g_block_last(36), 48);
+	zassert_equal(chan_5g_block_last(52), 64);
+	zassert_equal(chan_5g_block_last(149), 161);
+	zassert_equal(chan_5g_block_last(165), 177);
+	zassert_equal(chan_5g_block_last(40), 0, "not a block's first channel");
+	zassert_equal(chan_5g_block_last(6), 0, "a 2.4 GHz channel");
+	zassert_equal(chan_5g_block_last(0), 0);
+}
+
+
+/**
+ * @brief Each level has the name the screens and the console show.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_chan, test_level_name)
+{
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_CLEAR), "clear");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_MODERATE), "moderate");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_BUSY), "busy");
+	zassert_str_equal(chan_level_name(CHAN_LEVEL_COUNT), "?");
+}
+
 
 /**
  * @brief Interference levels split at -85 and -70 dBm.
@@ -373,6 +960,7 @@ ZTEST(meter_chan, test_level)
 	zassert_equal(chan_stats_level(-70), CHAN_LEVEL_BUSY);
 	zassert_equal(chan_stats_level(-20), CHAN_LEVEL_BUSY);
 }
+
 
 /**
  * @brief A channel is as fresh as the freshest network reaching it.
@@ -400,6 +988,7 @@ ZTEST(meter_chan, test_channel_freshness)
 	chan_stats_channel(&s, 13, &info);
 	zassert_equal(info.freshness, 0, "nothing reaches 13");
 }
+
 
 /**
  * @brief Equal statistics compare equal; any field that differs makes them unequal.
@@ -432,7 +1021,17 @@ ZTEST(meter_chan, test_equal)
 	b = a;
 	b.ap_count = 1;
 	zassert_false(chan_stats_equal(&a, &b), "fewer networks");
+	b = a;
+	b.aps[0].band = CHAN_BAND_5G;
+	zassert_false(chan_stats_equal(&a, &b), "band");
+	b = a;
+	b.aps[0].width = CHAN_WIDTH_40;
+	zassert_false(chan_stats_equal(&a, &b), "width");
+	b = a;
+	b.aps[0].centre = 8;
+	zassert_false(chan_stats_equal(&a, &b), "centre");
 }
+
 
 /**
  * @brief Only 1, 6 and 11 are standard channels.
@@ -446,6 +1045,7 @@ ZTEST(meter_chan, test_standard_channels)
 			      (unsigned int)ch);
 	}
 }
+
 
 /**
  * @brief A network is named by its SSID; a hidden one by the end of its
@@ -490,6 +1090,7 @@ ZTEST(meter_chan, test_ap_name)
 	zassert_equal(name[0], 'x', "size 0 writes nothing");
 }
 
+
 ZTEST_SUITE(meter_chan, NULL, NULL, NULL, NULL, NULL);
 
 /* ---- History of access points -------------------------------------------- */
@@ -513,6 +1114,7 @@ static void one_scan(struct chan_stats *scan, uint8_t id, uint8_t channel, int8_
 	add_ap(scan, id, channel, rssi);
 }
 
+
 /**
  * @brief Full brightness until the fade starts, then a straight line to 0.
  *
@@ -528,6 +1130,7 @@ ZTEST(meter_history, test_freshness_curve)
 	zassert_equal(ap_history_freshness(60000, &fade), 0);
 }
 
+
 /** @brief A fade that ends when it starts (or before) drops straight to 0, without dividing by 0.
  *
  * @sideeffects None; errno unchanged.
@@ -542,6 +1145,7 @@ ZTEST(meter_history, test_freshness_no_fade)
 	zassert_equal(ap_history_freshness(4000, &backwards), CHAN_FRESH);
 	zassert_equal(ap_history_freshness(5001, &backwards), 0);
 }
+
 
 /**
  * @brief An empty scan leaves the networks heard before on show.
@@ -566,6 +1170,7 @@ ZTEST(meter_history, test_empty_scan_keeps_data)
 	zassert_equal(snap.aps[0].channel, 11);
 	zassert_equal(snap.aps[0].freshness, CHAN_FRESH, "10 s old: not fading yet");
 }
+
 
 /**
  * @brief Networks fade from 15 s and are gone at 30 s (the test's own times); hearing one
@@ -604,6 +1209,7 @@ ZTEST(meter_history, test_fade_and_expire)
 	zassert_equal(snap.aps[0].freshness, CHAN_FRESH);
 }
 
+
 /**
  * @brief When full, a new network replaces the one heard longest ago.
  *
@@ -627,6 +1233,7 @@ ZTEST(meter_history, test_full_replaces_oldest)
 	zassert_equal(h.heard_ms[0], 5000);
 }
 
+
 /**
  * @brief The latest scan's ignored and dropped counts are reported.
  *
@@ -648,6 +1255,30 @@ ZTEST(meter_history, test_counts)
 	zassert_equal(snap.dropped, 1);
 }
 
+
+/**
+ * @brief A network's band survives the history: merged, then snapshot.
+ *
+ * @sideeffects Overwrites the test's own static history and statistics. errno may be set by
+ *              snprintf() (only on an output error).
+ */
+ZTEST(meter_history, test_band_kept)
+{
+	static struct ap_history h;
+	static struct chan_stats scan;
+	static struct chan_stats snap;
+
+	ap_history_reset(&h);
+	chan_stats_reset(&scan);
+	add_ap(&scan, 1, 6, -60);
+	add_ap_5g(&scan, 2, 100, -70);
+	ap_history_merge(&h, &scan, 0);
+	ap_history_snapshot(&h, 0, &fade, &snap);
+	zassert_equal(chan_stats_band_count(&snap, CHAN_BAND_2G4), 1);
+	zassert_equal(chan_stats_band_count(&snap, CHAN_BAND_5G), 1);
+}
+
+
 /**
  * @brief With a minimum, a network fades only to it, stays visible until the
  *        end of the fade, then goes.
@@ -668,6 +1299,7 @@ ZTEST(meter_history, test_freshness_floor)
 	zassert_equal(ap_history_freshness(5, &too_high), CHAN_FRESH, "never above CHAN_FRESH");
 }
 
+
 ZTEST_SUITE(meter_history, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -684,6 +1316,7 @@ ZTEST(meter_raster, test_fade)
 	/* Half of 31 and 63, rounded down: 15 and 31, which 120 and 124 give */
 	zassert_equal(rgb565x_fade(rgb565x(255, 255, 255), 128), rgb565x(120, 124, 120));
 }
+
 
 /* ---- Text on a colour display -------------------------------------------- */
 
@@ -729,6 +1362,7 @@ static uint16_t px(const uint16_t *band, size_t width, size_t x, size_t y)
 	return band[(y * width) + x];
 }
 
+
 /**
  * @brief RGB565, stored big-endian as the panel takes it.
  *
@@ -748,6 +1382,7 @@ ZTEST(meter_raster, test_rgb)
 	zassert_true(b[0] == 0x00 && b[1] == 0x1f);
 	zassert_equal(raster_rgb(255, 255, 255), 0xffff);
 }
+
 
 /**
  * @brief Glyphs land where the font says, column after column.
@@ -771,6 +1406,7 @@ ZTEST(meter_raster, test_glyphs)
 	}
 }
 
+
 /**
  * @brief Characters the font lacks show as '?'; a UTF-8 character takes
  *        one place; text is cut at the band's edge.
@@ -790,6 +1426,7 @@ ZTEST(meter_raster, test_fallbacks)
 	zassert_equal(px(band, 5, 2, 0), FG, "the UTF-8 'e acute' as one '?'");
 	zassert_equal(px(band, 5, 4, 1), FG, "'A' cut to its first column");
 }
+
 
 /**
  * @brief An MSB-first font reads bit 7 as the top pixel.
@@ -818,6 +1455,7 @@ ZTEST(meter_raster, test_msb_first)
 	zassert_equal(px(band, 1, 0, 7), BG);
 }
 
+
 /**
  * @brief Bold text inks every pixel of the plain text and the one to its
  *        right, but never across into the next character's cell.
@@ -844,6 +1482,7 @@ ZTEST(meter_raster, test_bold)
 	zassert_true(extra > 0U, "bold differs from plain");
 }
 
+
 ZTEST_SUITE(meter_raster, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -867,6 +1506,7 @@ ZTEST(meter_health, test_failures_in_a_row)
 	zassert_true(scan_health_record(&h, -EIO, 3), "and every one after it");
 }
 
+
 /**
  * @brief A limit of 0 never asks for a restart, and the count doesn't wrap
  *        round to zero.
@@ -882,6 +1522,7 @@ ZTEST(meter_health, test_no_limit)
 	zassert_equal(h.failures, UINT_MAX, "stops at UINT_MAX");
 	zassert_true(scan_health_record(&h, -EAGAIN, 5), "still over a limit");
 }
+
 
 ZTEST_SUITE(meter_health, NULL, NULL, NULL, NULL, NULL);
 
@@ -903,6 +1544,7 @@ ZTEST(meter_paging, test_move)
 	zassert_equal(paging_move(7, true, 25, 0), 7, "no rows: unchanged");
 }
 
+
 /**
  * @brief A page stays within a list that shrinks, and on a page boundary.
  *
@@ -919,6 +1561,7 @@ ZTEST(meter_paging, test_clamp)
 	zassert_equal(paging_move(SIZE_MAX, true, 25, 10), 20, "no overflow moving either");
 	zassert_equal(paging_clamp(5, 25, 0), 0, "no rows");
 }
+
 
 ZTEST_SUITE(meter_paging, NULL, NULL, NULL, NULL, NULL);
 
@@ -954,6 +1597,7 @@ ZTEST(meter_boot, test_record_round_trip)
 	zassert_equal(bytes[4], 0x98, "little-endian");
 }
 
+
 /**
  * @brief Anything that isn't a record is refused: wrong size, version or
  *        cause.
@@ -978,6 +1622,7 @@ ZTEST(meter_boot, test_record_refused)
 	(void)memset(bytes, 0xff, sizeof(bytes));
 	zassert_equal(boot_record_decode(bytes, sizeof(bytes), &out), -EINVAL, "erased flash");
 }
+
 
 /**
  * @brief Each kind of start is described in a line, with how long the run
@@ -1022,6 +1667,7 @@ ZTEST(meter_boot, test_describe)
 	zassert_equal(text[0], 'x', "size 0 writes nothing");
 }
 
+
 /**
  * @brief A sealed note is valid; any change to it, or RAM's contents after
  *        a power cut, isn't.
@@ -1050,6 +1696,7 @@ ZTEST(meter_boot, test_note_valid)
 	(void)memset(&garbage, 0xa5, sizeof(garbage));
 	zassert_false(boot_note_valid(&garbage), "RAM after power-on");
 }
+
 
 /**
  * @brief A start is worked out from the note: none means power-on, one
@@ -1088,6 +1735,7 @@ ZTEST(meter_boot, test_from_note)
 	zassert_equal(r.uptime_s, 600);
 }
 
+
 /**
  * @brief The hardware's reset cause survives the flash format in the byte
  *        that used to be zero; records from before it, and causes this
@@ -1119,6 +1767,7 @@ ZTEST(meter_boot, test_hw_reset_round_trip)
 	boot_record_encode(&in, bytes);
 	zassert_equal(bytes[2], 0, "unknown writes the old zero byte");
 }
+
 
 /**
  * @brief A start the note can't explain is named by the hardware's reset
@@ -1168,6 +1817,7 @@ ZTEST(meter_boot, test_describe_hw_reset)
 	zassert_true(strlen(text) <= 32U, "fits the events screen: \"%s\"", text);
 }
 
+
 ZTEST_SUITE(meter_boot, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -1189,6 +1839,7 @@ ZTEST(meter_country, test_country_codes)
 	}
 	zassert_false(country_code_valid(NULL));
 }
+
 
 ZTEST_SUITE(meter_country, NULL, NULL, NULL, NULL, NULL);
 
@@ -1216,6 +1867,47 @@ ZTEST(meter_reset_cause, test_from_flags)
 	zassert_equal(reset_cause_from_flags(RESET_POR | RESET_PIN), BOOT_HW_PIN);
 }
 
+
+/**
+ * @brief The RP2040's watchdog reason: the timer is the hardware watchdog,
+ *        a forced reset is software, neither is a reset it can't name; the
+ *        timer wins if both are set.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_reset_cause, test_from_watchdog)
+{
+	zassert_equal(reset_cause_from_watchdog(false, false), BOOT_HW_UNKNOWN);
+	zassert_equal(reset_cause_from_watchdog(true, false), BOOT_HW_WATCHDOG);
+	zassert_equal(reset_cause_from_watchdog(false, true), BOOT_HW_SOFTWARE);
+	zassert_equal(reset_cause_from_watchdog(true, true), BOOT_HW_WATCHDOG);
+}
+
+
+/**
+ * @brief An unexplained restart the hardware watchdog made is named for it
+ *        on the events screen.
+ *
+ * @sideeffects None; errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_reset_cause, test_describe_watchdog)
+{
+	struct boot_record r = {
+		.boot = 44,
+		.uptime_s = 378379,
+		.cause = BOOT_UNEXPLAINED,
+		.hw_reset = reset_cause_from_watchdog(true, false),
+	};
+	char text[48];
+
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#44 HW watchdog after 4d09h");
+	r.hw_reset = reset_cause_from_watchdog(false, false);
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#44 restart after 4d09h");
+}
+
+
 ZTEST_SUITE(meter_reset_cause, NULL, NULL, NULL, NULL, NULL);
 
 /**
@@ -1233,6 +1925,7 @@ ZTEST(meter_keys, test_single)
 	zassert_equal(keys_event(&s, INPUT_KEY_X, false), -1);
 	zassert_equal(keys_event(&s, INPUT_KEY_Y, true), INPUT_KEY_Y, "X was released first");
 }
+
 
 /**
  * @brief X and Y together give KEYS_X_AND_Y, in either order; other keys
@@ -1256,6 +1949,7 @@ ZTEST(meter_keys, test_x_and_y)
 	zassert_equal(keys_event(&s, INPUT_KEY_A, true), INPUT_KEY_A);
 	zassert_equal(keys_event(&s, INPUT_KEY_X, true), INPUT_KEY_X, "A held isn't Y");
 }
+
 
 ZTEST_SUITE(meter_keys, NULL, NULL, NULL, NULL, NULL);
 
@@ -1282,6 +1976,7 @@ ZTEST(meter_wifi_irq, test_classify)
 	zassert_equal(wifi_irq_classify(one, ARRAY_SIZE(one)), WIFI_IRQ_HELD);
 }
 
+
 /**
  * @brief No samples, or none to read, count as idle rather than reading
  *        through NULL.
@@ -1296,6 +1991,7 @@ ZTEST(meter_wifi_irq, test_classify_empty)
 	zassert_equal(wifi_irq_classify(NULL, 3), WIFI_IRQ_IDLE);
 }
 
+
 /**
  * @brief Every state has a name, and a value that isn't one says so.
  *
@@ -1308,5 +2004,6 @@ ZTEST(meter_wifi_irq, test_names)
 	zassert_str_equal(wifi_irq_state_name(WIFI_IRQ_HELD), "held asserted");
 	zassert_str_equal(wifi_irq_state_name(WIFI_IRQ_STATE_COUNT), "unknown");
 }
+
 
 ZTEST_SUITE(meter_wifi_irq, NULL, NULL, NULL, NULL, NULL);

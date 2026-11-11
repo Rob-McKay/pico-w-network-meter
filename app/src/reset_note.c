@@ -42,6 +42,7 @@ static uint32_t seconds(int64_t uptime_ms)
 	return (uint32_t)CLAMP(uptime_ms / MSEC_PER_SEC, 0, (int64_t)UINT32_MAX);
 }
 
+
 /**
  * @brief Rewrite the note.
  *
@@ -64,6 +65,7 @@ static void write_note(enum boot_cause cause, int32_t detail, uint32_t arg, int6
 	irq_unlock(key);
 }
 
+
 /*
  * Public interface: documented in reset_note.h.
  */
@@ -72,6 +74,7 @@ void reset_note_take(struct boot_note *out)
 	*out = note;
 	write_note(BOOT_NONE, 0, 0, 0);
 }
+
 
 /*
  * Public interface: documented in reset_note.h.
@@ -90,6 +93,7 @@ void reset_note_alive(int64_t uptime_ms)
 	irq_unlock(key);
 }
 
+
 /*
  * Public interface: documented in reset_note.h.
  */
@@ -103,6 +107,7 @@ FUNC_NORETURN void reset_note_restart(enum boot_cause cause, int32_t detail, uin
 	sys_reboot(SYS_REBOOT_COLD);
 }
 
+
 /**
  * @brief Restart after a fatal error, noting it, instead of halting
  *        (replaces Zephyr's handler).
@@ -112,8 +117,9 @@ FUNC_NORETURN void reset_note_restart(enum boot_cause cause, int32_t detail, uin
  * @param reason The error (K_ERR_*).
  * @param esf The exception's saved registers, or NULL.
  *
- * @sideeffects Those of reset_note_restart(): notes the crash with the program counter, flushes
- *              the log, restarts; does not return. errno unchanged.
+ * @sideeffects Those of reset_note_restart(): notes the crash with the program counter (on
+ *              Cortex-M and 32-bit RISC-V; 0 elsewhere), flushes the log, restarts; does not
+ *              return. errno unchanged.
  */
 void k_sys_fatal_error_handler(unsigned int reason, const struct arch_esf *esf)
 {
@@ -122,6 +128,12 @@ void k_sys_fatal_error_handler(unsigned int reason, const struct arch_esf *esf)
 #ifdef CONFIG_CPU_CORTEX_M
 	if (esf != NULL) {
 		pc = esf->basic.pc;
+	}
+#elif defined(CONFIG_RISCV) && !defined(CONFIG_64BIT)
+	/* RV32: mepc, an unsigned long, is 32 bits, so it fits. */
+	BUILD_ASSERT(sizeof(esf->mepc) == sizeof(pc), "mepc is 32 bits on RV32");
+	if (esf != NULL) {
+		pc = (uint32_t)esf->mepc;
 	}
 #else
 	ARG_UNUSED(esf);

@@ -1,9 +1,20 @@
-# Pico W network meter
+# Wi-Fi network meter
 
-A [Zephyr RTOS](https://zephyrproject.org) firmware for a **Raspberry Pi Pico W**
-with a **Pimoroni Pico Display Pack 2.0** that works as a 2.4 GHz Wi-Fi
-channel meter. Every 10 seconds it scans for the Wi-Fi networks it can hear
-and shows:
+A [Zephyr RTOS](https://zephyrproject.org) firmware that works as a
+Wi-Fi channel meter, for two targets: 2.4 GHz on both, and 5 GHz as well
+on the XIAO ESP32-C5.
+
+| Target | Hardware | Build | Guide |
+|---|---|---|---|
+| **Pico W** | Raspberry Pi Pico W with a Pimoroni Pico Display Pack 2.0 | `make pico` | [docs/targets/pico.md](docs/targets/pico.md) |
+| **XIAO ESP32-C5** | Seeed XIAO ESP32-C5 with a 2.2" ILI9341 TFT, four buttons and an RGB LED (first runs on a breadboard) | `make xiao` | [docs/targets/xiao-esp32c5.md](docs/targets/xiao-esp32c5.md) |
+
+Each target's guide has its hardware and pins, flashing, the serial
+console, the battery, and its known issues. The screens, buttons and LED
+are the same on both.
+
+Every 10 seconds the meter scans for the Wi-Fi networks it can hear and
+shows:
 
 - **Channels**: for each 2.4 GHz channel (1-13), a bright bar for the
   strongest network on the channel (*signal*) inside a dim bar for every
@@ -50,20 +61,18 @@ driver that has stopped working (see below).
 **Usage guide:** [docs/USAGE.md](docs/USAGE.md), and a printable one-page
 [quick reference](docs/quick-reference.pdf) (from
 `docs/quick-reference.html`).
-**Serial console** on the Pico's own USB socket (a USB serial port:
+**Serial console** on the board's USB socket (a USB serial port:
 `/dev/cu.usbmodem<N>` on a Mac, `/dev/ttyACM<N>` on Linux): each scan's
 per-channel figures as log lines. Open it with, for example,
-`screen /dev/cu.usbmodem1101 115200` (any baud rate works; quit with Ctrl-A
-then K). `make pico BUILD_ARGS=-DCONFIG_METER_LOG_LEVEL_DBG=y` also logs
-every network each scan hears.
-`make pico BUILD_ARGS=-DCONFIG_METER_DEBUG_WIFI_IRQ=y` logs, whenever a scan
-fails, the Wi-Fi chip's interrupt line (GPIO 24) and the Wi-Fi library's
-state (its credits, queue, bus and thread), then wakes the library's thread
-to read from the chip and logs it again
-(`app/src/target/pico/wifi_debug.c`; for finding why scans stop working
-after a few hours). Adding `-DCONFIG_METER_DEBUG_WIFI_BUS_AWAKE=y` also keeps the
-chip's bus up, so the chip stays out of its save/restore deep sleep, to test
-whether that sleep is what stops it answering; it uses more power.
+`screen /dev/cu.usbmodem1101 115200` (quit with Ctrl-A then K).
+`make pico BUILD_ARGS=-DCONFIG_METER_LOG_LEVEL_DBG=y` (or `make xiao ...`)
+also logs every network each scan hears.
+`make pico BUILD_ARGS=-DCONFIG_METER_DEBUG_WIFI_IRQ=y` (on the
+`debug-wifi-whd` branch) logs, whenever a scan fails, the Wi-Fi chip's
+interrupt line (GPIO 24) and the Wi-Fi library's state (its credits,
+queue, bus and thread), then wakes the library's thread to read from the
+chip and logs it again (`app/src/target/pico/wifi_debug.c`; for finding why
+scans stop working).
 
 Scans are **passive** by default: the radio listens on each channel long
 enough to hear every network's beacons, instead of sending probe requests
@@ -75,24 +84,22 @@ off broadband noise across the 2.4 GHz band. Next to a hub, the meter
 heard only a network at −41 dBm. On a 1 m cable, away from the hub, it
 heard every network down to −92 dBm. If only strong networks show up,
 move the meter away from USB 3 equipment, or power it from a USB charger.
-The Display Pack also sits over the Pico W's antenna (the end opposite the
-USB socket), which costs a little range.
 
-**It restarts itself if the Wi-Fi driver gives up.** After about 12 hours
-of scans, the AIROC Wi-Fi driver ran out of packet buffers for good (the
-console showed `failed to allocate a packet buffer for IOVAR` and
-`Failed to start scan` every 2 seconds). They leak somewhere in the
-driver or its WHD library, and only a restart gets them back. So after 5
-failed scans in a row (`CONFIG_METER_RECOVER_AFTER`), the meter restarts,
-which takes a few seconds.
+**It restarts itself if the Wi-Fi driver gives up.** After 5 failed scans
+in a row (`CONFIG_METER_RECOVER_AFTER`), the meter restarts, which takes a
+few seconds. On the Pico W this recovers the Wi-Fi chip if it fails to
+wake from its deep sleep, which it did every few hours; the meter now keeps
+it out of that sleep (`CONFIG_METER_WIFI_KEEP_AWAKE`), so the restart is a
+safety net
+([docs/targets/pico.md](docs/targets/pico.md#known-issues-and-limits)).
 
-**It logs every start in flash.** The last 64 KB of flash
-(`storage_partition`, in `app/boards/rpi_pico_rp2040_w.overlay`) hold a
-log of starts, in Zephyr's flash circular buffer: one 20-byte record a
-start, the oldest 4 KB erased when it fills, so it holds hundreds of starts
-and wears the flash very slowly. A UF2 update writes only the firmware's
-own blocks, so the log survives it. Why each start happened comes from a
-note in RAM that start-up doesn't clear (`app/src/reset_note.c`):
+**It logs every start in flash.** A 64 KB partition at the end of the
+flash (`storage_partition`, in each board's overlay) holds a log of
+starts, in Zephyr's flash circular buffer: one 20-byte record a start, the
+oldest 4 KB erased when it fills, so it holds hundreds of starts and wears
+the flash very slowly. Flashing new firmware leaves it alone, so the log
+survives updates. Why each start happened comes from a note in RAM that
+start-up doesn't clear (`app/src/reset_note.c`):
 
 - Every restart the meter makes writes why in the note first: a Wi-Fi
   restart, a fatal error (Zephyr's fatal error handler is replaced, so a
@@ -101,8 +108,8 @@ note in RAM that start-up doesn't clear (`app/src/reset_note.c`):
 - A power cut loses RAM, so a start with no valid note is a power-on.
 - A valid note with no reason means something restarted the meter without
   warning: the reset button, a debugger, or the hardware watchdog. The
-  RP2040 can't tell these apart: its reset register keeps the last
-  power-on until the next one.
+  Pico W can't tell these apart; the XIAO ESP32-C5 records the chip's own
+  reset cause and names it ("HW watchdog", "brown-out", ...).
 
 The note also keeps how long the run has lasted, updated twice a second,
 so the log says how long each run lasted before its restart. The events
@@ -126,38 +133,23 @@ the unit tests. The one exception is the XIAO ESP32-C5 firmware, built with
 the Zephyr SDK's GCC because Espressif's SoC support doesn't build with
 clang.
 
-**A second target, the Seeed XIAO ESP32-C5**, with a 2.2" ILI9341 TFT,
-four buttons and an RGB LED, builds with `make xiao`. It has **not been run
-on hardware yet**. Its scans cover both bands, but until the 5 GHz work it
-shows 2.4 GHz only, like the Pico, and counts 5 GHz networks as "other".
-[docs/port-esp32c5.md](docs/port-esp32c5.md) has the wiring, the plan and
-the bring-up checks.
+**5 GHz on the XIAO.** A Channels 5 GHz screen follows the 2.4 GHz one:
+the channels in the 80 MHz blocks routers use (36-48 to 149-161), each
+network counted on the channels of its own width (20, 40, 80 or
+160 MHz), and the quietest block recommended ("Use 52-64: clear").
+A Networks 5 GHz list follows it, and the LED shows the band of the
+screen last viewed. The 2.4 GHz screens are the same on both targets.
+
+| Channels 5 GHz | Networks 5 GHz |
+|---|---|
+| ![5 GHz channels screen](docs/screens/channels-5g.png) | ![5 GHz networks screen](docs/screens/networks-5g.png) |
 
 ## Hardware
 
-- Raspberry Pi Pico W (RP2040 + Infineon CYW43439 Wi-Fi). The CYW43439 is a
-  2.4 GHz-only chip, so the meter covers the 2.4 GHz band.
-- [Pimoroni Pico Display Pack 2.0](https://shop.pimoroni.com/products/pico-display-pack-2-0)
-  plugged onto the Pico's headers: 320x240 IPS panel (ST7789V), four
-  buttons and an RGB LED.
-
-| Display Pack function | Pico W GPIO |
-|---|---|
-| LCD CS / SCLK / MOSI (SPI0) | 17 / 18 / 19 |
-| LCD DC | 16 |
-| Backlight | 20 |
-| Buttons A / B / X / Y | 12 / 13 / 14 / 15 |
-| LED red / green / blue | 6 / 7 / 8 |
-
-None of these clash with the CYW43439's pins (23, 24, 25, 29). The
-devicetree overlay is `app/boards/rpi_pico_rp2040_w.overlay`. If the picture is
-upside down on your unit, change the panel's `mdac` there from `0x60` to `0xa0`.
-
-**Battery and case:** [hardware/](hardware/README.md) has a 3D-printable
-case, generated by a Python script, with a Pimoroni LiPo Amigo Pro charger
-and a 350 mAh LiPo behind the Pico. It also has the
-[wiring diagram](hardware/wiring.svg) and the
-[bill of materials](hardware/BOM.md).
+[hardware/](hardware/README.md) has a folder per target: for the Pico W a
+3D-printable battery case with its wiring and parts, and for the XIAO
+ESP32-C5 the wiring, power notes and parts. The pins are in each target's
+guide.
 
 ## Build
 
@@ -175,19 +167,12 @@ make test       # checks, unit tests, and both firmware builds
 
 **Wi-Fi country.** The regulatory domain decides which channels the chip
 scans: channels 12 and 13 are allowed in the UK and Europe but not in
-the US. The default is the UK. To change it, pass a country name from
-Infineon's WHD (`whd_country_code_t` in `whd_types.h`) without its
-`WHD_COUNTRY_` prefix:
+the US. The default is the UK. `WIFI_COUNTRY` changes it, in each
+driver's own form:
 
 ```sh
-make pico WIFI_COUNTRY=UNITED_STATES
-```
-
-For the XIAO it is an ISO 3166 code instead (default `GB`; `00` is the
-world-safe set):
-
-```sh
-make xiao WIFI_COUNTRY=US
+make pico WIFI_COUNTRY=UNITED_STATES   # a WHD country name
+make xiao WIFI_COUNTRY=US              # an ISO 3166 code
 ```
 
 Other settings can be passed to CMake from `scripts/build.sh`, for example
@@ -201,26 +186,13 @@ extra flags to `docker build`, such as `--network host` or
 
 ## Flash
 
-1. Hold the Pico W's **BOOTSEL** button while plugging it into USB. It
-   appears as a drive called `RPI-RP2`.
-2. Copy `out/pico/network-meter.uf2` to that drive. The Pico restarts into
-   the meter.
+- **Pico W**: hold BOOTSEL while plugging it in, and copy
+  `out/pico/network-meter.uf2` to the `RPI-RP2` drive.
+- **XIAO ESP32-C5**: from the host,
+  `esptool --chip esp32c5 write-flash 0x2000 out/xiao/network-meter.bin`,
+  or `out/xiao/network-meter-merged.bin` at 0 with a browser flasher.
 
-For SWD (a Raspberry Pi Debug Probe), `out/pico/network-meter.elf` works with
-OpenOCD or probe-rs. `west flash` also works from a host with a west workspace.
-
-**XIAO ESP32-C5**: plug it in by USB-C and, from the host (Docker on a Mac
-can't reach USB), run
-
-```sh
-esptool --chip esp32c5 write-flash 0x2000 out/xiao/network-meter.bin
-```
-
-or flash `out/xiao/network-meter-merged.bin` at offset 0 with a browser
-flasher. If esptool can't connect, hold BOOT while plugging the board in.
-The console is the board's USB serial port (USB Serial/JTAG). Flashing
-leaves the event log, at the end of the flash, alone; `esptool
-erase-flash` wipes it.
+Details, debugging and the console in each target's guide.
 
 ## How the figures are worked out
 
@@ -229,14 +201,21 @@ erase-flash` wipes it.
 - Each scan's results are kept once per BSSID (access point), at the
   strongest signal reported. Networks the driver reports without a
   2.4 GHz channel are counted as "other". Hidden networks are counted
-  like any other: a carried Zephyr patch (`zephyr/patches.yml`) makes the
-  CYW43439 driver report their channel, signal and BSSID.
+  like any other: carried Zephyr patches (`zephyr/patches.yml`) make both
+  Wi-Fi drivers report their channel, signal and BSSID.
 - 2.4 GHz channels are 5 MHz apart but 20 MHz wide. A network on channel
   *n* overlaps channel *n*±1 by 15 MHz, *n*±2 by 10 MHz and *n*±3 by 5 MHz.
   Channel 14 is 12 MHz above 13. A channel's **interference** is the sum of
   every network's signal power (in mW, not dBm), each scaled by its
   overlap ÷ 20 MHz, converted back to dBm. All of this is integer
   arithmetic, accurate to 1 dB.
+- A network's overlap is worked out from its whole width where the driver
+  reports it (the XIAO's does): a 40 MHz network on 2.4 GHz covers its
+  primary channel and the one 4 above or below in full, and spills over
+  beyond both. A 5 GHz network covers the channels of its width (20, 40,
+  80 or 160 MHz) in full and no others. Without a width, a 2.4 GHz
+  network is taken to be 20 MHz wide, and a 5 GHz one to use its whole
+  80 MHz block, as nearly every home router does.
 - Levels: below −85 dBm is **clear** (green), −85 to −71 dBm **moderate**
   (amber), −70 dBm and above **busy** (red).
 - The **recommended channel** is the one of 1, 6 and 11 with the least
@@ -248,7 +227,9 @@ erase-flash` wipes it.
 
 | Path | What |
 |---|---|
-| `hardware/` | The case (`case/case.py` generates `case/stl/`), wiring diagram and bill of materials |
+| `hardware/pico/` | The Pico W's case (`case/case.py` generates `case/stl/`), wiring diagram and bill of materials |
+| `hardware/xiao-esp32c5/` | The XIAO ESP32-C5's wiring, power notes and bill of materials; Seeed's board documents in `vendor/` |
+| `docs/targets/` | Each target's guide: hardware, pins, flashing, console, battery, known issues |
 | `app/src/main.c` | Redraw loop, buttons, LED |
 | `app/src/scan_task.c` | Scan thread: scans on a schedule into the history; console report |
 | `app/src/scanner.c` | Wi-Fi scans through Zephyr's `net_mgmt` Wi-Fi API |
@@ -270,6 +251,7 @@ erase-flash` wipes it.
 | `app/boards/rpi_pico_rp2040_w.overlay`, `.conf` | The Pico W's own parts, which Zephyr adds by board name: the Display Pack 2.0 devicetree, the console on the USB port, the CYW43439's country |
 | `app/boards/xiao_esp32c5_esp32c5_hpcore.overlay`, `.conf` | The XIAO ESP32-C5's own parts: the TFT, buttons and RGB LED devicetree, a 64 KB event log partition, flash size, Wi-Fi country, scan dwell time, reset cause |
 | `app/src/target/pico/usb_console.c` | Flow control for the console on the Pico's USB port, while a terminal has it open (`CONFIG_METER_USB_CONSOLE_FLOW`) |
+| `app/src/target/pico/wifi_awake.c` | Keeps the Pico W's Wi-Fi chip out of its deep sleep, which it sometimes failed to wake from (`CONFIG_METER_WIFI_KEEP_AWAKE`; needs the carried hal_infineon patch) |
 | `tests/meter_units` | Unit tests: channel statistics, network history and fading, text rendering (native_sim, AddressSanitizer) |
 | `tests/ui_render` | The screens drawn on a fake 320x240 panel: pixel checks and screenshots |
 | `cmake/toolchain.cmake` | Compiler choice: ATfE for the Pico, host clang for native_sim, the Zephyr SDK's GCC for the XIAO ESP32-C5 |
@@ -298,17 +280,19 @@ hidden network's channel, signal and BSSID, not just a named network's.
 hidden networks and passes the scan's dwell times and bands on to
 Espressif's library, which it otherwise ignores.
 
+`wifi-scan-result-width.patch` (XIAO ESP32-C5): Zephyr's scan result gains
+each network's channel width and centre channel, which the ESP32 driver
+fills in from Espressif's scan record. The meter counts each network on
+the channels of its width; where a driver doesn't give it (the Pico W's),
+a 2.4 GHz network is taken to be 20 MHz wide and a 5 GHz one to use its
+80 MHz block.
+
 ## Status
 
-The firmware and the tests build and pass in the Docker image. The UI is
-checked by `tests/ui_render`. It has **not yet been run on a real Pico W and
-Display Pack**. Things to check first on hardware:
-
-- Panel orientation and colours (`mdac`, `inversion-off` in the overlay).
-- The 62.5 MHz SPI clock to the panel (`mipi-max-frequency`). Lower it if
-  the picture is garbled.
-- Scan times. The scan timeout is `CONFIG_METER_SCAN_TIMEOUT_S` (default
-  15 s); a scan that runs over it is shown with what it heard.
+The firmware for both targets and the tests build and pass in the Docker
+image, and the UI is checked by `tests/ui_render`. The XIAO ESP32-C5 runs
+on a breadboard: it scans, shows the screens and takes all four buttons.
+Its guide lists what has and hasn't been checked on hardware yet.
 
 ## Licence
 

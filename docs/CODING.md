@@ -7,18 +7,27 @@ repository's own C and Python. `make test` enforces what a tool can check:
 | Rule | Checked by |
 |---|---|
 | 0. No compiler warnings, clean clang-tidy | the build itself (`cmake/strict.cmake`) |
-| 0. Zephyr's coding style | `scripts/check-style.sh`: Zephyr's `.clang-format` and `checkpatch.pl` |
+| 0. Zephyr's coding style | `scripts/check-style.sh`: the repository's `.clang-format` (Zephyr's, plus two blank lines kept), `checkpatch.pl`, and `scripts/check-blank-lines.py` |
 | 1. Doxygen comment on every function: parameters, return values, side effects (errno included) | `scripts/check-docs.py` |
 | 2. Single responsibility | review |
 | 3. No unbounded string functions; buffer overflows trapped | clang-tidy, and `_FORTIFY_SOURCE=2` in the firmware |
 | 4. Zephyr's driver models first | review |
 | 5. Every file includes the headers it uses itself | clang-tidy's `misc-include-cleaner` (sources), `scripts/check-header-includes.py` (headers) |
+| 6. No magic numbers: named constants that say what they mean | clang-tidy's `readability-magic-numbers` |
 
 Pull requests are reviewed against these rules with the checklist in
 [.github/pull_request_template.md](../.github/pull_request_template.md),
 which GitHub fills into every new pull request.
 [CLAUDE.md](../CLAUDE.md) summarises them for Claude Code, which reads it
 in every session on this repository.
+
+**Two targets.** Every change must pass `make test`, which builds the
+firmware for both, and `make pico` and `make xiao` must build with no
+warnings from this repository's code. A pull request says what was tested
+on each target's hardware (a Pico W with a Display Pack, a XIAO ESP32-C5
+with its TFT), or that it wasn't. When behaviour, buttons, LED colours or
+settings change, update the README, `docs/USAGE.md`, the quick reference
+and the guide of every target the change affects (`docs/targets/`).
 
 ## 0. The build checks every file
 
@@ -54,10 +63,19 @@ such a case: their expansion can end in an empty statement, which
 `-Wpedantic` reports.
 
 Formatting is Zephyr's: tabs, 100 columns, kernel brace style, as its
-`.clang-format` lays out. `scripts/check-style.sh --fix` (in `make shell`)
-reformats. Where clang-format would wrap a line that must stay whole, such
-as a `NOLINTNEXTLINE`, fence it with `/* clang-format off */` and
-`/* clang-format on */`.
+`.clang-format` lays out. The repository's `.clang-format` is Zephyr's,
+copied unchanged between two marker lines, plus one addition: up to two
+blank lines are kept, not one. Every function is followed by two blank
+lines, before whatever comes next (an `#else`, `#elif` or `#endif` that
+closes the function's conditional doesn't count, and the end of the file
+needs none). clang-format can't require that, so
+`scripts/check-blank-lines.py` checks it. `scripts/check-style.sh` also
+checks that the copy still matches the pinned Zephyr's, so a Zephyr update
+that changes its `.clang-format` fails the check until the copy is
+refreshed. `scripts/check-style.sh --fix` (in `make shell`) reformats and
+adds missing blank lines. Where clang-format would wrap a line that must
+stay whole, such as a `NOLINTNEXTLINE`, fence it with
+`/* clang-format off */` and `/* clang-format on */`.
 
 ## Concurrency
 
@@ -187,3 +205,30 @@ from a public header instead (`IgnoreHeaders`), and why. Only missing
 includes are reported: an include that looks unused may be in use through
 a devicetree or Kconfig macro the check can't follow, so removing one is
 left to review.
+
+## 6. No magic numbers
+
+A number in the code says what it is through its name. Every number except
+0 to 4 (counting, halving and doubling, as in `2 * PAD`) is a named
+constant, a `#define`, an `enum` or a `const`, whose name gives its
+meaning, with a comment for its units or where it comes from:
+
+- a field's offset in a stored format: `REC_UPTIME`, not `8`
+  (`boot_record.c`)
+- a register's or a pixel's bits: `RGB565_R_SHIFT`, not `11` (`rgb565.h`)
+- a colour: `RGB_HIGHLIGHT`, not `0, 210, 255` (`ui.c`)
+- a buffer's size: `SCAN_TEXT_MAX`, with what it holds
+- a radio fact: `CHAN_SPACING_MHZ`, `CHAN_14_MHZ` (`chan_stats.c`)
+
+Use a constant the platform already names, such as Zephyr's
+`BITS_PER_BYTE` or `MSEC_PER_SEC`, rather than defining another. A
+character literal (`'?'`, `' '`) names itself. Where a number is tied to
+another, write the relationship (`NOTE_AT_CAUSE + 1U`), and check it with
+`BUILD_ASSERT` when it must hold (`REC_ARG + sizeof(uint32_t) ==
+BOOT_RECORD_SIZE`). Settings a user might change are Kconfig options
+(`CONFIG_METER_*`), not constants.
+
+clang-tidy's `readability-magic-numbers` checks it on every build. The
+tests are exempt (`tests/.clang-tidy`): their numbers are the inputs they
+give and the results they expect, and read best as they are.
+

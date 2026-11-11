@@ -54,6 +54,7 @@ static void erase(void *fixture)
 	flash_area_close(fa);
 }
 
+
 #if PARTITION_SECTORS <= CONFIG_METER_EVENT_LOG_MAX_SECTORS
 
 /**
@@ -74,6 +75,7 @@ static void add_start(enum boot_cause cause)
 	zassert_ok(event_log_add(&r));
 }
 
+
 /**
  * @brief An empty partition gives an empty log.
  *
@@ -86,6 +88,7 @@ ZTEST(meter_event_log, test_empty)
 	zassert_equal(event_log_last_boot(), 0);
 	zassert_is_null(event_log_get(0));
 }
+
 
 /**
  * @brief Records survive reopening the log, as across a restart, and come
@@ -108,6 +111,7 @@ ZTEST(meter_event_log, test_reopen)
 	zassert_equal(event_log_get(2)->cause, BOOT_POWER_ON);
 	zassert_is_null(event_log_get(3));
 }
+
 
 /**
  * @brief A full log erases its oldest sector and carries on; the boot
@@ -133,6 +137,7 @@ ZTEST(meter_event_log, test_full)
 	zassert_equal(event_log_get(EVENT_LOG_RECENT - 1U)->boot, starts - EVENT_LOG_RECENT + 1U);
 }
 
+
 /**
  * @brief Flash holding something else is erased and a new log started.
  *
@@ -155,6 +160,7 @@ ZTEST(meter_event_log, test_foreign_flash)
 	zassert_equal(event_log_count(), 1);
 }
 
+
 /**
  * @brief Count the records a dump gives, and check they come oldest first
  *        (event_log_dump() function).
@@ -171,6 +177,7 @@ static void check_order(const struct boot_record *r, void *arg)
 	zassert_true(r->boot > *previous, "oldest first");
 	*previous = r->boot;
 }
+
 
 /**
  * @brief A dump gives every record in flash, oldest first, not just the
@@ -191,6 +198,7 @@ ZTEST(meter_event_log, test_dump)
 	zassert_equal(n, 100, "all of them: more than the %u in RAM", EVENT_LOG_RECENT);
 	zassert_equal(previous, 100, "ends with the newest");
 }
+
 
 ZTEST_SUITE(meter_event_log, NULL, NULL, erase, NULL, NULL);
 
@@ -222,6 +230,7 @@ ZTEST(meter_event_log_too_small, test_left_alone)
 	flash_area_close(fa);
 	zassert_mem_equal(back, marker, sizeof(marker), "not erased");
 }
+
 
 ZTEST_SUITE(meter_event_log_too_small, NULL, NULL, erase, NULL, NULL);
 

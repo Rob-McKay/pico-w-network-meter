@@ -3,6 +3,32 @@
 #
 # Options for the Raspberry Pi Pico W target only.
 
+config METER_WIFI_KEEP_AWAKE
+	bool "Keep the Wi-Fi chip out of its deep sleep"
+	default y
+	depends on WIFI_AIROC
+	help
+	  Between requests the Wi-Fi driver lets the CYW43439 go into its
+	  save/restore deep sleep, and every few hours it fails to wake
+	  properly, so every scan fails until the meter restarts. This
+	  asks the driver to keep the chip's bus up between scans, so the
+	  chip never goes into deep sleep (src/target/pico/wifi_awake.c,
+	  with the carried hal_infineon patch that makes it possible). It
+	  uses more power: turn it off to stretch a battery, and the meter
+	  will restart every few hours instead.
+
+config METER_RESET_CAUSE_RP2040
+	bool "Record whether the hardware watchdog reset the Pico"
+	default y
+	depends on SOC_RP2040
+	select METER_RESET_CAUSE
+	help
+	  Reads the RP2040's watchdog reason register at start-up and keeps
+	  it in the start's record, so a restart the hardware watchdog made
+	  shows as "HW watchdog after ..." rather than "restart after ..."
+	  (src/target/pico/reset_cause_rp2040.c). Zephyr's hwinfo driver
+	  doesn't read that register on the RP2040.
+
 config METER_DEBUG_WIFI_IRQ
 	bool "After a failed scan, log the Wi-Fi library's state"
 	depends on WIFI_AIROC
@@ -12,17 +38,6 @@ config METER_DEBUG_WIFI_IRQ
 	  (GPIO 24) and the WHD library's credits, queue, bus and thread,
 	  then wakes the WHD thread to read from the chip and logs them
 	  again (src/target/pico/wifi_debug.c). Reads WHD internals; for
-	  debug builds only.
-
-config METER_DEBUG_WIFI_BUS_AWAKE
-	bool "Keep the Wi-Fi chip's bus up, out of save/restore deep sleep"
-	depends on METER_DEBUG_WIFI_IRQ
-	help
-	  For testing whether the chip's save/restore deep sleep is what
-	  makes it stop answering: after the first scan that works, asks
-	  the WHD library to keep the chip's bus up for an hour after each
-	  transfer, which scanning keeps starting again, so the chip never
-	  goes into deep sleep. Uses more power. Changes WHD internals; for
 	  debug builds only.
 
 config METER_USB_CONSOLE_FLOW

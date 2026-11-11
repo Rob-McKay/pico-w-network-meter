@@ -31,6 +31,7 @@ enum wifi_irq_state wifi_irq_classify(const bool *asserted, size_t count)
 	return held == count ? WIFI_IRQ_HELD : WIFI_IRQ_BUSY;
 }
 
+
 /*
  * Public interface: documented in wifi_irq_state.h.
  */

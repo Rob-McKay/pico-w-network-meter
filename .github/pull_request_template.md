@@ -6,9 +6,10 @@
 
 <!-- What was run, and on what. Say what was NOT tested (for example, on a real Pico W). -->
 
-- [ ] `make test` passes (docs check, style check, unit and screen tests)
-- [ ] `make pico` builds with no warnings from this repository's code
+- [ ] `make test` passes (docs check, style check, unit and screen tests, both firmware builds)
+- [ ] `make pico` and `make xiao` build with no warnings from this repository's code
 - [ ] Tested on a Pico W with a Display Pack 2.0: <!-- what was checked, or "not tested on hardware" -->
+- [ ] Tested on a XIAO ESP32-C5 with its TFT: <!-- what was checked, or "not tested on hardware" -->
 - [ ] `make image` needed after merging? <!-- yes (Dockerfile, west.yml or zephyr/patches changed) / no -->
 
 ## Review checklist
@@ -38,6 +39,10 @@ not met is explained in a review comment.
 - [ ] Hardware-independent logic stays out of driver/UI code, so it can be unit
       tested on native_sim
 
+### Magic numbers
+- [ ] No number but 0 to 4 in the code: each is a named constant whose name says what it
+      means (clang-tidy's `readability-magic-numbers`)
+
 ### Undefined and implementation-defined behaviour
 - [ ] No signed overflow, shifts by negative or oversized amounts, or shifts of
       negative values; worst-case values checked for arithmetic
@@ -61,7 +66,8 @@ not met is explained in a review comment.
 - [ ] Code that must run on one thread (display, LED) says so
 
 ### Zephyr standards
-- [ ] `scripts/check-style.sh` clean (Zephyr's `.clang-format` and `checkpatch.pl`)
+- [ ] `scripts/check-style.sh` clean (Zephyr's `.clang-format`, `checkpatch.pl`, two
+      blank lines after every function)
 - [ ] Zephyr's driver models and APIs used (devicetree, LED, input, display,
       net_mgmt) rather than direct register access; Kconfig options prefixed
       `METER_`
@@ -74,6 +80,7 @@ not met is explained in a review comment.
 - [ ] Every new or changed source file starts with `Copyright (c) <year> Rob McKay`
       and `SPDX-License-Identifier: Apache-2.0`
 - [ ] Carried Zephyr patches listed in `zephyr/patches.yml` with their reason
-- [ ] README, `docs/USAGE.md` and the quick reference updated if behaviour,
-      buttons, LED colours or settings changed
+- [ ] README, `docs/USAGE.md`, the quick reference and each affected target's
+      guide (`docs/targets/`) updated if behaviour, buttons, LED colours or
+      settings changed
 - [ ] New behaviour has tests; screen changes checked in `tests/ui_render`

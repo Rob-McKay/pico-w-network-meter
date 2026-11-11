@@ -47,6 +47,7 @@ static void on_missed(int channel, void *user_data)
 	reset_note_restart(BOOT_WATCHDOG, (int32_t)*who, 0);
 }
 
+
 /*
  * Public interface: documented in watchdog.h.
  */
@@ -60,6 +61,7 @@ int watchdog_init(void)
 
 	return ret;
 }
+
 
 /*
  * Public interface: documented in watchdog.h.
@@ -79,6 +81,7 @@ int watchdog_add(enum boot_watched who, uint32_t timeout_ms)
 	return ret;
 }
 
+
 /*
  * Public interface: documented in watchdog.h.
  */
@@ -88,6 +91,7 @@ void watchdog_feed(int channel)
 		(void)task_wdt_feed(channel);
 	}
 }
+
 
 /*
  * Public interface: documented in watchdog.h.

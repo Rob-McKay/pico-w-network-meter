@@ -6,21 +6,41 @@
 
 #include <errno.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/crc.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #include "boot_record.h"
 
 /* Version of the flash format, its first byte. */
-#define RECORD_VERSION   1U
+#define RECORD_VERSION 1U
 /* A sealed note's magic number: "MTRN". */
-#define NOTE_MAGIC       0x4d54524eU
+#define NOTE_MAGIC     0x4d54524eU
+/* A record's fields in flash: their byte offsets, little-endian. */
+#define REC_VERSION    0U
+#define REC_CAUSE      1U
+#define REC_HW         2U
+#define REC_SPARE      3U
+#define REC_BOOT       4U
+#define REC_UPTIME     8U
+#define REC_DETAIL     12U
+#define REC_ARG        16U
+BUILD_ASSERT(REC_ARG + sizeof(uint32_t) == BOOT_RECORD_SIZE, "the last field ends the record");
+/* The note's fields covered by its checksum, as they are serialised for it. */
+#define NOTE_AT_MAGIC    0U
+#define NOTE_AT_UPTIME   4U
+#define NOTE_AT_DETAIL   8U
+#define NOTE_AT_ARG      12U
+#define NOTE_AT_CAUSE    16U
 /* Bytes of a note covered by its checksum. */
-#define NOTE_CHECKED     17U
+#define NOTE_CHECKED     (NOTE_AT_CAUSE + 1U)
+/* duration()'s text: at most "49710d06h" (2^32 s), its terminator, room to spare. */
+#define DURATION_MAX     16U
 #define SECONDS_PER_MIN  60U
 #define SECONDS_PER_HOUR 3600U
 #define HOURS_PER_DAY    24U
@@ -45,6 +65,7 @@ static int32_t from_twos_complement(uint32_t v)
 	return -(int32_t)(~v) - 1;
 }
 
+
 /*
  * Public interface: documented in boot_record.h.
  *
@@ -54,34 +75,36 @@ static int32_t from_twos_complement(uint32_t v)
  */
 void boot_record_encode(const struct boot_record *r, uint8_t *out)
 {
-	out[0] = RECORD_VERSION;
-	out[1] = r->cause;
-	out[2] = r->hw_reset;
-	out[3] = 0;
-	sys_put_le32(r->boot, &out[4]);
-	sys_put_le32(r->uptime_s, &out[8]);
-	sys_put_le32((uint32_t)r->detail, &out[12]);
-	sys_put_le32(r->arg, &out[16]);
+	out[REC_VERSION] = RECORD_VERSION;
+	out[REC_CAUSE] = r->cause;
+	out[REC_HW] = r->hw_reset;
+	out[REC_SPARE] = 0;
+	sys_put_le32(r->boot, &out[REC_BOOT]);
+	sys_put_le32(r->uptime_s, &out[REC_UPTIME]);
+	sys_put_le32((uint32_t)r->detail, &out[REC_DETAIL]);
+	sys_put_le32(r->arg, &out[REC_ARG]);
 }
+
 
 /*
  * Public interface: documented in boot_record.h.
  */
 int boot_record_decode(const uint8_t *in, size_t len, struct boot_record *r)
 {
-	if (len != BOOT_RECORD_SIZE || in[0] != RECORD_VERSION || in[1] == BOOT_NONE ||
-	    in[1] >= BOOT_CAUSE_COUNT) {
+	if (len != BOOT_RECORD_SIZE || in[REC_VERSION] != RECORD_VERSION ||
+	    in[REC_CAUSE] == BOOT_NONE || in[REC_CAUSE] >= BOOT_CAUSE_COUNT) {
 		return -EINVAL;
 	}
-	r->cause = in[1];
-	r->hw_reset = in[2] < BOOT_HW_COUNT ? in[2] : (uint8_t)BOOT_HW_UNKNOWN;
-	r->boot = sys_get_le32(&in[4]);
-	r->uptime_s = sys_get_le32(&in[8]);
-	r->detail = from_twos_complement(sys_get_le32(&in[12]));
-	r->arg = sys_get_le32(&in[16]);
+	r->cause = in[REC_CAUSE];
+	r->hw_reset = in[REC_HW] < BOOT_HW_COUNT ? in[REC_HW] : (uint8_t)BOOT_HW_UNKNOWN;
+	r->boot = sys_get_le32(&in[REC_BOOT]);
+	r->uptime_s = sys_get_le32(&in[REC_UPTIME]);
+	r->detail = from_twos_complement(sys_get_le32(&in[REC_DETAIL]));
+	r->arg = sys_get_le32(&in[REC_ARG]);
 
 	return 0;
 }
+
 
 /**
  * @brief Write a length of time briefly: "3d04h", "2h31m" or "5m07s".
@@ -108,6 +131,7 @@ static void duration(uint32_t s, char *buf, size_t size)
 			       s % SECONDS_PER_MIN);
 	}
 }
+
 
 /**
  * @brief Name a hardware reset cause that explains a restart the note can't.
@@ -136,12 +160,13 @@ static const char *hw_reset_name(uint8_t hw_reset)
 	}
 }
 
+
 /*
  * Public interface: documented in boot_record.h.
  */
 void boot_record_describe(const struct boot_record *r, char *buf, size_t size)
 {
-	char ran[16];
+	char ran[DURATION_MAX];
 	unsigned int boot = (unsigned int)r->boot;
 	const char *hw = hw_reset_name(r->hw_reset);
 
@@ -174,6 +199,7 @@ void boot_record_describe(const struct boot_record *r, char *buf, size_t size)
 	}
 }
 
+
 /**
  * @brief Work out a note's checksum.
  *
@@ -189,14 +215,15 @@ static uint32_t note_check(const struct boot_note *n)
 {
 	uint8_t bytes[NOTE_CHECKED];
 
-	sys_put_le32(n->magic, &bytes[0]);
-	sys_put_le32(n->uptime_s, &bytes[4]);
-	sys_put_le32((uint32_t)n->detail, &bytes[8]);
-	sys_put_le32(n->arg, &bytes[12]);
-	bytes[16] = n->cause;
+	sys_put_le32(n->magic, &bytes[NOTE_AT_MAGIC]);
+	sys_put_le32(n->uptime_s, &bytes[NOTE_AT_UPTIME]);
+	sys_put_le32((uint32_t)n->detail, &bytes[NOTE_AT_DETAIL]);
+	sys_put_le32(n->arg, &bytes[NOTE_AT_ARG]);
+	bytes[NOTE_AT_CAUSE] = n->cause;
 
 	return crc32_ieee(bytes, sizeof(bytes));
 }
+
 
 /*
  * Public interface: documented in boot_record.h.
@@ -207,6 +234,7 @@ void boot_note_seal(struct boot_note *n)
 	n->check = note_check(n);
 }
 
+
 /*
  * Public interface: documented in boot_record.h.
  */
@@ -214,6 +242,7 @@ bool boot_note_valid(const struct boot_note *n)
 {
 	return n->magic == NOTE_MAGIC && n->cause < BOOT_CAUSE_COUNT && n->check == note_check(n);
 }
+
 
 /*
  * Public interface: documented in boot_record.h.
