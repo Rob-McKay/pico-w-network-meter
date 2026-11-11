@@ -117,7 +117,7 @@ static enum status led_status(const struct chan_stats *s, const struct scan_task
 		return STATUS_ERROR;
 	}
 	if (band == CHAN_BAND_5G) {
-		chan_stats_channel_5g(s, recommend_5g(s), &best);
+		chan_stats_block_5g(s, recommend_5g(s), &best);
 	} else {
 		chan_stats_channel(s, chan_stats_recommend(s), &best);
 	}

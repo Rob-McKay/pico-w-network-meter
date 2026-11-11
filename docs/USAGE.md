@@ -73,9 +73,10 @@ neighbouring channels into one wider channel. Most home routers use
   and 149-161, labelled by the block's first channel, with a gap between
   blocks.
 - **Bright bar:** the strongest network whose main channel is this one.
-  **Dim bars:** every other network in the block. The meter can't tell how
-  wide a network is, so it counts every 5 GHz network across its whole
-  80 MHz block: a block with one network on it lights up all four columns.
+  **Dim bars:** every other network using the channel. A network counts on
+  each channel of its width: one column at 20 MHz, two at 40 MHz, the
+  whole block at 80 MHz and two blocks at 160 MHz. So an 80 MHz network
+  lights up all four columns of its block.
 - **The number above a bar:** networks on that channel ("+" for 10 or
   more).
 - **Bold labels** are the blocks without DFS (36 and 149). On the others,
@@ -83,8 +84,11 @@ neighbouring channels into one wider channel. Most home routers use
   channel, and may have to move if it hears some.
 - **The highlighted label** is the recommended block, the quietest the
   meter is set to consider (36-48 to 116-128; see
-  [Settings](#settings)). On a tie it prefers fewer networks, then a block
-  without DFS, then the lower block.
+  [Settings](#settings)). A block is judged by every network using any of
+  its channels, as a router using the whole block would share it with all
+  of them: even one 20 MHz network makes it busy if it is strong. On a tie
+  it prefers fewer networks, then a block without DFS, then the lower
+  block.
 - **Footer:** "Use 52-64: clear": the block to set your router's 5 GHz
   channel to (any channel of it, at 80 MHz), and how busy it is.
 

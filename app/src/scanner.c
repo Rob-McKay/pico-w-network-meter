@@ -55,11 +55,40 @@ static K_SEM_DEFINE(scan_done, 0, 1);
 #pragma GCC diagnostic pop
 
 /**
+ * @brief Convert a scan result's channel width to the meter's.
+ *
+ * The width comes from a carried Zephyr patch (wifi-scan-result-width.patch); drivers that
+ * don't fill it in leave 0, which isn't a width.
+ *
+ * @param bandwidth enum wifi_frequency_bandwidths, or 0.
+ * @return enum chan_width: CHAN_WIDTH_UNKNOWN for anything but 20, 40, 80 and 160 MHz.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+static uint8_t to_chan_width(uint8_t bandwidth)
+{
+	switch (bandwidth) {
+	case WIFI_FREQ_BANDWIDTH_20MHZ:
+		return CHAN_WIDTH_20;
+	case WIFI_FREQ_BANDWIDTH_40MHZ:
+		return CHAN_WIDTH_40;
+	case WIFI_FREQ_BANDWIDTH_80MHZ:
+		return CHAN_WIDTH_80;
+	case WIFI_FREQ_BANDWIDTH_160MHZ:
+		return CHAN_WIDTH_160;
+	default:
+		return CHAN_WIDTH_UNKNOWN;
+	}
+}
+
+
+/**
  * @brief Convert a Zephyr scan result to an access point record.
  *
  * 2.4 GHz results, and 5 GHz ones with CONFIG_METER_BAND_5G, keep their
  * band and channel; anything else is left on channel 0, which
- * chan_stats_add() counts as ignored.
+ * chan_stats_add() counts as ignored. The width and centre channel are
+ * kept as the driver gives them: chan_stats checks they make sense.
  *
  * @param r Zephyr's scan result.
  * @param[out] ap The access point.
@@ -81,6 +110,8 @@ static void to_chan_ap(const struct wifi_scan_result *r, struct chan_ap *ap)
 		ap->band = CHAN_BAND_5G;
 		ap->channel = r->channel;
 	}
+	ap->width = to_chan_width(r->bandwidth);
+	ap->centre = r->center_channel;
 	ap->rssi = r->rssi;
 	ap->secured = r->security != WIFI_SECURITY_TYPE_NONE;
 	ap->freshness = CHAN_FRESH;

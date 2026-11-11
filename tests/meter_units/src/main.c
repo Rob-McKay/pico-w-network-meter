@@ -537,6 +537,247 @@ ZTEST(meter_chan, test_channel_5g_ignores_2g4)
 
 
 /**
+ * @brief Add an access point with a reported width, failing the test if it is refused.
+ *
+ * @param[in,out] s Statistics.
+ * @param id See make_ap().
+ * @param band enum chan_band.
+ * @param channel Primary channel.
+ * @param width enum chan_width.
+ * @param centre Centre channel; 0 for none.
+ * @param rssi dBm.
+ *
+ * @sideeffects None (writes only through @p s). errno may be set by snprintf() (only on an
+ *              output error).
+ */
+static void add_ap_wide(struct chan_stats *s, uint8_t id, uint8_t band, uint8_t channel,
+			uint8_t width, uint8_t centre, int8_t rssi)
+{
+	struct chan_ap ap = make_ap(id, channel, rssi);
+
+	ap.band = band;
+	ap.width = width;
+	ap.centre = centre;
+	zassert_ok(chan_stats_add(s, &ap));
+}
+
+
+/**
+ * @brief Make an access point with a reported width.
+ *
+ * @param band enum chan_band.
+ * @param channel Primary channel.
+ * @param width enum chan_width.
+ * @param centre Centre channel; 0 for none.
+ * @return The record.
+ *
+ * @sideeffects None. errno may be set by snprintf() (only on an output error).
+ */
+static struct chan_ap make_wide(uint8_t band, uint8_t channel, uint8_t width, uint8_t centre)
+{
+	struct chan_ap ap = make_ap(1, channel, -50);
+
+	ap.band = band;
+	ap.width = width;
+	ap.centre = centre;
+
+	return ap;
+}
+
+
+/**
+ * @brief A network is counted at its reported width when it fits its primary channel, and
+ *        otherwise at 20 MHz on 2.4 GHz and its 80 MHz block on 5 GHz.
+ *
+ * @sideeffects None. errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_chan, test_width_mhz)
+{
+	static const struct {
+		uint8_t band;
+		uint8_t channel;
+		uint8_t width;
+		uint8_t centre;
+		int mhz;
+		const char *why;
+	} cases[] = {
+		{CHAN_BAND_2G4, 6, CHAN_WIDTH_UNKNOWN, 0, 20, "2.4 GHz, not reported"},
+		{CHAN_BAND_2G4, 6, CHAN_WIDTH_20, 6, 20, "2.4 GHz 20 MHz"},
+		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 3, 40, "2.4 GHz 40 MHz, secondary above"},
+		{CHAN_BAND_2G4, 11, CHAN_WIDTH_40, 9, 40, "2.4 GHz 40 MHz, secondary below"},
+		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 2, 20, "centre one off: not two channels"},
+		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 0, 20, "no centre"},
+		{CHAN_BAND_2G4, 6, CHAN_WIDTH_80, 6, 20, "no 80 MHz on 2.4 GHz"},
+		{CHAN_BAND_2G4, 14, CHAN_WIDTH_20, 14, 20, "channel 14"},
+		{CHAN_BAND_2G4, 12, CHAN_WIDTH_40, 14, 20, "no centre on channel 14"},
+		{CHAN_BAND_2G4, 6, 9, 6, 20, "not a width"},
+		{CHAN_BAND_5G, 40, CHAN_WIDTH_UNKNOWN, 0, 80, "5 GHz, not reported: its block"},
+		{CHAN_BAND_5G, 36, CHAN_WIDTH_20, 36, 20, "5 GHz 20 MHz"},
+		{CHAN_BAND_5G, 36, CHAN_WIDTH_20, 40, 80, "20 MHz off its primary"},
+		{CHAN_BAND_5G, 149, CHAN_WIDTH_40, 151, 40, "5 GHz 40 MHz"},
+		{CHAN_BAND_5G, 40, CHAN_WIDTH_80, 42, 80, "5 GHz 80 MHz"},
+		{CHAN_BAND_5G, 52, CHAN_WIDTH_80, 42, 80, "80 MHz around another block: the block"},
+		{CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, 160, "5 GHz 160 MHz"},
+		{CHAN_BAND_5G, 44, CHAN_WIDTH_160, 50, 160, "160 MHz from 36"},
+		{CHAN_BAND_5G, 100, CHAN_WIDTH_160, 0, 80, "160 MHz without a centre"},
+		{CHAN_BAND_5G, 100, CHAN_WIDTH_80, 104, 80, "centre between channels: the block"},
+	};
+
+	for (size_t i = 0; i < ARRAY_SIZE(cases); i++) {
+		struct chan_ap ap =
+			make_wide(cases[i].band, cases[i].channel, cases[i].width, cases[i].centre);
+
+		zassert_equal(chan_ap_width_mhz(&ap), cases[i].mhz, "%s", cases[i].why);
+	}
+}
+
+
+/**
+ * @brief A 2.4 GHz 40 MHz network counts in full on both its channels and partly on their
+ *        neighbours.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_channel_40_2g4)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	add_ap_wide(&s, 1, CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 3, -50);
+
+	chan_stats_channel(&s, 1, &c);
+	zassert_equal(c.interference, -50, "its primary");
+	zassert_equal(c.ap_count, 1);
+	chan_stats_channel(&s, 5, &c);
+	zassert_equal(c.interference, -50, "its secondary, in full");
+	zassert_equal(c.ap_count, 0, "not its primary");
+	chan_stats_channel(&s, 6, &c);
+	zassert_equal(c.interference, -51, "15 of its 20 MHz");
+	chan_stats_channel(&s, 8, &c);
+	zassert_equal(c.interference, -56, "5 of 20 MHz");
+	chan_stats_channel(&s, 9, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "beyond it");
+	zassert_equal(c.freshness, 0);
+	zassert_equal(chan_stats_recommend(&s), 11);
+}
+
+
+/**
+ * @brief 5 GHz networks count on the channels of their width: 20 MHz on its own, 40 on its
+ *        pair, 160 on two blocks.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_channel_5g_widths)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	add_ap_wide(&s, 1, CHAN_BAND_5G, 36, CHAN_WIDTH_20, 36, -50);
+	add_ap_wide(&s, 2, CHAN_BAND_5G, 149, CHAN_WIDTH_40, 151, -60);
+	add_ap_wide(&s, 3, CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, -70);
+
+	chan_stats_channel_5g(&s, 36, &c);
+	zassert_equal(c.interference, -50);
+	zassert_equal(c.best_rssi, -50);
+	chan_stats_channel_5g(&s, 40, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "20 MHz stays on 36");
+	zassert_equal(c.freshness, 0);
+
+	chan_stats_channel_5g(&s, 153, &c);
+	zassert_equal(c.interference, -60, "40 MHz: its secondary");
+	chan_stats_channel_5g(&s, 157, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "40 MHz: not the rest of the block");
+
+	static const uint8_t wide[] = {100, 104, 108, 112, 116, 120, 124, 128};
+
+	for (size_t i = 0; i < ARRAY_SIZE(wide); i++) {
+		chan_stats_channel_5g(&s, wide[i], &c);
+		zassert_equal(c.interference, -70, "160 MHz on %u", wide[i]);
+		zassert_equal(c.ap_count, wide[i] == 100 ? 1 : 0);
+	}
+	chan_stats_channel_5g(&s, 132, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "160 MHz ends at 128");
+	chan_stats_channel_5g(&s, 64, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE);
+}
+
+
+/**
+ * @brief A block's figures count every network reaching it, once and in full.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_block_5g)
+{
+	static struct chan_stats s;
+	struct chan_info c;
+
+	chan_stats_reset(&s);
+	chan_stats_block_5g(&s, 44, &c);
+	zassert_equal(c.channel, 36, "named by its first channel");
+	zassert_equal(c.interference, CHAN_RSSI_NONE);
+	zassert_equal(c.ap_count, 0);
+
+	add_ap_wide(&s, 1, CHAN_BAND_5G, 36, CHAN_WIDTH_20, 36, -50);
+	add_ap_wide(&s, 2, CHAN_BAND_5G, 48, CHAN_WIDTH_20, 48, -60);
+	add_ap_wide(&s, 3, CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, -70);
+	add_ap_5g(&s, 4, 132, -80);
+	add_ap(&s, 5, 6, -30);
+
+	chan_stats_block_5g(&s, 44, &c);
+	zassert_equal(c.channel, 36);
+	zassert_equal(c.ap_count, 2, "two 20 MHz networks in the block");
+	zassert_equal(c.best_rssi, -50);
+	zassert_equal(c.interference, -50, "-50 and -60 dBm make -49.6");
+	zassert_equal(c.others, -60);
+	zassert_equal(c.freshness, CHAN_FRESH);
+
+	chan_stats_block_5g(&s, 100, &c);
+	zassert_equal(c.interference, -70, "160 MHz: in its first block");
+	zassert_equal(c.ap_count, 1);
+	chan_stats_block_5g(&s, 128, &c);
+	zassert_equal(c.channel, 116);
+	zassert_equal(c.interference, -70, "and in its second");
+	chan_stats_block_5g(&s, 140, &c);
+	zassert_equal(c.interference, -80, "width unknown: its block");
+	chan_stats_block_5g(&s, 52, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "2.4 GHz doesn't count");
+	chan_stats_block_5g(&s, 38, &c);
+	zassert_equal(c.interference, CHAN_RSSI_NONE, "not a channel");
+	zassert_equal(c.ap_count, 0);
+}
+
+
+/**
+ * @brief The recommendation weighs a block by every network reaching it: a 20 MHz network
+ *        makes its whole block busy for an 80 MHz router, and a 160 MHz one both its blocks.
+ *
+ * @sideeffects Overwrites the test's own static statistics. errno may be set by snprintf()
+ *              (only on an output error).
+ */
+ZTEST(meter_chan, test_recommend_5g_widths)
+{
+	static struct chan_stats s;
+	const uint32_t europe = chan_5g_blocks(false, false);
+
+	chan_stats_reset(&s);
+	add_ap_wide(&s, 1, CHAN_BAND_5G, 48, CHAN_WIDTH_20, 48, -50);
+	add_ap_wide(&s, 2, CHAN_BAND_5G, 64, CHAN_WIDTH_20, 64, -85);
+	add_ap_wide(&s, 3, CHAN_BAND_5G, 100, CHAN_WIDTH_160, 114, -80);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 52, "52-64: -85 dBm, the quietest");
+
+	add_ap_wide(&s, 4, CHAN_BAND_5G, 56, CHAN_WIDTH_40, 54, -75);
+	zassert_equal(chan_stats_recommend_5g(&s, europe), 100, "-80 dBm: a tie, the lower");
+}
+
+
+/**
  * @brief The quietest allowed 80 MHz block is recommended; ties go to
  *        fewer networks, then a block without DFS, then the lower block.
  *
@@ -782,6 +1023,12 @@ ZTEST(meter_chan, test_equal)
 	b = a;
 	b.aps[0].band = CHAN_BAND_5G;
 	zassert_false(chan_stats_equal(&a, &b), "band");
+	b = a;
+	b.aps[0].width = CHAN_WIDTH_40;
+	zassert_false(chan_stats_equal(&a, &b), "width");
+	b = a;
+	b.aps[0].centre = 8;
+	zassert_false(chan_stats_equal(&a, &b), "centre");
 }
 
 
