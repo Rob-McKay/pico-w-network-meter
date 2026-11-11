@@ -17,6 +17,18 @@ config METER_WIFI_KEEP_AWAKE
 	  uses more power: turn it off to stretch a battery, and the meter
 	  will restart every few hours instead.
 
+config METER_RESET_CAUSE_RP2040
+	bool "Record whether the hardware watchdog reset the Pico"
+	default y
+	depends on SOC_RP2040
+	select METER_RESET_CAUSE
+	help
+	  Reads the RP2040's watchdog reason register at start-up and keeps
+	  it in the start's record, so a restart the hardware watchdog made
+	  shows as "HW watchdog after ..." rather than "restart after ..."
+	  (src/target/pico/reset_cause_rp2040.c). Zephyr's hwinfo driver
+	  doesn't read that register on the RP2040.
+
 config METER_USB_CONSOLE_FLOW
 	bool "Console flow control that follows DTR"
 	default y

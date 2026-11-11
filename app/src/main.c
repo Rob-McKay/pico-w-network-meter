@@ -409,14 +409,14 @@ static void start_io(void)
  * @brief Record this start in the flash log, with why it happened.
  *
  * Takes the note the run before left (reset_note_take()) first, before
- * anything else can restart the meter. With CONFIG_METER_RESET_CAUSE_HWINFO,
+ * anything else can restart the meter. With CONFIG_METER_RESET_CAUSE,
  * the record also keeps the hardware's reset cause (reset_cause_take()).
  *
  * @retval 0 Recorded, or the log is open but the record couldn't be added.
  * @retval <0 Negative errno from event_log_init(): there is no log.
  *
  * @sideeffects Those of reset_note_take(), reset_cause_take() (with
- *              CONFIG_METER_RESET_CAUSE_HWINFO), event_log_init() and event_log_add(): starts
+ *              CONFIG_METER_RESET_CAUSE), event_log_init() and event_log_add(): starts
  *              this run's note, reads and clears the hardware's reset cause, reads and writes
  *              the flash log. errno unchanged.
  */
@@ -432,7 +432,7 @@ static int record_start(void)
 		return ret;
 	}
 	boot_record_from_note(&note, event_log_last_boot() + 1U, &r);
-	if (IS_ENABLED(CONFIG_METER_RESET_CAUSE_HWINFO)) {
+	if (IS_ENABLED(CONFIG_METER_RESET_CAUSE)) {
 		r.hw_reset = reset_cause_take();
 	}
 	(void)event_log_add(&r);

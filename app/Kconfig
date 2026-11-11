@@ -95,16 +95,26 @@ config METER_WIFI_REG_DOMAIN
 	  Set when METER_WIFI_COUNTRY names a country: builds
 	  src/wifi_country.c.
 
+config METER_RESET_CAUSE
+	bool
+	help
+	  Set when the board has a way to read the hardware's reset cause
+	  (one of the options that select it): each start's record keeps
+	  it, so the events screen can name what the restart note can't
+	  tell apart. Builds src/reset_cause.c.
+
 config METER_RESET_CAUSE_HWINFO
-	bool "Record the hardware's reset cause with each start"
+	bool "Record the hardware's reset cause with each start, through hwinfo"
 	select HWINFO
+	select METER_RESET_CAUSE
 	help
 	  Reads the reset cause from the hardware (hwinfo_get_reset_cause())
 	  and keeps it in each start's record, so the events screen can
 	  name what the restart note can't tell apart: the reset button, a
 	  hardware watchdog, a brown-out, a CPU fault. Only for boards whose
 	  hwinfo driver reports it reliably: the RP2040's keeps the last
-	  power-on until the next one, so the Pico W leaves this off.
+	  power-on until the next one, so the Pico W reads its watchdog
+	  instead (METER_RESET_CAUSE_RP2040).
 
 config METER_RETRY_S
 	int "Seconds before retrying a scan that heard nothing"

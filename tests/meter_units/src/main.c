@@ -605,8 +605,7 @@ ZTEST(meter_chan, test_width_mhz)
 		{CHAN_BAND_2G4, 6, CHAN_WIDTH_20, 6, 20, "2.4 GHz 20 MHz"},
 		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 3, 40, "2.4 GHz 40 MHz, secondary above"},
 		{CHAN_BAND_2G4, 11, CHAN_WIDTH_40, 9, 40, "2.4 GHz 40 MHz, secondary below"},
-		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 2, 20,
-		 "centre one channel off: not two channels"},
+		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 2, 20, "centre one off: not two channels"},
 		{CHAN_BAND_2G4, 1, CHAN_WIDTH_40, 0, 20, "no centre"},
 		{CHAN_BAND_2G4, 6, CHAN_WIDTH_80, 6, 20, "no 80 MHz on 2.4 GHz"},
 		{CHAN_BAND_2G4, 14, CHAN_WIDTH_20, 14, 20, "channel 14"},
@@ -1865,6 +1864,46 @@ ZTEST(meter_reset_cause, test_from_flags)
 		      "a brown-out also shows as a power-on");
 	zassert_equal(reset_cause_from_flags(RESET_PIN | RESET_WATCHDOG), BOOT_HW_WATCHDOG);
 	zassert_equal(reset_cause_from_flags(RESET_POR | RESET_PIN), BOOT_HW_PIN);
+}
+
+
+/**
+ * @brief The RP2040's watchdog reason: the timer is the hardware watchdog,
+ *        a forced reset is software, neither is a reset it can't name; the
+ *        timer wins if both are set.
+ *
+ * @sideeffects None; errno unchanged.
+ */
+ZTEST(meter_reset_cause, test_from_watchdog)
+{
+	zassert_equal(reset_cause_from_watchdog(false, false), BOOT_HW_UNKNOWN);
+	zassert_equal(reset_cause_from_watchdog(true, false), BOOT_HW_WATCHDOG);
+	zassert_equal(reset_cause_from_watchdog(false, true), BOOT_HW_SOFTWARE);
+	zassert_equal(reset_cause_from_watchdog(true, true), BOOT_HW_WATCHDOG);
+}
+
+
+/**
+ * @brief An unexplained restart the hardware watchdog made is named for it
+ *        on the events screen.
+ *
+ * @sideeffects None; errno may be set by snprintf() (only on an output error).
+ */
+ZTEST(meter_reset_cause, test_describe_watchdog)
+{
+	struct boot_record r = {
+		.boot = 44,
+		.uptime_s = 378379,
+		.cause = BOOT_UNEXPLAINED,
+		.hw_reset = reset_cause_from_watchdog(true, false),
+	};
+	char text[48];
+
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#44 HW watchdog after 4d09h");
+	r.hw_reset = reset_cause_from_watchdog(false, false);
+	boot_record_describe(&r, text, sizeof(text));
+	zassert_str_equal(text, "#44 restart after 4d09h");
 }
 
 
